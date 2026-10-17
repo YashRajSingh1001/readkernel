@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+/* ReadKernel palette: warm paper, dark ink, one ember accent. */
+:root {
+  --paper: #fbfaf6;
+  --card: #ffffff;
+  --ink: #1b1a17;
+  --muted: #6b6860;
+  --line: #e7e4dc;
+  --accent: #c2410c;
+  --accent-soft: #fdeee6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #12110f;
+    --card: #1b1a17;
+    --ink: #edebe4;
+    --muted: #9a968c;
+    --line: #2c2a26;
+    --accent: #fb7a3c;
+    --accent-soft: #2e1a10;
+  }
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-newsreader);
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+::selection {
+  background: var(--accent-soft);
+}
