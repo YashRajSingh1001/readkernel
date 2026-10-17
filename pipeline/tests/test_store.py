@@ -1,0 +1,65 @@
+import json
+
+import httpx
+
+from kernel.store import Supabase, SupabaseCache, save_files, save_supabase
+
+OUTPUT = {
+    "date": "2026-10-18",
+    "generated_at": "2026-10-18T03:00:00+00:00",
+    "ai": None,
+    "stats": {"stories": 2},
+    "stories": [
+        {
+            "headline": "First", "summary": "S", "why_it_matters": "", "topic": "ai",
+            "score": 5.0, "importance": None, "published": "2026-10-18T01:00:00+00:00",
+            "sources": [{"name": "A", "title": "First", "url": "https://a", "published": "x"}],
+        },
+        {
+            "headline": "Second", "summary": "S", "why_it_matters": "", "topic": "dev",
+            "score": 4.0, "importance": 3, "published": "2026-10-18T00:00:00+00:00", "sources": [],
+        },
+    ],
+}
+
+
+def fake_db(handler) -> tuple[Supabase, list[httpx.Request]]:
+    seen: list[httpx.Request] = []
+
+    def record(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return handler(request)
+
+    db = Supabase("https://proj.supabase.co", "sb_secret_test")
+    db.client = httpx.Client(transport=httpx.MockTransport(record), headers=db.client.headers)
+    return db, seen
+
+
+def test_save_supabase_replaces_the_days_stories():
+    db, seen = fake_db(lambda r: httpx.Response(201))
+    save_supabase(OUTPUT, db)
+    calls = [(r.method, r.url.path, r.url.params.get("edition_date")) for r in seen]
+    assert calls == [
+        ("POST", "/rest/v1/editions", None),
+        ("DELETE", "/rest/v1/stories", "eq.2026-10-18"),
+        ("POST", "/rest/v1/stories", None),
+    ]
+    stories = json.loads(seen[2].content)
+    assert [s["position"] for s in stories] == [1, 2]
+    assert seen[0].headers["apikey"] == "sb_secret_test"
+    assert "authorization" not in seen[0].headers  # new-style keys go in apikey only
+
+
+def test_supabase_cache_round_trip_and_tolerates_errors():
+    db, _ = fake_db(lambda r: httpx.Response(200, json=[{"body": {"headline": "H"}}]))
+    assert SupabaseCache(db).get("k") == {"headline": "H"}
+
+    broken, _ = fake_db(lambda r: httpx.Response(500))
+    assert SupabaseCache(broken).get("k") is None
+    SupabaseCache(broken).put("k", {})  # logs, does not raise
+
+
+def test_save_files_writes_dated_and_latest(tmp_path):
+    latest = save_files(OUTPUT, tmp_path)
+    assert latest.name == "latest.json"
+    assert (tmp_path / "brief-2026-10-18.json").exists()

@@ -1,0 +1,68 @@
+# ReadKernel news sources.
+#
+# Each source:
+#   name     shown on story cards
+#   url      RSS or Atom feed
+#   topic    ai | tech | dev | startups | security | markets | design
+#   weight   how much we trust it in ranking (1.0 = normal)
+#   exclude  extra title words that should drop an article (optional)
+#
+# Words listed under global_exclude drop an article from any source.
+
+global_exclude:
+  - deal
+  - deals
+  - discount
+  - coupon
+  - giveaway
+  - sponsored
+  - promo code
+  - how to watch
+  - black friday
+  - prime day
+  - horoscope
+
+sources:
+  # --- AI -------------------------------------------------------------------
+  - { name: OpenAI News, url: "https://openai.com/news/rss.xml", topic: ai, weight: 1.4 }
+  - { name: Google DeepMind, url: "https://deepmind.google/blog/rss.xml", topic: ai, weight: 1.3 }
+  - { name: Google AI Blog, url: "https://blog.google/technology/ai/rss/", topic: ai, weight: 1.2 }
+  - { name: Hugging Face, url: "https://huggingface.co/blog/feed.xml", topic: ai, weight: 1.1 }
+  - { name: NVIDIA Blog, url: "https://blogs.nvidia.com/feed/", topic: ai, weight: 1.0 }
+  - { name: MIT Technology Review, url: "https://www.technologyreview.com/feed/", topic: ai, weight: 1.3 }
+  - { name: VentureBeat AI, url: "https://venturebeat.com/category/ai/feed/", topic: ai, weight: 1.0 }
+  - { name: Simon Willison, url: "https://simonwillison.net/atom/everything/", topic: ai, weight: 1.1 }
+
+  # --- Tech -----------------------------------------------------------------
+  - { name: The Verge, url: "https://www.theverge.com/rss/index.xml", topic: tech, weight: 1.2, exclude: [review, best] }
+  - { name: TechCrunch, url: "https://techcrunch.com/feed/", topic: tech, weight: 1.2 }
+  - { name: Ars Technica, url: "https://feeds.arstechnica.com/arstechnica/index", topic: tech, weight: 1.2 }
+  - { name: Wired, url: "https://www.wired.com/feed/rss", topic: tech, weight: 1.1, exclude: [review, best] }
+  - { name: Engadget, url: "https://www.engadget.com/rss.xml", topic: tech, weight: 1.0, exclude: [review, best] }
+  - { name: The Register, url: "https://www.theregister.com/headlines.atom", topic: tech, weight: 1.0 }
+  - { name: 9to5Mac, url: "https://9to5mac.com/feed/", topic: tech, weight: 0.9 }
+  - { name: 9to5Google, url: "https://9to5google.com/feed/", topic: tech, weight: 0.9 }
+
+  # --- Developers -----------------------------------------------------------
+  - { name: Hacker News, url: "https://hnrss.org/frontpage?points=200", topic: dev, weight: 1.1 }
+  - { name: GitHub Blog, url: "https://github.blog/feed/", topic: dev, weight: 1.1 }
+  - { name: Cloudflare Blog, url: "https://blog.cloudflare.com/rss/", topic: dev, weight: 1.0 }
+  - { name: The New Stack, url: "https://thenewstack.io/feed/", topic: dev, weight: 0.9 }
+  - { name: InfoQ, url: "https://feed.infoq.com/", topic: dev, weight: 0.9 }
+
+  # --- Startups and funding -------------------------------------------------
+  - { name: Crunchbase News, url: "https://news.crunchbase.com/feed/", topic: startups, weight: 1.1 }
+  - { name: TechCrunch Startups, url: "https://techcrunch.com/category/startups/feed/", topic: startups, weight: 1.0 }
+  - { name: Inc42, url: "https://inc42.com/feed/", topic: startups, weight: 1.0 }
+  - { name: YourStory, url: "https://yourstory.com/feed", topic: startups, weight: 0.9 }
+
+  # --- Security -------------------------------------------------------------
+  - { name: Krebs on Security, url: "https://krebsonsecurity.com/feed/", topic: security, weight: 1.2 }
+  - { name: BleepingComputer, url: "https://www.bleepingcomputer.com/feed/", topic: security, weight: 1.1 }
+  - { name: The Hacker News, url: "https://feeds.feedburner.com/TheHackersNews", topic: security, weight: 1.0 }
+
+  # --- Markets --------------------------------------------------------------
+  - { name: CNBC Technology, url: "https://www.cnbc.com/id/19854910/device/rss/rss.html", topic: markets, weight: 1.1 }
+
+  # --- Design ---------------------------------------------------------------
+  - { name: Smashing Magazine, url: "https://www.smashingmagazine.com/feed/", topic: design, weight: 0.9 }
