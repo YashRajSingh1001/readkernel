@@ -12,7 +12,8 @@ with every source linked. It is built to run at zero cost.
 | --- | --- | --- |
 | 1 | News pipeline (fetch, filter, group, rank, summarise) | **working** |
 | 1 | Database + website (feed, topic filter, daily archive) | **working** (Supabase not yet connected) |
-| 1 | Daily email | next |
+| 1 | Daily email (sign-up, confirm, unsubscribe, daily send) | **working** (Gmail SMTP) |
+| 1 | Deploy (Vercel + daily GitHub Actions run) | ready to deploy |
 | 2 | Chrome new-tab extension, MCP server for AI assistants | later |
 
 ## How the pipeline works
@@ -58,7 +59,7 @@ Output goes to `pipeline/data/latest.json` and `pipeline/data/brief-YYYY-MM-DD.j
 ## Database (Supabase)
 
 1. Create a free project at supabase.com.
-2. Open **SQL Editor**, paste `db/migrations/001_init.sql`, and run it.
+2. Open **SQL Editor** and run each file in `db/migrations/` in order (`001_init.sql`, then `002_email.sql`).
 3. From **Project Settings -> API**, copy:
    - the project URL and **secret** key into `.env` (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`), for the pipeline
    - the project URL and **publishable** key into `web/.env.local` (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`), for the website
@@ -82,6 +83,69 @@ npm run dev            # http://localhost:3000
 
 Pages are cached and refresh about once a minute, so a new pipeline run shows
 up on its own.
+
+## Daily email
+
+How it works:
+
+1. A reader enters their email on the home page.
+2. They get a **confirmation email** and must click it (double opt-in), so nobody can sign up someone else.
+3. Each morning `python -m kernel.send` emails the day's brief to everyone confirmed. Each send is logged, so re-running never emails anyone twice.
+4. Every email has an unsubscribe link, plus the one-click unsubscribe button Gmail and Outlook show.
+
+Confirm and unsubscribe links open a page with a button rather than acting
+immediately, because email security scanners open every link.
+
+```bash
+cd pipeline
+.venv/Scripts/python -m kernel.send --to you@example.com   # one test email
+.venv/Scripts/python -m kernel.send --dry-run              # who would get today's brief
+.venv/Scripts/python -m kernel.send                        # send it
+```
+
+Choose how mail goes out with `EMAIL_TRANSPORT` (in both `.env` and `web/.env.local`):
+
+| Value | What happens | Cost |
+| --- | --- | --- |
+| `preview` | Nothing is sent. Pipeline saves `.eml` files to `pipeline/data/outbox/`; the website prints emails to its log | free |
+| `smtp` | Real email through any SMTP server. Gmail with an app password allows ~500/day | free |
+| `resend` | Resend's API. 3,000/month free; needs a domain you own | free |
+
+## Deploy
+
+```
+GitHub Actions (06:00 IST daily) --writes--> Supabase <--reads-- Vercel (website)
+        \--> emails subscribers
+```
+
+### Pipeline: GitHub Actions
+
+`.github/workflows/daily-brief.yml` builds the brief and emails subscribers
+every day at 06:00 India time. It reads its settings from the repo's
+**Actions secrets**. Load them all from your local `.env`, then point
+`SITE_URL` at the live site:
+
+```bash
+gh secret set -f .env
+gh secret set SITE_URL --body "https://YOUR-SITE.vercel.app"
+```
+
+Run it by hand from the **Actions** tab (or `gh workflow run daily-brief.yml`).
+Manual runs build the brief without emailing unless you tick "send_email".
+
+### Website: Vercel
+
+1. vercel.com -> **Add New -> Project** -> import this GitHub repo.
+2. **Root Directory: `web`** (the framework is detected as Next.js).
+3. **Environment Variables**: paste the contents of `web/.env.local`, but set
+   `SITE_URL` to the Vercel address (or your domain).
+4. **Deploy.** Every push to `main` redeploys automatically.
+
+### Custom domain
+
+Vercel project -> **Settings -> Domains** -> add the domain, then copy the
+DNS records Vercel shows into your registrar. Afterwards update `SITE_URL` in
+both Vercel and the GitHub secrets.
 
 ## Add or remove a source
 

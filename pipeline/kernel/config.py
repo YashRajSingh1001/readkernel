@@ -35,6 +35,15 @@ class Settings:
     timezone: ZoneInfo
     supabase_url: str
     supabase_secret_key: str
+    site_url: str
+    email_transport: str
+    email_from: str
+    smtp_host: str
+    smtp_port: int
+    smtp_user: str
+    smtp_password: str
+    resend_api_key: str
+    send_per_minute: int
     sources_file: Path
     data_dir: Path
 
@@ -54,6 +63,15 @@ def load_settings() -> Settings:
         timezone=ZoneInfo(_env("TIMEZONE", "Asia/Kolkata")),
         supabase_url=_env("SUPABASE_URL"),
         supabase_secret_key=_env("SUPABASE_SECRET_KEY"),
+        site_url=_env("SITE_URL", "http://localhost:3000").rstrip("/"),
+        email_transport=_env("EMAIL_TRANSPORT", "preview").lower(),
+        email_from=_env("EMAIL_FROM"),
+        smtp_host=_env("SMTP_HOST"),
+        smtp_port=int(_env("SMTP_PORT", "587")),
+        smtp_user=_env("SMTP_USER"),
+        smtp_password=_env("SMTP_PASSWORD"),
+        resend_api_key=_env("RESEND_API_KEY"),
+        send_per_minute=int(_env("SEND_PER_MINUTE", "20")),
         sources_file=Path(_env("SOURCES_FILE", str(PIPELINE_DIR / "sources.yaml"))),
         data_dir=Path(_env("DATA_DIR", str(PIPELINE_DIR / "data"))),
     )

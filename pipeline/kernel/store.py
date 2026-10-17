@@ -45,6 +45,18 @@ class Supabase:
         response = self.client.delete(f"{self.base}/{table}", params=params)
         response.raise_for_status()
 
+    def select(self, table: str, params: dict[str, str], page_size: int = 1000) -> list[dict]:
+        """All rows matching PostgREST query params, fetched page by page."""
+        rows: list[dict] = []
+        while True:
+            page = {**params, "limit": str(page_size), "offset": str(len(rows))}
+            response = self.client.get(f"{self.base}/{table}", params=page)
+            response.raise_for_status()
+            batch = response.json()
+            rows.extend(batch)
+            if len(batch) < page_size:
+                return rows
+
     def select_one(self, table: str, columns: str, **filters: str) -> dict | None:
         params = {"select": columns, "limit": "1", **{k: f"eq.{v}" for k, v in filters.items()}}
         response = self.client.get(f"{self.base}/{table}", params=params)
