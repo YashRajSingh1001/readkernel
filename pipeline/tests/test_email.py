@@ -50,3 +50,21 @@ def test_preview_mailer_writes_a_valid_email(tmp_path):
     assert parsed["To"] == "Reader@Example.com"
     assert parsed["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"
     assert {p.get_content_type() for p in parsed.walk()} >= {"text/plain", "text/html"}
+
+
+def test_formats_change_what_the_email_contains():
+    story = dict(EDITION["stories"][0], image_url="https://img.example/a.jpg", image_credit="A")
+    edition = {**EDITION, "stories": [story]}
+    _, headlines_html, headlines_text = render(edition, "https://r.example", "t", fmt="headlines")
+    assert "It paid $5 billion." not in headlines_html and "It paid" not in headlines_text
+    _, images_html, _ = render(edition, "https://r.example", "t", fmt="images")
+    assert "https://img.example/a.jpg" in images_html and "Image: A" in images_html
+    _, plain_html, _ = render(edition, "https://r.example", "t")
+    assert "img.example" not in plain_html
+    assert "https://r.example/preferences?token=t" in plain_html  # manage link
+
+
+def test_weekly_subject_and_label():
+    subject, html, _ = render({**EDITION, "weekly": True}, "https://r.example", "t")
+    assert subject.startswith("The week in tech:")
+    assert "This week" in html

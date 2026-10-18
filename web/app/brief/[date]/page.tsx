@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
+import { Container } from "@/components/Container";
 import { EditionView } from "@/components/EditionView";
 import { formatDate, getEdition, isValidDate, listEditions } from "@/lib/brief";
 
@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: PageProps<"/brief/[date]">): 
   if (!isValidDate(date)) return {};
   const edition = await getEdition(date);
   return {
-    title: `Brief for ${formatDate(date)}`,
+    title: `10 stories that mattered · ${formatDate(date)}`,
     description: edition?.stories
       .slice(0, 3)
       .map((s) => s.headline)
@@ -27,14 +27,9 @@ export async function generateMetadata({ params }: PageProps<"/brief/[date]">): 
 
 export default function BriefForDay({ params }: PageProps<"/brief/[date]">) {
   return (
-    <>
-      <Link href="/brief" className="mb-6 inline-block text-sm text-muted hover:text-ink">
-        ← All briefs
-      </Link>
-      <Suspense fallback={<p className="text-muted">Loading…</p>}>
-        <Day params={params} />
-      </Suspense>
-    </>
+    <Suspense fallback={<Container><p className="text-muted">Loading…</p></Container>}>
+      <Day params={params} />
+    </Suspense>
   );
 }
 
@@ -42,5 +37,5 @@ async function Day({ params }: { params: PageProps<"/brief/[date]">["params"] })
   const { date } = await params;
   const edition = await getEdition(date);
   if (!edition) notFound();
-  return <EditionView edition={edition} title="Daily brief" />;
+  return <EditionView edition={edition} />;
 }

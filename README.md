@@ -2,7 +2,7 @@
 
 The day's tech and AI news, boiled down to the stories that matter.
 
-ReadKernel reads about 30 tech news feeds, merges articles about the same
+ReadKernel reads 56 tech and AI news sources, merges articles about the same
 event into one story, ranks them, and writes a short summary for each one,
 with every source linked. It is built to run at zero cost.
 
@@ -11,9 +11,12 @@ with every source linked. It is built to run at zero cost.
 | Iteration | What | State |
 | --- | --- | --- |
 | 1 | News pipeline (fetch, filter, group, rank, summarise) | **working** |
-| 1 | Database + website (feed, topic filter, daily archive) | **working** (Supabase not yet connected) |
-| 1 | Daily email (sign-up, confirm, unsubscribe, daily send) | **working** (Gmail SMTP) |
-| 1 | Deploy (Vercel + daily GitHub Actions run) | ready to deploy |
+| 1 | Database + website + daily email | **working**, live on Vercel |
+| Phase 1 | Light/dark toggle, new homepage, story photos with credit, source icons, brief sections, listen | **built** |
+| Phase 2 | Feed side menu + phone bottom bar, topic pages, Top articles, Model releases, 56 sources, Sources page | **built** |
+| Phase 3 | Make it yours (topics, 5/10/15, format, daily/weekly) with live preview, preferences link in every email, Google sign-in, synced saves | **built** (sign-in needs setup) |
+| Phase 4 | Blog, guides, newsletter reviews, compare, contact, privacy, terms | **built** |
+| Phase 5 | Archive search, story timelines, weekly digest, Telegram, listen mode | **built** (Telegram needs a bot) |
 | 2 | Chrome new-tab extension, MCP server for AI assistants | later |
 
 ## How the pipeline works
@@ -28,7 +31,12 @@ sources.yaml -> fetch -> filter -> group -> rank -> summarise -> Supabase + data
 | Filter | `kernel/filter.py` | Keeps the last 36 hours, drops deals and promos, removes duplicate links and titles. |
 | Group | `kernel/group.py` | Local embeddings find look-alike articles. Clear matches merge; borderline ones are checked by the AI. |
 | Rank | `kernel/rank.py` | Score = number of sources + source trust + freshness, nudged by an AI editor's 1-5 rating. Max 3 stories per topic. |
-| Summarise | `kernel/summarise.py` | Headline, 2-3 sentence summary and "why it matters" per story, cached so each story is summarised once. |
+| Summarise | `kernel/summarise.py` | Headline, 2-3 sentence summary, "why it matters" and news/model-release per story, cached so each story is summarised once. |
+| Photos | `kernel/images.py` | The publisher's own preview photo (RSS media or the page's og:image), shown from their site with a credit. |
+| Threads | `kernel/threads.py` | Links a story to the same ongoing story on earlier days, for the "This story so far" timeline. |
+| Top articles | `kernel/discussions.py` | The most-upvoted Hacker News posts, with a one-line summary each. |
+| Email | `kernel/send.py`, `kernel/personal.py` | Each reader's own picks (topics, 5/10/15, format); daily, or weekly on Sundays. |
+| Telegram | `kernel/telegram.py` | Posts the brief to a Telegram channel when a bot token is set. |
 
 ## Cost
 
@@ -59,7 +67,7 @@ Output goes to `pipeline/data/latest.json` and `pipeline/data/brief-YYYY-MM-DD.j
 ## Database (Supabase)
 
 1. Create a free project at supabase.com.
-2. Open **SQL Editor** and run each file in `db/migrations/` in order (`001_init.sql`, `002_email.sql`, `003_feed.sql`).
+2. Open **SQL Editor** and run each file in `db/migrations/` in order (`001_init.sql` to `004_phases.sql`).
 3. From **Project Settings -> API**, copy:
    - the project URL and **secret** key into `.env` (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`), for the pipeline
    - the project URL and **publishable** key into `web/.env.local` (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`), for the website
@@ -151,8 +159,29 @@ Vercel project -> **Settings -> Domains** -> add the domain, then copy the
 DNS records Vercel shows into your registrar. Afterwards update `SITE_URL` in
 both Vercel and the GitHub secrets.
 
+## Sign-in (optional)
+
+Sign-in is off until you turn it on, so the site never shows a broken login.
+
+1. Google Cloud Console: create an OAuth client (Web application). Authorised
+   redirect URI: `https://<your-project>.supabase.co/auth/v1/callback`.
+2. Supabase: Authentication -> Sign In / Providers -> Google: paste the client
+   ID and secret, enable it. Authentication -> URL Configuration: set Site URL
+   to your live address and add `https://<your-site>/auth/callback` to the
+   redirect URLs.
+3. Vercel environment variables: `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (same values as the server ones) and
+   `NEXT_PUBLIC_AUTH_ENABLED=1`. Redeploy.
+
+## Writing pages
+
+Blog posts, guides and newsletter reviews are Markdown files in
+`web/content/blog`, `web/content/guides` and `web/content/newsletters`. Copy
+an existing file, change the front matter at the top and the text, push.
+
 ## Add or remove a source
 
 Edit `pipeline/sources.yaml`. Each source needs a `name`, a feed `url`, a
 `topic` (`ai`, `tech`, `dev`, `startups`, `security`, `markets`, `design`)
-and optionally a `weight` and `exclude` words.
+and optionally a `weight` and `exclude` words. Then refresh the list the
+website shows: `cd pipeline && .venv/Scripts/python -m kernel.sources`.

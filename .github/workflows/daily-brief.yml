@@ -40,10 +40,12 @@ jobs:
       SMTP_USER: ${{ secrets.SMTP_USER }}
       SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -65,3 +67,14 @@ jobs:
       - name: Email subscribers
         if: github.event_name == 'schedule' || inputs.send_email
         run: python -m kernel.send
+
+      # Sundays (India time): the weekly digest for readers who chose weekly.
+      - name: Weekly digest
+        if: github.event_name == 'schedule' || inputs.send_email
+        run: |
+          if [ "$(TZ=Asia/Kolkata date +%u)" = "7" ]; then python -m kernel.send --weekly; else echo "Not Sunday"; fi
+
+      # Does nothing until TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID secrets exist.
+      - name: Post to Telegram
+        if: github.event_name == 'schedule' || inputs.send_email
+        run: python -m kernel.telegram

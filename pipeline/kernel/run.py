@@ -8,29 +8,28 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import time
 from datetime import datetime, timezone
 
 from .config import load_settings
+from .discussions import collect_discussions, discussion_to_dict
 from .fetch import fetch_all
-from .filter import canonical_url, filter_articles
+from .filter import filter_articles
 from .group import group_articles
+from .images import attach_images
 from .llm import make_llm
 from .models import Story
 from .rank import pick_brief, pick_feed, rank_stories
 from .sources import load_sources
-from .store import Supabase, SupabaseCache, save_files, save_supabase
+from .store import Supabase, SupabaseCache, load_recent_stories, save_files, save_supabase
 from .summarise import SummaryCache, summarise
+from .threads import assign_threads, story_key
+
+__all__ = ["main", "story_key", "story_to_dict"]
 
 
 def _log(msg: str) -> None:
     print(f"[kernel] {msg}", flush=True)
-
-
-def story_key(story: Story) -> str:
-    """Stable id for the story's page, from its lead article's link."""
-    return hashlib.sha1(canonical_url(story.lead.url).encode()).hexdigest()[:12]
 
 
 def story_to_dict(story: Story, brief_position: int | None = None) -> dict:
@@ -41,9 +40,13 @@ def story_to_dict(story: Story, brief_position: int | None = None) -> dict:
         "summary": story.summary,
         "why_it_matters": story.why_it_matters,
         "topic": story.topic,
+        "kind": story.kind,
         "score": round(story.score, 3),
         "importance": story.importance,
         "published": story.newest.isoformat(),
+        "image_url": story.image_url or None,
+        "image_credit": story.image_credit or None,
+        "thread_id": story.thread_id or story_key(story),
         "sources": [
             {"name": a.source, "title": a.title, "url": a.url, "published": a.published.isoformat()}
             for a in story.articles
@@ -56,6 +59,7 @@ def main() -> None:
     parser.add_argument("--top", type=int, help="number of stories (default from STORIES_PER_BRIEF)")
     parser.add_argument("--no-ai", action="store_true", help="skip all AI calls")
     parser.add_argument("--no-db", action="store_true", help="only write local JSON, skip Supabase")
+    parser.add_argument("--no-images", action="store_true", help="don't look up photos on article pages")
     args = parser.parse_args()
 
     settings = load_settings()
@@ -73,7 +77,8 @@ def main() -> None:
     fresh = filter_articles(articles, sources, global_exclude, settings.max_age_hours)
     _log(f"kept {len(fresh)} after filtering (last {settings.max_age_hours}h, no junk, no dupes)")
 
-    stories = group_articles(fresh, llm, settings.embeddings, settings.data_dir / "models")
+    model_dir = settings.data_dir / "models"
+    stories = group_articles(fresh, llm, settings.embeddings, model_dir)
     multi = sum(1 for s in stories if len(s.sources) > 1)
     _log(f"grouped into {len(stories)} stories ({multi} covered by 2+ sources)")
 
@@ -88,7 +93,17 @@ def main() -> None:
     summarise(feed, llm, cache)
     brief_rank = {id(s): i for i, s in enumerate(brief, 1)}
 
+    with_photo = attach_images(feed, fetch_pages=not args.no_images)
+    _log(f"photos: {with_photo}/{len(feed)} stories")
+
     today = datetime.now(settings.timezone).date().isoformat()
+    previous = load_recent_stories(db, settings.data_dir, today, days=7)
+    continued = assign_threads(feed, previous, settings.embeddings, model_dir)
+    _log(f"threads: {continued} stories continue an earlier one (checked {len(previous)} from the past week)")
+
+    discussions = collect_discussions(llm, settings.max_age_hours)
+    _log(f"top articles: {len(discussions)} discussions")
+
     output = {
         "date": today,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -104,6 +119,7 @@ def main() -> None:
         # "stories" is the brief (in brief order); "feed" is the whole day, by score.
         "stories": [story_to_dict(s, i) for i, s in enumerate(brief, 1)],
         "feed": [story_to_dict(s, brief_rank.get(id(s))) for s in feed],
+        "discussions": [discussion_to_dict(d) for d in discussions],
     }
     latest = save_files(output, settings.data_dir)
     if db:
@@ -117,11 +133,9 @@ def main() -> None:
         count = len(story.sources)
         label = f"{count} sources" if count > 1 else story.sources[0]
         print(f"\n  {i:>2}. {story.headline}")
-        print(f"      [{story.topic}] {label}")
+        print(f"      [{story.topic}{', model release' if story.kind == 'model_release' else ''}] {label}")
         if story.summary:
             print(f"      {story.summary}")
-        if story.why_it_matters:
-            print(f"      Why it matters: {story.why_it_matters}")
     print()
     _log(f"feed: {len(feed)} stories (brief: {len(brief)}); done in {time.time() - started:.0f}s -> {latest}")
 

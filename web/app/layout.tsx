@@ -1,55 +1,40 @@
 import type { Metadata } from "next";
-import { Inter, Newsreader } from "next/font/google";
-import Link from "next/link";
+import { Geist_Mono, Inter, Newsreader } from "next/font/google";
+
+import { SiteFooter } from "@/components/SiteFooter";
+import { SiteHeader } from "@/components/SiteHeader";
+import { THEME_SCRIPT } from "@/components/ThemeToggle";
 import "./globals.css";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 const newsreader = Newsreader({ variable: "--font-newsreader", subsets: ["latin"] });
+const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.SITE_URL || "http://localhost:3000"),
   alternates: { types: { "application/rss+xml": "/rss.xml" } },
-  title: { default: "ReadKernel: the day's tech news, distilled", template: "%s · ReadKernel" },
+  title: { default: "ReadKernel: the day's tech and AI news, distilled", template: "%s · ReadKernel" },
   description:
-    "ReadKernel reads dozens of tech and AI news sources every day, merges duplicate coverage, and gives you the stories that matter with every source linked.",
+    "ReadKernel reads 50+ tech and AI news sources every morning, merges duplicate coverage, and gives you the stories that matter with every source linked. Free, by email or on the web.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    // suppressHydrationWarning: browser extensions add attributes to <html>
-    // (e.g. data-extension-installed) before React loads; that's not our bug.
+    // data-theme is set before paint by THEME_SCRIPT (light unless the reader chose otherwise).
+    // suppressHydrationWarning: that script and browser extensions change <html> attributes.
     <html
       lang="en"
-      className={`${inter.variable} ${newsreader.variable} antialiased`}
+      data-theme="light"
+      className={`${inter.variable} ${newsreader.variable} ${geistMono.variable} antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-screen font-sans">
-        <header className="border-b border-line">
-          <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4 sm:px-6">
-            <Link href="/" className="flex items-baseline gap-1.5" aria-label="ReadKernel home">
-              <span className="h-2.5 w-2.5 translate-y-[-1px] rounded-full bg-accent" />
-              <span className="font-serif text-2xl font-semibold tracking-tight">ReadKernel</span>
-            </Link>
-            <nav className="flex gap-4 text-sm text-muted sm:gap-5">
-              <Link href="/" className="hover:text-ink">Today</Link>
-              <Link href="/feed" className="hover:text-ink">Feed</Link>
-              <Link href="/saved" className="hover:text-ink">Saved</Link>
-              <Link href="/brief" className="hidden hover:text-ink sm:inline">Archive</Link>
-            </nav>
-          </div>
-        </header>
-        <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-10">{children}</main>
-        <footer className="border-t border-line">
-          <div className="mx-auto max-w-3xl px-4 py-6 text-xs text-muted sm:px-6">
-            <nav className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-              <Link href="/how-it-works" className="hover:text-ink">How it works</Link>
-              <Link href="/brief" className="hover:text-ink">Archive</Link>
-              <Link href="/feed" className="hover:text-ink">Feed</Link>
-              <a href="/rss.xml" className="hover:text-ink">RSS</a>
-            </nav>
-            Summaries are written by AI from public news feeds. Every story links to its original sources.
-          </div>
-        </footer>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
+      <body className="flex min-h-screen flex-col font-sans">
+        <SiteHeader />
+        <main className="flex-1 py-8 sm:py-10">{children}</main>
+        <SiteFooter />
       </body>
     </html>
   );

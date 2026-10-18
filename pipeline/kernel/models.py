@@ -24,6 +24,7 @@ class Article:
     topic: str
     weight: float
     published: datetime
+    image_url: str = ""  # the publisher's own preview photo, if the feed gives one
 
 
 @dataclass
@@ -36,6 +37,10 @@ class Story:
     headline: str = ""
     summary: str = ""
     why_it_matters: str = ""
+    kind: str = "news"  # "news" or "model_release"
+    image_url: str = ""
+    image_credit: str = ""  # which source the photo comes from
+    thread_id: str = ""  # shared by the same ongoing story on different days
     extra: dict = field(default_factory=dict)
 
     @property

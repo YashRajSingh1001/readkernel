@@ -1,0 +1,282 @@
+[
+  {
+    "name": "OpenAI News",
+    "topic": "ai",
+    "site": "https://openai.com"
+  },
+  {
+    "name": "Google DeepMind",
+    "topic": "ai",
+    "site": "https://deepmind.google"
+  },
+  {
+    "name": "Google AI Blog",
+    "topic": "ai",
+    "site": "https://blog.google"
+  },
+  {
+    "name": "Hugging Face",
+    "topic": "ai",
+    "site": "https://huggingface.co"
+  },
+  {
+    "name": "NVIDIA Blog",
+    "topic": "ai",
+    "site": "https://blogs.nvidia.com"
+  },
+  {
+    "name": "MIT Technology Review",
+    "topic": "ai",
+    "site": "https://www.technologyreview.com"
+  },
+  {
+    "name": "VentureBeat AI",
+    "topic": "ai",
+    "site": "https://venturebeat.com"
+  },
+  {
+    "name": "Simon Willison",
+    "topic": "ai",
+    "site": "https://simonwillison.net"
+  },
+  {
+    "name": "The Decoder",
+    "topic": "ai",
+    "site": "https://the-decoder.com"
+  },
+  {
+    "name": "Import AI",
+    "topic": "ai",
+    "site": "https://importai.substack.com"
+  },
+  {
+    "name": "Latent Space",
+    "topic": "ai",
+    "site": "https://www.latent.space"
+  },
+  {
+    "name": "Ahead of AI",
+    "topic": "ai",
+    "site": "https://magazine.sebastianraschka.com"
+  },
+  {
+    "name": "AWS Machine Learning Blog",
+    "topic": "ai",
+    "site": "https://aws.amazon.com"
+  },
+  {
+    "name": "MarkTechPost",
+    "topic": "ai",
+    "site": "https://www.marktechpost.com"
+  },
+  {
+    "name": "The Verge",
+    "topic": "tech",
+    "site": "https://www.theverge.com"
+  },
+  {
+    "name": "TechCrunch",
+    "topic": "tech",
+    "site": "https://techcrunch.com"
+  },
+  {
+    "name": "Ars Technica",
+    "topic": "tech",
+    "site": "https://arstechnica.com"
+  },
+  {
+    "name": "Wired",
+    "topic": "tech",
+    "site": "https://www.wired.com"
+  },
+  {
+    "name": "Engadget",
+    "topic": "tech",
+    "site": "https://www.engadget.com"
+  },
+  {
+    "name": "The Register",
+    "topic": "tech",
+    "site": "https://www.theregister.com"
+  },
+  {
+    "name": "9to5Mac",
+    "topic": "tech",
+    "site": "https://9to5mac.com"
+  },
+  {
+    "name": "9to5Google",
+    "topic": "tech",
+    "site": "https://9to5google.com"
+  },
+  {
+    "name": "CNET",
+    "topic": "tech",
+    "site": "https://www.cnet.com"
+  },
+  {
+    "name": "Gizmodo",
+    "topic": "tech",
+    "site": "https://gizmodo.com"
+  },
+  {
+    "name": "The Next Web",
+    "topic": "tech",
+    "site": "https://thenextweb.com"
+  },
+  {
+    "name": "Tom's Hardware",
+    "topic": "tech",
+    "site": "https://www.tomshardware.com"
+  },
+  {
+    "name": "ZDNET",
+    "topic": "tech",
+    "site": "https://www.zdnet.com"
+  },
+  {
+    "name": "Rest of World",
+    "topic": "tech",
+    "site": "https://restofworld.org"
+  },
+  {
+    "name": "Livemint Technology",
+    "topic": "tech",
+    "site": "https://www.livemint.com"
+  },
+  {
+    "name": "Hacker News",
+    "topic": "dev",
+    "site": "https://hnrss.org"
+  },
+  {
+    "name": "GitHub Blog",
+    "topic": "dev",
+    "site": "https://github.blog"
+  },
+  {
+    "name": "Cloudflare Blog",
+    "topic": "dev",
+    "site": "https://blog.cloudflare.com"
+  },
+  {
+    "name": "The New Stack",
+    "topic": "dev",
+    "site": "https://thenewstack.io"
+  },
+  {
+    "name": "InfoQ",
+    "topic": "dev",
+    "site": "https://infoq.com"
+  },
+  {
+    "name": "Product Hunt",
+    "topic": "dev",
+    "site": "https://www.producthunt.com"
+  },
+  {
+    "name": "Vercel Blog",
+    "topic": "dev",
+    "site": "https://vercel.com"
+  },
+  {
+    "name": "Stack Overflow Blog",
+    "topic": "dev",
+    "site": "https://stackoverflow.blog"
+  },
+  {
+    "name": "Crunchbase News",
+    "topic": "startups",
+    "site": "https://news.crunchbase.com"
+  },
+  {
+    "name": "TechCrunch Startups",
+    "topic": "startups",
+    "site": "https://techcrunch.com"
+  },
+  {
+    "name": "Inc42",
+    "topic": "startups",
+    "site": "https://inc42.com"
+  },
+  {
+    "name": "YourStory",
+    "topic": "startups",
+    "site": "https://yourstory.com"
+  },
+  {
+    "name": "ET Tech",
+    "topic": "startups",
+    "site": "https://economictimes.indiatimes.com"
+  },
+  {
+    "name": "Moneycontrol Tech",
+    "topic": "startups",
+    "site": "https://www.moneycontrol.com"
+  },
+  {
+    "name": "Krebs on Security",
+    "topic": "security",
+    "site": "https://krebsonsecurity.com"
+  },
+  {
+    "name": "BleepingComputer",
+    "topic": "security",
+    "site": "https://www.bleepingcomputer.com"
+  },
+  {
+    "name": "The Hacker News",
+    "topic": "security",
+    "site": "https://feedburner.com"
+  },
+  {
+    "name": "Dark Reading",
+    "topic": "security",
+    "site": "https://www.darkreading.com"
+  },
+  {
+    "name": "SecurityWeek",
+    "topic": "security",
+    "site": "https://www.securityweek.com"
+  },
+  {
+    "name": "The Record",
+    "topic": "security",
+    "site": "https://therecord.media"
+  },
+  {
+    "name": "CNBC Technology",
+    "topic": "markets",
+    "site": "https://www.cnbc.com"
+  },
+  {
+    "name": "Bloomberg Technology",
+    "topic": "markets",
+    "site": "https://bloomberg.com"
+  },
+  {
+    "name": "CNBC Markets",
+    "topic": "markets",
+    "site": "https://www.cnbc.com"
+  },
+  {
+    "name": "Smashing Magazine",
+    "topic": "design",
+    "site": "https://www.smashingmagazine.com"
+  },
+  {
+    "name": "Figma Blog",
+    "topic": "design",
+    "site": "https://www.figma.com"
+  },
+  {
+    "name": "UX Collective",
+    "topic": "design",
+    "site": "https://uxdesign.cc"
+  },
+  {
+    "name": "Nielsen Norman Group",
+    "topic": "design",
+    "site": "https://www.nngroup.com"
+  }
+]

@@ -42,6 +42,32 @@ def clean_description(value: str) -> str:
     return _NOISE_RE.sub("", text).strip()
 
 
+_IMG_RE = re.compile(r"""<img[^>]+src=["']([^"']+)["']""", flags=re.IGNORECASE)
+
+
+def entry_image(entry) -> str:
+    """The photo a feed attaches to an entry (media tags, enclosure, or first <img>)."""
+    candidates: list[str] = []
+    for item in entry.get("media_content") or []:
+        if item.get("medium") in (None, "image") or str(item.get("type", "")).startswith("image"):
+            candidates.append(item.get("url", ""))
+    candidates += [t.get("url", "") for t in entry.get("media_thumbnail") or []]
+    candidates += [
+        e.get("href", "") for e in entry.get("enclosures") or [] if str(e.get("type", "")).startswith("image")
+    ]
+    html_parts = [entry.get("summary") or ""] + [c.get("value", "") for c in entry.get("content") or []]
+    for part in html_parts:
+        match = _IMG_RE.search(part)
+        if match:
+            candidates.append(html.unescape(match.group(1)))
+    for url in candidates:
+        url = (url or "").strip()
+        # skip tracking pixels and tiny icons that some feeds embed
+        if url.startswith("https://") and not re.search(r"(pixel|feedburner|gravatar|emoji|1x1)", url, re.I):
+            return url
+    return ""
+
+
 def _entry_time(entry) -> datetime | None:
     for key in ("published_parsed", "updated_parsed", "created_parsed"):
         parsed = entry.get(key)
@@ -71,6 +97,7 @@ def parse_feed(content: bytes, source: Source) -> list[Article]:
                 topic=source.topic,
                 weight=source.weight,
                 published=published,
+                image_url=entry_image(entry),
             )
         )
     return articles

@@ -36,3 +36,27 @@ def load_sources(path: Path) -> tuple[list[Source], list[str]]:
         )
     global_exclude = [w.lower() for w in raw.get("global_exclude") or []]
     return sources, global_exclude
+
+
+def export_for_web(sources: list[Source], path: Path) -> None:
+    """Write the public source list the website shows (name, topic, home page)."""
+    import json
+    from urllib.parse import urlsplit
+
+    rows = []
+    for s in sources:
+        host = urlsplit(s.url).netloc
+        for prefix in ("feeds.", "feed.", "rss."):
+            host = host.removeprefix(prefix)
+        rows.append({"name": s.name, "topic": s.topic, "site": f"https://{host}"})
+    path.write_text(json.dumps(rows, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+if __name__ == "__main__":
+    # python -m kernel.sources  -> refresh web/lib/sources.json after editing sources.yaml
+    from .config import PIPELINE_DIR, load_settings
+
+    found, _ = load_sources(load_settings().sources_file)
+    target = PIPELINE_DIR.parent / "web" / "lib" / "sources.json"
+    export_for_web(found, target)
+    print(f"wrote {len(found)} sources to {target}")

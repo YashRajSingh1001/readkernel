@@ -9,6 +9,7 @@ tables, written through Supabase's REST API, plus the summary cache.
 from __future__ import annotations
 
 import json
+from datetime import date, timedelta
 from pathlib import Path
 
 import httpx
@@ -123,7 +124,53 @@ def save_supabase(output: dict, db: Supabase) -> None:
                 "importance": s["importance"],
                 "published": s["published"],
                 "sources": s["sources"],
+                # Phase 1-5 fields; older outputs simply don't have them.
+                **{k: s[k] for k in ("image_url", "image_credit", "kind", "thread_id") if k in s},
             }
             for i, s in enumerate(output.get("feed") or output["stories"], 1)
         ],
     )
+    if "discussions" in output:
+        db.delete("discussions", edition_date=date)
+        db.insert(
+            "discussions",
+            [
+                {
+                    "edition_date": date,
+                    "position": i,
+                    "title": d["title"],
+                    "url": d["url"],
+                    "comments_url": d.get("comments_url") or None,
+                    "source": d["source"],
+                    "points": d.get("points"),
+                    "comments": d.get("comments"),
+                    "summary": d.get("summary") or "",
+                }
+                for i, d in enumerate(output["discussions"], 1)
+            ],
+        )
+
+
+def load_recent_stories(db: Supabase | None, data_dir: Path, today: str, days: int = 7) -> list[dict]:
+    """Stories from the past `days` days (not today), for linking ongoing stories."""
+    start = (date.fromisoformat(today) - timedelta(days=days)).isoformat()
+    if db:
+        try:
+            return db.select(
+                "stories",
+                {
+                    "select": "story_key,thread_id,headline,summary,edition_date",
+                    "and": f"(edition_date.gte.{start},edition_date.lt.{today})",
+                },
+            )
+        except httpx.HTTPError as exc:
+            print(f"    [store] could not load past stories: {exc}")
+            return []
+    rows: list[dict] = []
+    for path in sorted(data_dir.glob("brief-*.json")):
+        day = path.stem.removeprefix("brief-")
+        if start <= day < today:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            for s in data.get("feed") or data.get("stories") or []:
+                rows.append({**s, "edition_date": day})
+    return rows

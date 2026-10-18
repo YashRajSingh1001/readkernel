@@ -1,0 +1,57 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { Suspense } from "react";
+
+import { savePreferencesAction } from "@/app/actions";
+import { Container } from "@/components/Container";
+import { PreferencesForm } from "@/components/PreferencesForm";
+import { adminConfigured } from "@/lib/server/admin-db";
+import { getByToken } from "@/lib/server/subscribers";
+
+export const metadata: Metadata = { title: "Your brief settings", robots: { index: false } };
+
+export default function PreferencesPage({ searchParams }: PageProps<"/preferences">) {
+  return (
+    <Container>
+      <p className="font-mono text-xs tracking-wide text-label uppercase">Your brief</p>
+      <h1 className="mt-1 text-4xl font-extrabold tracking-tight">Change your settings</h1>
+      <Suspense fallback={<p className="mt-6 text-muted">Loading…</p>}>
+        <Settings searchParams={searchParams} />
+      </Suspense>
+    </Container>
+  );
+}
+
+async function Settings({ searchParams }: { searchParams: PageProps<"/preferences">["searchParams"] }) {
+  const { token } = await searchParams;
+  const subscriber = typeof token === "string" && adminConfigured() ? await getByToken(token) : null;
+
+  if (!subscriber || typeof token !== "string") {
+    return (
+      <p className="mt-6 text-muted">
+        This link isn&apos;t valid. Use the &ldquo;Change topics or format&rdquo; link in your latest email, or{" "}
+        <Link href="/brief/customize" className="text-accent hover:underline">
+          build a new brief
+        </Link>
+        .
+      </p>
+    );
+  }
+
+  return (
+    <>
+      <p className="mt-2 mb-8 text-muted">
+        For <span className="font-medium text-ink">{subscriber.email}</span>.
+        {subscriber.status === "unsubscribed" && " You're unsubscribed; saving will start your emails again."}
+      </p>
+      <PreferencesForm initial={subscriber.prefs} action={savePreferencesAction} token={token} />
+      <p className="mt-10 text-sm text-muted">
+        Want to stop the emails?{" "}
+        <Link href={`/unsubscribe?token=${encodeURIComponent(token)}`} className="underline">
+          Unsubscribe
+        </Link>
+        .
+      </p>
+    </>
+  );
+}

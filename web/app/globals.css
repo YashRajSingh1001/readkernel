@@ -1,38 +1,68 @@
 @import "tailwindcss";
 
-/* ReadKernel palette: warm paper, dark ink, one ember accent. */
+/*
+ * ReadKernel palette. Light is the default; dark is opt-in via the header
+ * toggle (data-theme="dark"), or follows the device when the reader picks
+ * "system" (data-theme="system").
+ */
 :root {
-  --paper: #fbfaf6;
+  --paper: #fbfaf7;
   --card: #ffffff;
-  --ink: #1b1a17;
-  --muted: #6b6860;
-  --line: #e7e4dc;
-  --accent: #c2410c;
+  --sunk: #f3f1ec;
+  --ink: #17150f;
+  --muted: #66625a;
+  --line: #e6e3dc;
+  --accent: #c2410c; /* ember: actions and the brand dot */
   --accent-soft: #fdeee6;
+  --label: #0f766e; /* teal: section labels like "Story of the day" */
+  --label-soft: #e6f4f2;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --paper: #121110;
+  --card: #1b1a17;
+  --sunk: #171614;
+  --ink: #efece5;
+  --muted: #a39f95;
+  --line: #2c2a26;
+  --accent: #fb7a3c;
+  --accent-soft: #2e1a10;
+  --label: #3cc2b3;
+  --label-soft: #10302c;
+  color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #12110f;
+  :root[data-theme="system"] {
+    --paper: #121110;
     --card: #1b1a17;
-    --ink: #edebe4;
-    --muted: #9a968c;
+    --sunk: #171614;
+    --ink: #efece5;
+    --muted: #a39f95;
     --line: #2c2a26;
     --accent: #fb7a3c;
     --accent-soft: #2e1a10;
+    --label: #3cc2b3;
+    --label-soft: #10302c;
+    color-scheme: dark;
   }
 }
 
 @theme inline {
   --color-paper: var(--paper);
   --color-card: var(--card);
+  --color-sunk: var(--sunk);
   --color-ink: var(--ink);
   --color-muted: var(--muted);
   --color-line: var(--line);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-label: var(--label);
+  --color-label-soft: var(--label-soft);
   --font-sans: var(--font-inter);
   --font-serif: var(--font-newsreader);
+  --font-mono: var(--font-geist-mono);
 }
 
 body {
@@ -42,4 +72,58 @@ body {
 
 ::selection {
   background: var(--accent-soft);
+}
+
+/* Long-form pages (blog, guides, legal) */
+.prose-rk {
+  line-height: 1.7;
+}
+.prose-rk h2 {
+  font-family: var(--font-newsreader);
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 2rem 0 0.75rem;
+}
+.prose-rk h3 {
+  font-weight: 600;
+  margin: 1.5rem 0 0.5rem;
+}
+.prose-rk p,
+.prose-rk ul,
+.prose-rk ol {
+  margin: 0 0 1rem;
+}
+.prose-rk ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+.prose-rk ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+}
+.prose-rk li {
+  margin: 0.25rem 0;
+}
+.prose-rk a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose-rk table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0 1.5rem;
+  font-size: 0.925rem;
+}
+.prose-rk th,
+.prose-rk td {
+  border-bottom: 1px solid var(--line);
+  padding: 0.5rem 0.5rem 0.5rem 0;
+  text-align: left;
+  vertical-align: top;
+}
+.prose-rk blockquote {
+  border-left: 2px solid var(--accent);
+  padding-left: 1rem;
+  color: var(--muted);
 }

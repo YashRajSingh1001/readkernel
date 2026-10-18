@@ -13,6 +13,20 @@ export type Story = {
   importance: number | null;
   published: string;
   sources: Source[];
+  kind?: "news" | "model_release";
+  image_url?: string | null; // the publisher's own preview photo
+  image_credit?: string | null;
+  thread_id?: string | null; // same id = same ongoing story across days
+};
+
+export type Discussion = {
+  title: string;
+  url: string;
+  comments_url: string | null;
+  source: string;
+  points: number | null;
+  comments: number | null;
+  summary: string;
 };
 
 export type Edition = {
@@ -21,11 +35,12 @@ export type Edition = {
   ai: string | null;
   stories: Story[]; // the daily brief, in brief order
   feed: Story[]; // every story saved that day, best first
+  discussions: Discussion[]; // Top articles
 };
 
 export type StoryWithDate = Story & { edition_date: string };
 
-export type EditionSummary = { date: string; story_count: number };
+export type EditionSummary = { date: string; story_count: number; lead?: string };
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -68,4 +83,28 @@ export function domainOf(url: string): string {
   } catch {
     return "";
   }
+}
+
+export const TOPIC_BLURBS: Record<string, string> = {
+  ai: "Models, labs and the companies building them",
+  tech: "Big Tech, devices and platforms",
+  dev: "Tools, open source and what developers are discussing",
+  startups: "Funding, launches and founders, with an eye on India",
+  security: "Breaches, vulnerabilities and fixes",
+  markets: "Tech stocks, deals and the money behind tech",
+  design: "Product and interface design",
+};
+
+/** Small site icon for a source link (Google's public icon service). */
+export function faviconUrl(url: string): string {
+  const host = domainOf(url);
+  return host ? `https://www.google.com/s2/favicons?domain=${host}&sz=64` : "";
+}
+
+export function readingMinutes(stories: Story[]): number {
+  const words = stories.reduce(
+    (n, s) => n + `${s.headline} ${s.summary} ${s.why_it_matters}`.split(/\s+/).length,
+    0,
+  );
+  return Math.max(1, Math.round(words / 220));
 }

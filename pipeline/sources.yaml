@@ -33,6 +33,13 @@ sources:
   - { name: VentureBeat AI, url: "https://venturebeat.com/category/ai/feed/", topic: ai, weight: 1.0 }
   - { name: Simon Willison, url: "https://simonwillison.net/atom/everything/", topic: ai, weight: 1.1 }
 
+  - { name: The Decoder, url: "https://the-decoder.com/feed/", topic: ai, weight: 1.1 }
+  - { name: Import AI, url: "https://importai.substack.com/feed", topic: ai, weight: 1.0 }
+  - { name: Latent Space, url: "https://www.latent.space/feed", topic: ai, weight: 1.0 }
+  - { name: Ahead of AI, url: "https://magazine.sebastianraschka.com/feed", topic: ai, weight: 1.0 }
+  - { name: AWS Machine Learning Blog, url: "https://aws.amazon.com/blogs/machine-learning/feed/", topic: ai, weight: 0.8 }
+  - { name: MarkTechPost, url: "https://www.marktechpost.com/feed/", topic: ai, weight: 0.8 }
+
   # --- Tech -----------------------------------------------------------------
   - { name: The Verge, url: "https://www.theverge.com/rss/index.xml", topic: tech, weight: 1.2, exclude: [review, best] }
   - { name: TechCrunch, url: "https://techcrunch.com/feed/", topic: tech, weight: 1.2 }
@@ -43,6 +50,14 @@ sources:
   - { name: 9to5Mac, url: "https://9to5mac.com/feed/", topic: tech, weight: 0.9 }
   - { name: 9to5Google, url: "https://9to5google.com/feed/", topic: tech, weight: 0.9 }
 
+  - { name: CNET, url: "https://www.cnet.com/rss/news/", topic: tech, weight: 1.0, exclude: [review, best, deal] }
+  - { name: Gizmodo, url: "https://gizmodo.com/feed", topic: tech, weight: 0.9, exclude: [review, best, deal] }
+  - { name: The Next Web, url: "https://thenextweb.com/feed", topic: tech, weight: 1.0 }
+  - { name: Tom's Hardware, url: "https://www.tomshardware.com/feeds/all", topic: tech, weight: 0.9, exclude: [review, best, deal] }
+  - { name: ZDNET, url: "https://www.zdnet.com/news/rss.xml", topic: tech, weight: 0.9, exclude: [review, best, deal] }
+  - { name: Rest of World, url: "https://restofworld.org/feed/latest", topic: tech, weight: 1.1 }
+  - { name: Livemint Technology, url: "https://www.livemint.com/rss/technology", topic: tech, weight: 0.9 }
+
   # --- Developers -----------------------------------------------------------
   - { name: Hacker News, url: "https://hnrss.org/frontpage?points=200", topic: dev, weight: 1.1 }
   - { name: GitHub Blog, url: "https://github.blog/feed/", topic: dev, weight: 1.1 }
@@ -50,19 +65,36 @@ sources:
   - { name: The New Stack, url: "https://thenewstack.io/feed/", topic: dev, weight: 0.9 }
   - { name: InfoQ, url: "https://feed.infoq.com/", topic: dev, weight: 0.9 }
 
+  - { name: Product Hunt, url: "https://www.producthunt.com/feed", topic: dev, weight: 0.8 }
+  - { name: Vercel Blog, url: "https://vercel.com/atom", topic: dev, weight: 0.8 }
+  - { name: Stack Overflow Blog, url: "https://stackoverflow.blog/feed/", topic: dev, weight: 0.8 }
+
   # --- Startups and funding -------------------------------------------------
   - { name: Crunchbase News, url: "https://news.crunchbase.com/feed/", topic: startups, weight: 1.1 }
   - { name: TechCrunch Startups, url: "https://techcrunch.com/category/startups/feed/", topic: startups, weight: 1.0 }
   - { name: Inc42, url: "https://inc42.com/feed/", topic: startups, weight: 1.0 }
   - { name: YourStory, url: "https://yourstory.com/feed", topic: startups, weight: 0.9 }
 
+  - { name: ET Tech, url: "https://economictimes.indiatimes.com/tech/rssfeeds/13357270.cms", topic: startups, weight: 1.0 }
+  - { name: Moneycontrol Tech, url: "https://www.moneycontrol.com/rss/technology.xml", topic: startups, weight: 0.8 }
+
   # --- Security -------------------------------------------------------------
   - { name: Krebs on Security, url: "https://krebsonsecurity.com/feed/", topic: security, weight: 1.2 }
   - { name: BleepingComputer, url: "https://www.bleepingcomputer.com/feed/", topic: security, weight: 1.1 }
   - { name: The Hacker News, url: "https://feeds.feedburner.com/TheHackersNews", topic: security, weight: 1.0 }
 
+  - { name: Dark Reading, url: "https://www.darkreading.com/rss.xml", topic: security, weight: 1.0 }
+  - { name: SecurityWeek, url: "https://www.securityweek.com/feed/", topic: security, weight: 1.0 }
+  - { name: The Record, url: "https://therecord.media/feed", topic: security, weight: 1.1 }
+
   # --- Markets --------------------------------------------------------------
   - { name: CNBC Technology, url: "https://www.cnbc.com/id/19854910/device/rss/rss.html", topic: markets, weight: 1.1 }
 
+  - { name: Bloomberg Technology, url: "https://feeds.bloomberg.com/technology/news.rss", topic: markets, weight: 1.3 }
+  - { name: CNBC Markets, url: "https://www.cnbc.com/id/20910258/device/rss/rss.html", topic: markets, weight: 1.0 }
+
   # --- Design ---------------------------------------------------------------
   - { name: Smashing Magazine, url: "https://www.smashingmagazine.com/feed/", topic: design, weight: 0.9 }
+  - { name: Figma Blog, url: "https://www.figma.com/blog/feed/atom.xml", topic: design, weight: 0.9 }
+  - { name: UX Collective, url: "https://uxdesign.cc/feed", topic: design, weight: 0.8 }
+  - { name: Nielsen Norman Group, url: "https://www.nngroup.com/feed/rss/", topic: design, weight: 1.0 }

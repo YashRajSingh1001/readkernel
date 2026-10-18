@@ -1,9 +1,32 @@
 "use server";
 
+import { TOPICS } from "@/lib/format";
+import { parsePrefs, type Prefs } from "@/lib/personal";
 import { adminConfigured } from "@/lib/server/admin-db";
-import { confirm, normaliseEmail, subscribe, unsubscribe } from "@/lib/server/subscribers";
+import { serverUser } from "@/lib/supabase/server";
+import {
+  confirm,
+  ensureAccountSubscription,
+  normaliseEmail,
+  savePreferences,
+  subscribe,
+  unsubscribe,
+} from "@/lib/server/subscribers";
 
 export type FormState = { ok: boolean; message: string } | null;
+
+function prefsFrom(form: FormData): Prefs | undefined {
+  if (!form.has("story_count")) return undefined; // plain sign-up box, no builder choices
+  return parsePrefs(
+    {
+      topics: form.get("topics"),
+      count: form.get("story_count"),
+      format: form.get("format"),
+      frequency: form.get("frequency"),
+    },
+    Object.keys(TOPICS),
+  );
+}
 
 export async function subscribeAction(_prev: FormState, form: FormData): Promise<FormState> {
   // Bots fill every field; people never see this one.
@@ -14,7 +37,7 @@ export async function subscribeAction(_prev: FormState, form: FormData): Promise
   if (!adminConfigured()) return { ok: false, message: "Sign-up isn't set up on this server yet." };
 
   try {
-    await subscribe(email);
+    await subscribe(email, prefsFrom(form));
     return { ok: true, message: "Almost done: check your inbox and click the link to confirm." };
   } catch (err) {
     console.error("[subscribe]", err);
@@ -34,4 +57,33 @@ export async function unsubscribeAction(_prev: FormState, form: FormData): Promi
   return result === "unsubscribed"
     ? { ok: true, message: "You've been unsubscribed. No more emails from us." }
     : { ok: false, message: "This link isn't valid. You may already be unsubscribed." };
+}
+
+/** From the link in every email: change topics, length, format, frequency. */
+export async function savePreferencesAction(_prev: FormState, form: FormData): Promise<FormState> {
+  const prefs = prefsFrom(form);
+  if (!prefs) return { ok: false, message: "Nothing to save." };
+  try {
+    const saved = await savePreferences(String(form.get("token") ?? ""), prefs);
+    return saved
+      ? { ok: true, message: "Saved. Your next email will follow these settings." }
+      : { ok: false, message: "This link isn't valid any more. Use the link in your latest email." };
+  } catch (err) {
+    console.error("[preferences]", err);
+    return { ok: false, message: "Something went wrong. Please try again in a minute." };
+  }
+}
+
+/** Signed-in readers: their email is already verified, so this subscribes them directly. */
+export async function saveAccountPreferencesAction(_prev: FormState, form: FormData): Promise<FormState> {
+  const user = await serverUser();
+  if (!user?.email) return { ok: false, message: "Please sign in again." };
+  const prefs = prefsFrom(form);
+  try {
+    await ensureAccountSubscription(user.id, user.email.toLowerCase(), prefs);
+    return { ok: true, message: `Saved. The brief goes to ${user.email}.` };
+  } catch (err) {
+    console.error("[account preferences]", err);
+    return { ok: false, message: "Something went wrong. Please try again in a minute." };
+  }
 }

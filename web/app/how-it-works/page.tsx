@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { Container } from "@/components/Container";
+
 export const metadata: Metadata = {
   title: "How it works",
   description:
@@ -51,9 +53,9 @@ const FAQ = [
 
 export default function HowItWorks() {
   return (
-    <>
-      <p className="text-sm font-medium tracking-wide text-accent uppercase">How it works</p>
-      <h1 className="mt-1 font-serif text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+    <Container>
+      <p className="font-mono text-xs tracking-wide text-label uppercase">How it works</p>
+      <h1 className="mt-1 text-4xl font-extrabold tracking-tight text-balance">
         From hundreds of articles to the ten that matter
       </h1>
       <p className="mt-3 max-w-2xl leading-relaxed text-muted">
@@ -91,6 +93,6 @@ export default function HowItWorks() {
         <Link href="/" className="rounded-lg bg-ink px-4 py-2 font-medium text-paper hover:opacity-90">Read today&apos;s brief</Link>
         <Link href="/feed" className="rounded-lg border border-line px-4 py-2 font-medium hover:border-ink">Open the feed</Link>
       </div>
-    </>
+    </Container>
   );
 }
