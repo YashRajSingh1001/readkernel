@@ -1,8 +1,13 @@
+import Link from "next/link";
+
 import { TOPICS, domainOf, timeAgo, type Story } from "@/lib/format";
+import { SaveButton } from "./SaveButton";
 
 export function StoryCard({ story, rank, now }: { story: Story; rank: number; now: number }) {
   const sourceNames = [...new Set(story.sources.map((s) => s.name))];
   const lead = story.sources[0];
+  const href = story.story_key ? `/story/${story.story_key}` : lead?.url;
+  const internal = Boolean(story.story_key);
 
   return (
     <article className="group grid grid-cols-[2rem_1fr] gap-x-3 border-b border-line py-6 last:border-b-0 sm:grid-cols-[2.5rem_1fr]">
@@ -14,14 +19,14 @@ export function StoryCard({ story, rank, now }: { story: Story; rank: number; no
           </span>
           <span>{timeAgo(story.published, now)}</span>
           <span aria-hidden>·</span>
-          <span>
-            {sourceNames.length > 1 ? `${sourceNames.length} sources` : sourceNames[0]}
-          </span>
+          <span>{sourceNames.length > 1 ? `${sourceNames.length} sources` : sourceNames[0]}</span>
         </div>
 
         <h2 className="font-serif text-xl leading-snug font-semibold text-balance sm:text-2xl">
-          {lead ? (
-            <a href={lead.url} target="_blank" rel="noopener noreferrer" className="hover:text-accent">
+          {href && internal ? (
+            <Link href={href} className="hover:text-accent">{story.headline}</Link>
+          ) : href ? (
+            <a href={href} target="_blank" rel="noopener noreferrer" className="hover:text-accent">
               {story.headline}
             </a>
           ) : (
@@ -38,24 +43,29 @@ export function StoryCard({ story, rank, now }: { story: Story; rank: number; no
           </p>
         )}
 
-        {story.sources.length > 0 && (
-          <ul className="mt-3 flex flex-wrap gap-2">
-            {story.sources.map((s) => (
-              <li key={s.url}>
-                <a
-                  href={s.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title={s.title}
-                  className="inline-flex items-center gap-1 rounded-md border border-line bg-card px-2 py-1 text-xs text-muted hover:border-accent hover:text-ink"
-                >
-                  {s.name}
-                  <span className="hidden opacity-60 sm:inline">{domainOf(s.url)}</span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        )}
+        <ul className="mt-3 flex flex-wrap items-center gap-2">
+          {story.sources.map((s) => (
+            <li key={s.url}>
+              <a
+                href={s.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={s.title}
+                className="inline-flex items-center gap-1 rounded-md border border-line bg-card px-2 py-1 text-xs text-muted hover:border-accent hover:text-ink"
+              >
+                {s.name}
+                <span className="hidden opacity-60 sm:inline">{domainOf(s.url)}</span>
+              </a>
+            </li>
+          ))}
+          {story.story_key && lead && (
+            <li className="ml-auto">
+              <SaveButton
+                story={{ key: story.story_key, headline: story.headline, topic: story.topic, url: lead.url, source: lead.name }}
+              />
+            </li>
+          )}
+        </ul>
       </div>
     </article>
   );

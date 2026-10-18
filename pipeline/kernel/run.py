@@ -8,16 +8,17 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import time
 from datetime import datetime, timezone
 
 from .config import load_settings
 from .fetch import fetch_all
-from .filter import filter_articles
+from .filter import canonical_url, filter_articles
 from .group import group_articles
 from .llm import make_llm
 from .models import Story
-from .rank import pick_brief, rank_stories
+from .rank import pick_brief, pick_feed, rank_stories
 from .sources import load_sources
 from .store import Supabase, SupabaseCache, save_files, save_supabase
 from .summarise import SummaryCache, summarise
@@ -27,8 +28,15 @@ def _log(msg: str) -> None:
     print(f"[kernel] {msg}", flush=True)
 
 
-def story_to_dict(story: Story) -> dict:
+def story_key(story: Story) -> str:
+    """Stable id for the story's page, from its lead article's link."""
+    return hashlib.sha1(canonical_url(story.lead.url).encode()).hexdigest()[:12]
+
+
+def story_to_dict(story: Story, brief_position: int | None = None) -> dict:
     return {
+        "story_key": story_key(story),
+        "brief_position": brief_position,
         "headline": story.headline,
         "summary": story.summary,
         "why_it_matters": story.why_it_matters,
@@ -76,7 +84,9 @@ def main() -> None:
 
     ranked = rank_stories(stories, llm)
     brief = pick_brief(ranked, top)
-    summarise(brief, llm, cache)
+    feed = pick_feed(ranked, brief, max(settings.feed_size, len(brief)))
+    summarise(feed, llm, cache)
+    brief_rank = {id(s): i for i, s in enumerate(brief, 1)}
 
     today = datetime.now(settings.timezone).date().isoformat()
     output = {
@@ -89,8 +99,11 @@ def main() -> None:
             "articles": len(articles),
             "kept": len(fresh),
             "stories": len(stories),
+            "feed": len(feed),
         },
-        "stories": [story_to_dict(s) for s in brief],
+        # "stories" is the brief (in brief order); "feed" is the whole day, by score.
+        "stories": [story_to_dict(s, i) for i, s in enumerate(brief, 1)],
+        "feed": [story_to_dict(s, brief_rank.get(id(s))) for s in feed],
     }
     latest = save_files(output, settings.data_dir)
     if db:
@@ -110,7 +123,7 @@ def main() -> None:
         if story.why_it_matters:
             print(f"      Why it matters: {story.why_it_matters}")
     print()
-    _log(f"done in {time.time() - started:.0f}s -> {latest}")
+    _log(f"feed: {len(feed)} stories (brief: {len(brief)}); done in {time.time() - started:.0f}s -> {latest}")
 
 
 if __name__ == "__main__":

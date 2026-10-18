@@ -95,3 +95,26 @@ def pick_brief(ranked: list[Story], count: int, per_topic: int = 3) -> list[Stor
         if story not in picked and story.importance != 1:
             picked.append(story)
     return picked
+
+
+def pick_feed(ranked: list[Story], brief: list[Story], size: int, per_topic: int = 10) -> list[Story]:
+    """The day's full feed: every brief story plus the next best, by score.
+
+    Topics are capped so one busy topic can't fill the whole feed.
+    """
+    feed = list(brief)
+    taken = {id(s) for s in feed}
+    per_topic_count: dict[str, int] = {}
+    for story in brief:
+        per_topic_count[story.topic] = per_topic_count.get(story.topic, 0) + 1
+    for story in ranked:
+        if len(feed) >= size:
+            break
+        if id(story) in taken or story.importance == 1:
+            continue
+        if per_topic_count.get(story.topic, 0) >= per_topic:
+            continue
+        feed.append(story)
+        taken.add(id(story))
+        per_topic_count[story.topic] = per_topic_count.get(story.topic, 0) + 1
+    return sorted(feed, key=lambda s: -s.score)

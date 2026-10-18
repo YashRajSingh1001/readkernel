@@ -30,8 +30,10 @@ def load_edition(db: Supabase | None, data_dir, day: str) -> dict | None:
         rows = db.select(
             "editions",
             {
-                "select": f"date,generated_at,ai,stories(position,{STORY_COLUMNS})",
-                "stories.order": "position.asc",
+                "select": f"date,generated_at,ai,stories(brief_position,{STORY_COLUMNS})",
+                # only the brief, in brief order (the feed holds more stories)
+                "stories.brief_position": "not.is.null",
+                "stories.order": "brief_position.asc",
                 "date": f"eq.{day}",
             },
         )

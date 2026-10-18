@@ -31,6 +31,7 @@ class Settings:
     openai_model: str
     max_age_hours: int
     stories_per_brief: int
+    feed_size: int
     embeddings: str
     timezone: ZoneInfo
     supabase_url: str
@@ -59,6 +60,7 @@ def load_settings() -> Settings:
         openai_model=_env("OPENAI_MODEL", "gpt-5-mini"),
         max_age_hours=int(_env("MAX_AGE_HOURS", "36")),
         stories_per_brief=int(_env("STORIES_PER_BRIEF", "10")),
+        feed_size=int(_env("FEED_SIZE", "30")),
         embeddings=_env("EMBEDDINGS", "local").lower(),
         timezone=ZoneInfo(_env("TIMEZONE", "Asia/Kolkata")),
         supabase_url=_env("SUPABASE_URL"),

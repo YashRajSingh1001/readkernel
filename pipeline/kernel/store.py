@@ -112,7 +112,9 @@ def save_supabase(output: dict, db: Supabase) -> None:
         [
             {
                 "edition_date": date,
-                "position": i,
+                "position": i,  # rank in the day's feed
+                "brief_position": s.get("brief_position"),
+                "story_key": s.get("story_key"),
                 "headline": s["headline"],
                 "summary": s["summary"],
                 "why_it_matters": s["why_it_matters"],
@@ -122,6 +124,6 @@ def save_supabase(output: dict, db: Supabase) -> None:
                 "published": s["published"],
                 "sources": s["sources"],
             }
-            for i, s in enumerate(output["stories"], 1)
+            for i, s in enumerate(output.get("feed") or output["stories"], 1)
         ],
     )

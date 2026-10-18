@@ -59,7 +59,7 @@ Output goes to `pipeline/data/latest.json` and `pipeline/data/brief-YYYY-MM-DD.j
 ## Database (Supabase)
 
 1. Create a free project at supabase.com.
-2. Open **SQL Editor** and run each file in `db/migrations/` in order (`001_init.sql`, then `002_email.sql`).
+2. Open **SQL Editor** and run each file in `db/migrations/` in order (`001_init.sql`, `002_email.sql`, `003_feed.sql`).
 3. From **Project Settings -> API**, copy:
    - the project URL and **secret** key into `.env` (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`), for the pipeline
    - the project URL and **publishable** key into `web/.env.local` (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`), for the website
@@ -77,9 +77,13 @@ npm run dev            # http://localhost:3000
 
 | Page | What |
 | --- | --- |
-| `/` | Latest brief, with a topic filter |
-| `/brief` | Archive of every day |
-| `/brief/YYYY-MM-DD` | One day's brief |
+| `/` | Today's brief (top 10), sign-up box |
+| `/feed` | The whole day (~30 stories): topic tabs with counts, Top / Recent |
+| `/story/<key>` | One story: summary, all coverage, share buttons, preview image for social |
+| `/saved` | Stories saved on this device (browser storage, no account) |
+| `/brief`, `/brief/YYYY-MM-DD` | Archive of every day's brief |
+| `/how-it-works` | How ReadKernel picks and summarises stories |
+| `/rss.xml`, `/sitemap.xml`, `/robots.txt` | For feed readers and search engines |
 
 Pages are cached and refresh about once a minute, so a new pipeline run shows
 up on its own.

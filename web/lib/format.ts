@@ -3,6 +3,8 @@
 export type Source = { name: string; title: string; url: string; published: string };
 
 export type Story = {
+  story_key?: string; // stable id for /story/<key>
+  brief_position?: number | null; // 1-10 if in the daily brief
   headline: string;
   summary: string;
   why_it_matters: string;
@@ -17,8 +19,11 @@ export type Edition = {
   date: string;
   generated_at: string;
   ai: string | null;
-  stories: Story[];
+  stories: Story[]; // the daily brief, in brief order
+  feed: Story[]; // every story saved that day, best first
 };
+
+export type StoryWithDate = Story & { edition_date: string };
 
 export type EditionSummary = { date: string; story_count: number };
 

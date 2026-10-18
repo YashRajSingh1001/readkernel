@@ -118,3 +118,26 @@ def test_fallback_summary_uses_first_sentences():
 def test_parse_json_object_handles_fences():
     assert parse_json_object('```json\n{"a": 1}\n```') == {"a": 1}
     assert parse_json_object('Sure! {"a": 2} hope that helps') == {"a": 2}
+
+
+def test_feed_keeps_brief_caps_topics_and_sorts_by_score():
+    from kernel.rank import pick_feed
+
+    stories = [Story([art(f"S{i}", topic="ai" if i < 6 else "dev")]) for i in range(10)]
+    for i, s in enumerate(stories):
+        s.score = 100 - i
+    brief = [stories[9]]  # lowest score, but in the brief
+    feed = pick_feed(stories, brief, size=6, per_topic=3)
+    assert stories[9] in feed
+    assert sum(1 for s in feed if s.topic == "ai") <= 3
+    assert [s.score for s in feed] == sorted((s.score for s in feed), reverse=True)
+    assert len(feed) == 6
+
+
+def test_story_key_is_stable_across_tracking_params():
+    from kernel.run import story_key
+
+    a = Story([art("X", url="https://site.com/post?utm_source=rss")])
+    b = Story([art("X", url="http://www.site.com/post/")])
+    assert story_key(a) == story_key(b)
+    assert len(story_key(a)) == 12

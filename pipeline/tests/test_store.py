@@ -46,6 +46,18 @@ def test_save_supabase_replaces_the_days_stories():
     ]
     stories = json.loads(seen[2].content)
     assert [s["position"] for s in stories] == [1, 2]
+    # without a separate feed, the brief itself is saved
+
+
+def test_save_supabase_saves_whole_feed_with_brief_marked():
+    db, seen = fake_db(lambda r: httpx.Response(201))
+    brief = [dict(OUTPUT["stories"][0], brief_position=1, story_key="k1")]
+    feed = brief + [dict(OUTPUT["stories"][1], brief_position=None, story_key="k2")]
+    save_supabase({**OUTPUT, "stories": brief, "feed": feed}, db)
+    rows = json.loads(seen[2].content)
+    assert [(r["position"], r["brief_position"], r["story_key"]) for r in rows] == [(1, 1, "k1"), (2, None, "k2")]
+    edition = json.loads(seen[0].content)
+    assert edition["story_count"] == 1  # the brief size, not the feed size
     assert seen[0].headers["apikey"] == "sb_secret_test"
     assert "authorization" not in seen[0].headers  # new-style keys go in apikey only
 
