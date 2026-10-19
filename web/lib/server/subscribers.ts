@@ -1,6 +1,7 @@
 import "server-only";
 
 import { randomBytes } from "crypto";
+import { headers } from "next/headers";
 
 import type { Prefs } from "@/lib/personal";
 import { adminRest } from "./admin-db";
@@ -31,8 +32,27 @@ export function normaliseEmail(raw: string): string | null {
   return email.length <= 254 && EMAIL_RE.test(email) ? email : null;
 }
 
-function siteUrl(): string {
-  return (process.env.SITE_URL || "http://localhost:3000").replace(/\/$/, "");
+const LOCAL_RE = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
+
+/**
+ * The address to put in email links. SITE_URL normally; but if it still says
+ * localhost while the request came in on a real address (a misconfigured
+ * deployment), use the address the person actually signed up on, so a live
+ * site never emails a link nobody can open.
+ */
+async function siteUrl(): Promise<string> {
+  const configured = (process.env.SITE_URL || "").replace(/\/$/, "");
+  if (configured && !LOCAL_RE.test(configured)) return configured;
+  try {
+    const h = await headers();
+    const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
+    if (host && !/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(host)) {
+      return `${h.get("x-forwarded-proto") ?? "https"}://${host}`;
+    }
+  } catch {
+    // not inside a request (scripts, tests)
+  }
+  return configured || "http://localhost:3000";
 }
 
 function prefsColumns(prefs: Prefs) {
@@ -167,7 +187,7 @@ function button(href: string, label: string) {
 }
 
 async function sendConfirmation(email: string, token: string) {
-  const link = `${siteUrl()}/confirm?token=${encodeURIComponent(token)}`;
+  const link = `${await siteUrl()}/confirm?token=${encodeURIComponent(token)}`;
   await sendMail({
     to: email,
     subject: "Confirm your ReadKernel subscription",
@@ -183,7 +203,7 @@ ${button(link, "Confirm subscription")}
 }
 
 async function sendManageLink(email: string, token: string) {
-  const link = `${siteUrl()}/preferences?token=${encodeURIComponent(token)}`;
+  const link = `${await siteUrl()}/preferences?token=${encodeURIComponent(token)}`;
   await sendMail({
     to: email,
     subject: "Change your ReadKernel brief",
