@@ -15,6 +15,8 @@ import {
 
 export type FormState = { ok: boolean; message: string } | null;
 
+const SIGNUP_SENT = "Almost done: check your inbox and click the link to confirm. Not there? Check your spam folder.";
+
 function prefsFrom(form: FormData): Prefs | undefined {
   if (!form.has("story_count")) return undefined; // plain sign-up box, no builder choices
   return parsePrefs(
@@ -30,7 +32,7 @@ function prefsFrom(form: FormData): Prefs | undefined {
 
 export async function subscribeAction(_prev: FormState, form: FormData): Promise<FormState> {
   // Bots fill every field; people never see this one.
-  if (form.get("company")) return { ok: true, message: "Check your inbox to confirm." };
+  if (form.get("company")) return { ok: true, message: SIGNUP_SENT };
 
   const email = normaliseEmail(String(form.get("email") ?? ""));
   if (!email) return { ok: false, message: "That doesn't look like an email address." };
@@ -38,7 +40,7 @@ export async function subscribeAction(_prev: FormState, form: FormData): Promise
 
   try {
     await subscribe(email, prefsFrom(form));
-    return { ok: true, message: "Almost done: check your inbox and click the link to confirm." };
+    return { ok: true, message: SIGNUP_SENT };
   } catch (err) {
     console.error("[subscribe]", err);
     return { ok: false, message: "Something went wrong. Please try again in a minute." };
@@ -49,7 +51,7 @@ export async function confirmAction(_prev: FormState, form: FormData): Promise<F
   const result = await confirm(String(form.get("token") ?? ""));
   if (result.status !== "confirmed") return { ok: false, message: "This link isn't valid. Try signing up again." };
   return result.briefSent
-    ? { ok: true, message: "You're in. We've just emailed you today's brief, and the next one arrives tomorrow morning." }
+    ? { ok: true, message: "You're in. We've just emailed you today's brief (check your spam folder if you don't see it), and the next one arrives tomorrow morning." }
     : { ok: true, message: "You're in. The next brief arrives tomorrow morning." };
 }
 
