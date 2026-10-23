@@ -2,6 +2,9 @@
 
 Email clients ignore most modern CSS, so the HTML uses tables and inline
 styles, and fonts fall back to Georgia/Arial.
+
+web/lib/server/brief-email.ts renders the same email for readers who confirm
+after the day's brief has gone out. Change both together.
 """
 
 from __future__ import annotations

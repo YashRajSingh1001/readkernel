@@ -47,9 +47,10 @@ export async function subscribeAction(_prev: FormState, form: FormData): Promise
 
 export async function confirmAction(_prev: FormState, form: FormData): Promise<FormState> {
   const result = await confirm(String(form.get("token") ?? ""));
-  return result === "confirmed"
-    ? { ok: true, message: "You're in. The next brief arrives tomorrow morning." }
-    : { ok: false, message: "This link isn't valid. Try signing up again." };
+  if (result.status !== "confirmed") return { ok: false, message: "This link isn't valid. Try signing up again." };
+  return result.briefSent
+    ? { ok: true, message: "You're in. We've just emailed you today's brief, and the next one arrives tomorrow morning." }
+    : { ok: true, message: "You're in. The next brief arrives tomorrow morning." };
 }
 
 export async function unsubscribeAction(_prev: FormState, form: FormData): Promise<FormState> {

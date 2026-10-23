@@ -3,9 +3,11 @@ import "server-only";
 import { randomBytes } from "crypto";
 import { headers } from "next/headers";
 
-import type { Prefs } from "@/lib/personal";
+import type { Story } from "@/lib/format";
+import { selectStories, type Prefs } from "@/lib/personal";
 import { adminRest } from "./admin-db";
-import { sendMail } from "./mailer";
+import { renderBrief } from "./brief-email";
+import { isPreviewTransport, sendMail } from "./mailer";
 
 type Subscriber = {
   id: string;
@@ -103,13 +105,82 @@ export async function subscribe(email: string, prefs?: Prefs): Promise<void> {
   await sendConfirmation(email, token);
 }
 
-export async function confirm(token: string): Promise<"confirmed" | "invalid"> {
+export type ConfirmResult = { status: "confirmed"; briefSent: boolean } | { status: "invalid" };
+
+export async function confirm(token: string): Promise<ConfirmResult> {
   const sub = token ? await findBy("token", token) : null;
-  if (!sub) return "invalid";
+  if (!sub) return { status: "invalid" };
   if (sub.status !== "active") {
     await update(sub.id, { status: "active", confirmed_at: new Date().toISOString(), unsubscribed_at: null });
   }
-  return "confirmed";
+  let briefSent = false;
+  try {
+    briefSent = await sendTodaysBrief(sub);
+  } catch (err) {
+    // The subscription is confirmed either way; they'll get tomorrow's brief.
+    console.error("[confirm] today's brief", err);
+  }
+  return { status: "confirmed", briefSent };
+}
+
+const STORY_COLUMNS =
+  "story_key,brief_position,position,headline,summary,why_it_matters,topic,kind," +
+  "score,importance,published,image_url,image_credit,thread_id,sources";
+
+/** Today's date where the pipeline runs (same TIMEZONE setting, same default). */
+function today(): string {
+  const timeZone = process.env.TIMEZONE || "Asia/Kolkata";
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
+
+/**
+ * Someone who confirms after today's brief is out would otherwise wait until
+ * tomorrow. If today's edition exists and they haven't had it, email it now,
+ * picked by their preferences, and log it in email_sends so the pipeline's
+ * send step (which skips logged readers) never emails it twice. Weekly
+ * readers wait for Sunday's digest. Returns whether an email went out.
+ */
+async function sendTodaysBrief(sub: Subscriber): Promise<boolean> {
+  if ((sub.frequency ?? "daily") !== "daily") return false;
+  const day = today();
+  const rows = await adminRest<{ date: string; stories: Story[] }[]>(
+    `editions?select=date,stories(${STORY_COLUMNS})&stories.order=position.asc&date=eq.${day}`,
+  );
+  if (!rows[0]) return false; // not built yet: the morning run will include them
+  const feed = rows[0].stories;
+  const brief = feed
+    .filter((s) => s.brief_position != null)
+    .sort((a, b) => (a.brief_position ?? 0) - (b.brief_position ?? 0));
+  if (brief.length === 0) return false;
+  const stories = selectStories(brief, feed, sub.topics ?? [], sub.story_count ?? 10);
+  if (stories.length === 0) return false; // nothing in their topics today
+
+  const email = renderBrief({ date: day, stories }, await siteUrl(), sub.token, sub.format);
+  if (isPreviewTransport()) {
+    // Nothing is delivered in preview, so don't log it as sent.
+    await sendMail({ to: sub.email, ...email });
+    return false;
+  }
+
+  // Claim the send first: if the row already exists (the pipeline sent it, or
+  // a second click got here first) nothing is inserted and we stop.
+  const claimed = await adminRest<unknown[]>("email_sends?on_conflict=edition_date,subscriber_id,kind", {
+    method: "POST",
+    body: { edition_date: day, subscriber_id: sub.id, kind: "daily" },
+    prefer: "resolution=ignore-duplicates,return=representation",
+  });
+  if (!claimed?.length) return false;
+  try {
+    await sendMail({ to: sub.email, ...email });
+  } catch (err) {
+    // Release the claim so a retry (clicking confirm again) can send it.
+    await adminRest(
+      `email_sends?edition_date=eq.${day}&subscriber_id=eq.${sub.id}&kind=eq.daily`,
+      { method: "DELETE", prefer: "return=minimal" },
+    ).catch(() => {});
+    throw err;
+  }
+  return true;
 }
 
 export async function unsubscribe(token: string): Promise<"unsubscribed" | "invalid"> {

@@ -5,10 +5,19 @@ import nodemailer from "nodemailer";
 // Same settings as the pipeline (EMAIL_TRANSPORT = preview | smtp | resend).
 // "preview" sends nothing and prints the email to the server log.
 
-export type Mail = { to: string; subject: string; html: string; text: string };
+export type Mail = { to: string; subject: string; html: string; text: string; headers?: Record<string, string> };
+
+function transportName(): string {
+  return (process.env.EMAIL_TRANSPORT || "preview").toLowerCase();
+}
+
+/** True when emails are only printed to the log, not actually delivered. */
+export function isPreviewTransport(): boolean {
+  return transportName() === "preview";
+}
 
 export async function sendMail(mail: Mail): Promise<void> {
-  const transport = (process.env.EMAIL_TRANSPORT || "preview").toLowerCase();
+  const transport = transportName();
   const from = process.env.EMAIL_FROM || "ReadKernel <preview@localhost>";
 
   if (transport === "preview") {
@@ -37,7 +46,14 @@ export async function sendMail(mail: Mail): Promise<void> {
         Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ from, to: [mail.to], subject: mail.subject, html: mail.html, text: mail.text }),
+      body: JSON.stringify({
+        from,
+        to: [mail.to],
+        subject: mail.subject,
+        html: mail.html,
+        text: mail.text,
+        ...(mail.headers ? { headers: mail.headers } : {}),
+      }),
     });
     if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text()}`);
     return;
