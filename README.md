@@ -139,7 +139,7 @@ every day at 06:00 India time. It reads its settings from the repo's
 
 ```bash
 gh secret set -f .env
-gh secret set SITE_URL --body "https://YOUR-SITE.vercel.app"
+gh secret set SITE_URL --body "https://readkernel.in"
 ```
 
 Run it by hand from the **Actions** tab (or `gh workflow run daily-brief.yml`).

@@ -97,3 +97,15 @@ def test_algolia_hits_become_discussions():
     assert [(d.title, d.points) for d in items] == [("Tiny DB", 120), ("Ask HN: no link", 80)]
     assert items[1].url == "https://news.ycombinator.com/item?id=10"
     assert _first_sentence("Surging U.S. gold exports topped oil. Second sentence.") == "Surging U.S. gold exports topped oil."
+
+
+def test_attach_images_falls_back_to_other_coverage(monkeypatch):
+    import kernel.images as images
+
+    pages = {"https://blocked.example/a": "", "https://open.example/b": "https://open.example/photo.jpg"}
+    monkeypatch.setattr(images, "_fetch_preview", lambda client, url: pages.get(url, ""))
+    blocked = Article(url="https://blocked.example/a", title="T", description="", source="Blocked", topic="ai", weight=1.0, published=NOW)
+    open_ = Article(url="https://open.example/b", title="T", description="", source="Open", topic="ai", weight=1.0, published=NOW)
+    story = Story([blocked, open_])
+    assert images.attach_images([story]) == 1
+    assert (story.image_url, story.image_credit) == ("https://open.example/photo.jpg", "Open")

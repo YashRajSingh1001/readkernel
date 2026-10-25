@@ -90,6 +90,8 @@ async function StoryView({ params }: { params: PageProps<"/story/[key]">["params
             topic={story.topic}
             headline={story.headline}
             size="lead"
+            sourceName={lead?.name}
+            sourceUrl={lead?.url}
           />
         </div>
 

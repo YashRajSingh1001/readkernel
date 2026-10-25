@@ -91,7 +91,15 @@ export function StoryCard({ story, now, rank, variant = "standard", showImage = 
     return (
       <article className="border-b border-line pb-8">
         {showImage && (
-          <StoryImage src={story.image_url} credit={story.image_credit} topic={story.topic} headline={story.headline} size="lead" />
+          <StoryImage
+            src={story.image_url}
+            credit={story.image_credit}
+            topic={story.topic}
+            headline={story.headline}
+            size="lead"
+            sourceName={lead?.name}
+            sourceUrl={lead?.url}
+          />
         )}
         <div className="mt-4">{meta}</div>
         <div className="mt-2">{title}</div>
@@ -123,7 +131,14 @@ export function StoryCard({ story, now, rank, variant = "standard", showImage = 
       </div>
       {showImage && (
         <div className="sm:order-2">
-          <StoryImage src={story.image_url} credit={story.image_credit} topic={story.topic} headline={story.headline} />
+          <StoryImage
+            src={story.image_url}
+            credit={story.image_credit}
+            topic={story.topic}
+            headline={story.headline}
+            sourceName={lead?.name}
+            sourceUrl={lead?.url}
+          />
         </div>
       )}
     </article>

@@ -20,6 +20,7 @@ from .models import Story
 
 PAGE_BYTES = 300_000  # preview tags live in <head>; no need for the whole page
 TIMEOUT = 8.0
+MAX_PAGES_PER_STORY = 3  # articles to try per story before giving up
 
 _META_RE = re.compile(
     r"""<meta[^>]+(?:property|name)=["'](?:og:image(?::secure_url)?|twitter:image(?::src)?)["'][^>]*>""",
@@ -72,8 +73,17 @@ def attach_images(stories: list[Story], fetch_pages: bool = True, workers: int =
         headers = {"User-Agent": USER_AGENT, "Accept": "text/html"}
         with httpx.Client(headers=headers, timeout=TIMEOUT, follow_redirects=True) as client:
             with ThreadPoolExecutor(max_workers=workers) as pool:
-                found = list(pool.map(lambda s: _fetch_preview(client, s.lead.url), need_page))
-        for story, url in zip(need_page, found):
-            if url:
-                story.image_url, story.image_credit = url, story.lead.source
+                found = list(pool.map(lambda s: _first_page_preview(client, s), need_page))
+        for story, hit in zip(need_page, found):
+            if hit:
+                story.image_url, story.image_credit = hit
     return sum(1 for s in stories if s.image_url)
+
+
+def _first_page_preview(client: httpx.Client, story: Story, tries: int = MAX_PAGES_PER_STORY) -> tuple[str, str] | None:
+    """Some publishers block automated visits; try the story's other coverage too."""
+    for article in story.articles[:tries]:
+        url = _fetch_preview(client, article.url)
+        if url:
+            return url, article.source
+    return None
