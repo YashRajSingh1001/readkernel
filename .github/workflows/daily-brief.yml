@@ -35,6 +35,7 @@ jobs:
       # Unset EMAIL_TRANSPORT means "preview": nothing is sent.
       EMAIL_TRANSPORT: ${{ secrets.EMAIL_TRANSPORT }}
       EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+      EMAIL_REPLY_TO: ${{ secrets.EMAIL_REPLY_TO }}
       SMTP_HOST: ${{ secrets.SMTP_HOST }}
       SMTP_PORT: ${{ secrets.SMTP_PORT }}
       SMTP_USER: ${{ secrets.SMTP_USER }}

@@ -39,6 +39,7 @@ class Settings:
     site_url: str
     email_transport: str
     email_from: str
+    email_reply_to: str
     smtp_host: str
     smtp_port: int
     smtp_user: str
@@ -68,6 +69,7 @@ def load_settings() -> Settings:
         site_url=_env("SITE_URL", "http://localhost:3000").rstrip("/"),
         email_transport=_env("EMAIL_TRANSPORT", "preview").lower(),
         email_from=_env("EMAIL_FROM"),
+        email_reply_to=_env("EMAIL_REPLY_TO"),
         smtp_host=_env("SMTP_HOST"),
         smtp_port=int(_env("SMTP_PORT", "587")),
         smtp_user=_env("SMTP_USER"),

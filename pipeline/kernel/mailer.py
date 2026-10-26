@@ -28,9 +28,11 @@ class Message:
     headers: dict[str, str] = field(default_factory=dict)
 
 
-def build_mime(msg: Message, sender: str) -> EmailMessage:
+def build_mime(msg: Message, sender: str, reply_to: str = "") -> EmailMessage:
     mime = EmailMessage()
     mime["From"] = sender
+    if reply_to:
+        mime["Reply-To"] = reply_to
     mime["To"] = msg.to
     mime["Subject"] = msg.subject
     mime["Date"] = formatdate(localtime=True)
@@ -43,15 +45,15 @@ def build_mime(msg: Message, sender: str) -> EmailMessage:
 
 
 class PreviewMailer:
-    def __init__(self, sender: str, folder: Path):
-        self.sender = sender
+    def __init__(self, sender: str, folder: Path, reply_to: str = ""):
+        self.sender, self.reply_to = sender, reply_to
         self.folder = folder
         folder.mkdir(parents=True, exist_ok=True)
 
     def send(self, msg: Message) -> None:
         name = re.sub(r"[^a-z0-9]+", "_", msg.to.lower()).strip("_")
         path = self.folder / f"{name}.eml"
-        path.write_bytes(bytes(build_mime(msg, self.sender)))
+        path.write_bytes(bytes(build_mime(msg, self.sender, self.reply_to)))
         print(f"    [mail] preview saved: {path}")
 
     def close(self) -> None:
@@ -59,8 +61,8 @@ class PreviewMailer:
 
 
 class SmtpMailer:
-    def __init__(self, sender: str, host: str, port: int, user: str, password: str):
-        self.sender = sender
+    def __init__(self, sender: str, host: str, port: int, user: str, password: str, reply_to: str = ""):
+        self.sender, self.reply_to = sender, reply_to
         self.host, self.port, self.user, self.password = host, port, user, password
         self._smtp: smtplib.SMTP | None = None
 
@@ -77,7 +79,7 @@ class SmtpMailer:
         return smtp
 
     def send(self, msg: Message) -> None:
-        mime = build_mime(msg, self.sender)
+        mime = build_mime(msg, self.sender, self.reply_to)
         for attempt in range(2):
             try:
                 if self._smtp is None:
@@ -98,8 +100,8 @@ class SmtpMailer:
 
 
 class ResendMailer:
-    def __init__(self, sender: str, api_key: str):
-        self.sender = sender
+    def __init__(self, sender: str, api_key: str, reply_to: str = ""):
+        self.sender, self.reply_to = sender, reply_to
         self.client = httpx.Client(
             headers={"Authorization": f"Bearer {api_key}"}, timeout=30.0
         )
@@ -114,6 +116,7 @@ class ResendMailer:
                 "html": msg.html,
                 "text": msg.text,
                 "headers": msg.headers,
+                **({"reply_to": [self.reply_to]} if self.reply_to else {}),
             },
         )
         response.raise_for_status()
@@ -125,18 +128,19 @@ class ResendMailer:
 def make_mailer(settings):
     transport = settings.email_transport
     sender = settings.email_from
+    reply_to = settings.email_reply_to
     if transport == "preview":
-        return PreviewMailer(sender, settings.data_dir / "outbox")
+        return PreviewMailer(sender, settings.data_dir / "outbox", reply_to)
     if not sender:
         raise ValueError("Set EMAIL_FROM, e.g. EMAIL_FROM=ReadKernel <you@gmail.com>")
     if transport == "smtp":
         if not settings.smtp_host:
             raise ValueError("EMAIL_TRANSPORT=smtp needs SMTP_HOST (and usually SMTP_USER / SMTP_PASSWORD)")
         return SmtpMailer(
-            sender, settings.smtp_host, settings.smtp_port, settings.smtp_user, settings.smtp_password
+            sender, settings.smtp_host, settings.smtp_port, settings.smtp_user, settings.smtp_password, reply_to
         )
     if transport == "resend":
         if not settings.resend_api_key:
             raise ValueError("EMAIL_TRANSPORT=resend needs RESEND_API_KEY")
-        return ResendMailer(sender, settings.resend_api_key)
+        return ResendMailer(sender, settings.resend_api_key, reply_to)
     raise ValueError(f"EMAIL_TRANSPORT must be preview, smtp or resend (got '{transport}')")

@@ -68,3 +68,10 @@ def test_weekly_subject_and_label():
     subject, html, _ = render({**EDITION, "weekly": True}, "https://r.example", "t")
     assert subject.startswith("The week in tech:")
     assert "This week" in html
+
+
+def test_reply_to_header_when_set(tmp_path):
+    mailer = PreviewMailer("ReadKernel <brief@r.example>", tmp_path, reply_to="hello@r.example")
+    mailer.send(message_for(EDITION, "a@example.com", "tok", "https://r.example"))
+    parsed = message_from_bytes(next(tmp_path.glob("*.eml")).read_bytes())
+    assert parsed["Reply-To"] == "hello@r.example"

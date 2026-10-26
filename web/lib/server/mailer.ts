@@ -19,6 +19,8 @@ export function isPreviewTransport(): boolean {
 export async function sendMail(mail: Mail): Promise<void> {
   const transport = transportName();
   const from = process.env.EMAIL_FROM || "ReadKernel <preview@localhost>";
+  // Where replies go, e.g. a Gmail inbox when sending from an address that can't receive.
+  const replyTo = process.env.EMAIL_REPLY_TO || undefined;
 
   if (transport === "preview") {
     console.log(`[mail preview] to=${mail.to} subject="${mail.subject}"\n${mail.text}\n`);
@@ -35,7 +37,7 @@ export async function sendMail(mail: Mail): Promise<void> {
         ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD }
         : undefined,
     });
-    await smtp.sendMail({ from, ...mail });
+    await smtp.sendMail({ from, replyTo, ...mail });
     return;
   }
 
@@ -52,6 +54,7 @@ export async function sendMail(mail: Mail): Promise<void> {
         subject: mail.subject,
         html: mail.html,
         text: mail.text,
+        ...(replyTo ? { reply_to: [replyTo] } : {}),
         ...(mail.headers ? { headers: mail.headers } : {}),
       }),
     });
