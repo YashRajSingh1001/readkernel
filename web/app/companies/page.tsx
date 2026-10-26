@@ -4,8 +4,8 @@ import { Suspense } from "react";
 
 import { CompanyPostCard } from "@/components/CompanyPostCard";
 import { Container } from "@/components/Container";
-import { isWorthReading, listCompanyPosts } from "@/lib/companies";
-import { COMPANY_CATEGORIES } from "@/lib/format";
+import { COMPANIES, isWorthReading, listCompanyPosts } from "@/lib/companies";
+import { COMPANY_CATEGORIES, faviconUrl } from "@/lib/format";
 
 export const metadata: Metadata = {
   title: "Company blogs",
@@ -38,10 +38,28 @@ export default function CompaniesPage({ searchParams }: PageProps<"/companies">)
         <p className="font-mono text-xs tracking-wide text-label uppercase">Company blogs</p>
         <h1 className="mt-1 text-4xl font-extrabold tracking-tight">How real companies build</h1>
         <p className="mt-2 text-muted">
-          Engineering and data science write-ups straight from the teams at Netflix, Uber, Airbnb, Meta and more. Each one
+          Engineering and data science write-ups straight from the teams at {COMPANIES.length} companies. Each one
           summarised in a line or two and sorted by subject. New posts are added every morning.
         </p>
       </header>
+
+      <section aria-label="Companies we read" className="mt-6 rounded-2xl border border-line bg-sunk px-4 py-5">
+        <p className="text-center font-mono text-xs tracking-wide text-muted uppercase">Reading the blogs of</p>
+        <ul className="mt-4 flex flex-wrap justify-center gap-x-6 gap-y-3">
+          {COMPANIES.map((c) => (
+            <li key={c.name}>
+              <Link
+                href={`/companies?company=${encodeURIComponent(c.name)}`}
+                className="flex items-center gap-2 text-sm font-medium hover:text-accent"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- favicons come from Google's favicon service */}
+                <img src={faviconUrl(c.site)} alt="" width={16} height={16} loading="lazy" referrerPolicy="no-referrer" className="h-4 w-4 rounded" />
+                {c.name}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
       <Suspense fallback={<p className="mt-8 text-muted">Loading posts…</p>}>
         <Posts searchParams={searchParams} />
       </Suspense>

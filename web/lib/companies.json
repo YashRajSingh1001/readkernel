@@ -1,0 +1,122 @@
+[
+  {
+    "name": "Netflix",
+    "site": "https://netflix.com"
+  },
+  {
+    "name": "Uber",
+    "site": "https://uber.com"
+  },
+  {
+    "name": "Meta",
+    "site": "https://meta.com"
+  },
+  {
+    "name": "Airbnb",
+    "site": "https://airbnb.com"
+  },
+  {
+    "name": "Spotify",
+    "site": "https://spotify.com"
+  },
+  {
+    "name": "Pinterest",
+    "site": "https://pinterest.com"
+  },
+  {
+    "name": "LinkedIn",
+    "site": "https://linkedin.com"
+  },
+  {
+    "name": "Dropbox",
+    "site": "https://dropbox.com"
+  },
+  {
+    "name": "Lyft",
+    "site": "https://lyft.com"
+  },
+  {
+    "name": "DoorDash",
+    "site": "https://doordash.com"
+  },
+  {
+    "name": "Instacart",
+    "site": "https://instacart.com"
+  },
+  {
+    "name": "Booking.com",
+    "site": "https://booking.com"
+  },
+  {
+    "name": "Etsy",
+    "site": "https://etsy.com"
+  },
+  {
+    "name": "Grab",
+    "site": "https://grab.com"
+  },
+  {
+    "name": "Anthropic",
+    "site": "https://anthropic.com"
+  },
+  {
+    "name": "GitHub",
+    "site": "https://github.com"
+  },
+  {
+    "name": "Stripe",
+    "site": "https://stripe.com"
+  },
+  {
+    "name": "Shopify",
+    "site": "https://shopify.com"
+  },
+  {
+    "name": "Databricks",
+    "site": "https://databricks.com"
+  },
+  {
+    "name": "Cursor",
+    "site": "https://cursor.com"
+  },
+  {
+    "name": "Figma",
+    "site": "https://figma.com"
+  },
+  {
+    "name": "Canva",
+    "site": "https://canva.com"
+  },
+  {
+    "name": "AWS Architecture",
+    "site": "https://aws.amazon.com"
+  },
+  {
+    "name": "Google Research",
+    "site": "https://research.google"
+  },
+  {
+    "name": "Microsoft Research",
+    "site": "https://microsoft.com"
+  },
+  {
+    "name": "Hotstar",
+    "site": "https://hotstar.com"
+  },
+  {
+    "name": "Razorpay",
+    "site": "https://razorpay.com"
+  },
+  {
+    "name": "Flipkart",
+    "site": "https://flipkart.com"
+  },
+  {
+    "name": "Swiggy",
+    "site": "https://swiggy.com"
+  },
+  {
+    "name": "Zomato",
+    "site": "https://zomato.com"
+  }
+]

@@ -26,6 +26,7 @@ def test_the_real_company_list_loads():
     assert len(companies) >= 25
     assert all(bool(c.feed) != bool(c.hn) for c in companies)
     assert any(c.name == "Uber" and c.hn for c in companies)
+    assert all(c.site and "/" not in c.site for c in companies)  # every company has a logo
 
 
 def test_same_post_under_country_paths_has_one_key():

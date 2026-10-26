@@ -89,6 +89,7 @@ class Company:
     weight: float = 1.0
     feed: str = ""
     hn: str = ""  # piece of the blog's address, for companies without a feed
+    site: str = ""  # main website, for the logo shown on the website
 
 
 @dataclass
@@ -123,6 +124,7 @@ def load_companies(path: Path = COMPANIES_FILE) -> list[Company]:
                 weight=float(entry.get("weight", 1.0)),
                 feed=entry.get("feed", ""),
                 hn=entry.get("hn", ""),
+                site=entry.get("site", ""),
             )
         )
     return companies
@@ -134,6 +136,12 @@ _LOCALE_PATH_RE = re.compile(r"/[a-z]{2}/[a-z]{2}(?:-[a-z]{2})?/blog/")
 
 def post_key(link: str) -> str:
     return _LOCALE_PATH_RE.sub("/blog/", canonical_url(link))
+
+
+def export_for_web(companies: list[Company], path: Path) -> None:
+    """Write the company list the website shows as a logo strip (name + website)."""
+    rows = [{"name": c.name, "site": f"https://{c.site}"} for c in companies if c.site]
+    path.write_text(json.dumps(rows, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
 def fetch_feed_posts(companies: list[Company], since: datetime) -> tuple[list[Post], dict[str, str]]:
@@ -322,7 +330,14 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="list new posts; no AI, nothing saved")
     parser.add_argument("--no-ai", action="store_true", help="skip AI summaries")
     parser.add_argument("--no-db", action="store_true", help="save to pipeline/data instead of Supabase")
+    parser.add_argument("--export-web", action="store_true", help="only refresh web/lib/companies.json")
     args = parser.parse_args()
+
+    if args.export_web:
+        target = PIPELINE_DIR.parent / "web" / "lib" / "companies.json"
+        export_for_web(load_companies(), target)
+        print(f"wrote {len(load_companies())} companies to {target}")
+        return
 
     settings = load_settings()
     db = None

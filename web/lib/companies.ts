@@ -6,9 +6,15 @@ import { cacheLife } from "next/cache";
 import path from "path";
 
 import { dataDir, rest, supabase } from "./brief";
+import list from "./companies.json";
 import type { CompanyPost } from "./format";
 
-const COLUMNS = "url,link,title,company,published,summary,category,depth,score,image_url,hn_points,found_via,added_at";
+export type CompanyInfo = { name: string; site: string };
+
+/** Every company we read. Generated from pipeline/company_blogs.yaml by `python -m kernel.company_blogs --export-web`. */
+export const COMPANIES: CompanyInfo[] = list;
+
+const COLUMNS ="url,link,title,company,published,summary,category,depth,score,image_url,hn_points,found_via,added_at";
 
 /** The newest posts (a few months' worth); pages filter and sort these. */
 export async function listCompanyPosts(limit = 400): Promise<CompanyPost[]> {

@@ -11,44 +11,46 @@
 #            find their posts through Hacker News search, which catches
 #            nearly every post someone shares there.
 #   weight   how much we trust it when ranking (1.0 = normal)
+#   site     the company's main website, for its logo on the website
 #
 # After editing, run: python -m kernel.company_blogs --dry-run
+# and refresh the website's logo list: python -m kernel.company_blogs --export-web
 
 companies:
   # --- Big consumer tech -------------------------------------------------------
-  - { name: Netflix, feed: "https://netflixtechblog.com/feed", weight: 1.3 }
-  - { name: Uber, hn: "uber.com/blog", weight: 1.3 }
-  - { name: Meta, feed: "https://engineering.fb.com/feed/", weight: 1.3 }
-  - { name: Airbnb, feed: "https://medium.com/feed/airbnb-engineering", weight: 1.2 }
-  - { name: Spotify, feed: "https://engineering.atspotify.com/feed/", weight: 1.2 }
-  - { name: Pinterest, feed: "https://medium.com/feed/pinterest-engineering", weight: 1.1 }
-  - { name: LinkedIn, hn: "linkedin.com/blog/engineering", weight: 1.1 }
-  - { name: Dropbox, feed: "https://dropbox.tech/feed", weight: 1.1 }
-  - { name: Lyft, feed: "https://eng.lyft.com/feed", weight: 1.0 }
-  - { name: DoorDash, hn: "careersatdoordash.com/blog", weight: 1.0 }
-  - { name: Instacart, feed: "https://tech.instacart.com/feed", weight: 1.0 }
-  - { name: Booking.com, feed: "https://medium.com/feed/booking-com-development", weight: 1.0 }
-  - { name: Etsy, feed: "https://www.etsy.com/codeascraft/rss", weight: 1.0 }
-  - { name: Grab, feed: "https://engineering.grab.com/feed.xml", weight: 1.0 }
+  - { name: Netflix, feed: "https://netflixtechblog.com/feed", weight: 1.3, site: "netflix.com" }
+  - { name: Uber, hn: "uber.com/blog", weight: 1.3, site: "uber.com" }
+  - { name: Meta, feed: "https://engineering.fb.com/feed/", weight: 1.3, site: "meta.com" }
+  - { name: Airbnb, feed: "https://medium.com/feed/airbnb-engineering", weight: 1.2, site: "airbnb.com" }
+  - { name: Spotify, feed: "https://engineering.atspotify.com/feed/", weight: 1.2, site: "spotify.com" }
+  - { name: Pinterest, feed: "https://medium.com/feed/pinterest-engineering", weight: 1.1, site: "pinterest.com" }
+  - { name: LinkedIn, hn: "linkedin.com/blog/engineering", weight: 1.1, site: "linkedin.com" }
+  - { name: Dropbox, feed: "https://dropbox.tech/feed", weight: 1.1, site: "dropbox.com" }
+  - { name: Lyft, feed: "https://eng.lyft.com/feed", weight: 1.0, site: "lyft.com" }
+  - { name: DoorDash, hn: "careersatdoordash.com/blog", weight: 1.0, site: "doordash.com" }
+  - { name: Instacart, feed: "https://tech.instacart.com/feed", weight: 1.0, site: "instacart.com" }
+  - { name: Booking.com, feed: "https://medium.com/feed/booking-com-development", weight: 1.0, site: "booking.com" }
+  - { name: Etsy, feed: "https://www.etsy.com/codeascraft/rss", weight: 1.0, site: "etsy.com" }
+  - { name: Grab, feed: "https://engineering.grab.com/feed.xml", weight: 1.0, site: "grab.com" }
 
   # --- Developer and AI companies ----------------------------------------------
-  - { name: Anthropic, hn: "anthropic.com/engineering", weight: 1.3 }
-  - { name: GitHub, feed: "https://github.blog/engineering/feed/", weight: 1.1 }
-  - { name: Stripe, feed: "https://stripe.com/blog/feed.rss", weight: 1.1 }
-  - { name: Shopify, feed: "https://shopify.engineering/blog.atom", weight: 1.1 }
-  - { name: Databricks, feed: "https://www.databricks.com/feed", weight: 0.9 }
-  - { name: Cursor, hn: "cursor.com/blog", weight: 1.0 }
-  - { name: Figma, feed: "https://www.figma.com/blog/feed/atom.xml", weight: 0.8 }
-  - { name: Canva, feed: "https://www.canva.dev/blog/engineering/feed", weight: 0.9 }
-  - { name: AWS Architecture, feed: "https://aws.amazon.com/blogs/architecture/feed/", weight: 0.9 }
+  - { name: Anthropic, hn: "anthropic.com/engineering", weight: 1.3, site: "anthropic.com" }
+  - { name: GitHub, feed: "https://github.blog/engineering/feed/", weight: 1.1, site: "github.com" }
+  - { name: Stripe, feed: "https://stripe.com/blog/feed.rss", weight: 1.1, site: "stripe.com" }
+  - { name: Shopify, feed: "https://shopify.engineering/blog.atom", weight: 1.1, site: "shopify.com" }
+  - { name: Databricks, feed: "https://www.databricks.com/feed", weight: 0.9, site: "databricks.com" }
+  - { name: Cursor, hn: "cursor.com/blog", weight: 1.0, site: "cursor.com" }
+  - { name: Figma, feed: "https://www.figma.com/blog/feed/atom.xml", weight: 0.8, site: "figma.com" }
+  - { name: Canva, feed: "https://www.canva.dev/blog/engineering/feed", weight: 0.9, site: "canva.com" }
+  - { name: AWS Architecture, feed: "https://aws.amazon.com/blogs/architecture/feed/", weight: 0.9, site: "aws.amazon.com" }
 
   # --- Research labs -----------------------------------------------------------
-  - { name: Google Research, feed: "https://research.google/blog/rss/", weight: 1.2 }
-  - { name: Microsoft Research, feed: "https://www.microsoft.com/en-us/research/feed/", weight: 1.1 }
+  - { name: Google Research, feed: "https://research.google/blog/rss/", weight: 1.2, site: "research.google" }
+  - { name: Microsoft Research, feed: "https://www.microsoft.com/en-us/research/feed/", weight: 1.1, site: "microsoft.com" }
 
   # --- India -------------------------------------------------------------------
-  - { name: Hotstar, feed: "https://blog.hotstar.com/feed", weight: 1.0 }
-  - { name: Razorpay, feed: "https://engineering.razorpay.com/feed", weight: 1.0 }
-  - { name: Flipkart, feed: "https://blog.flipkart.tech/feed", weight: 1.0 }
-  - { name: Swiggy, hn: "bytes.swiggy.com", weight: 1.0 }
-  - { name: Zomato, hn: "blog.zomato.com", weight: 1.0 }
+  - { name: Hotstar, feed: "https://blog.hotstar.com/feed", weight: 1.0, site: "hotstar.com" }
+  - { name: Razorpay, feed: "https://engineering.razorpay.com/feed", weight: 1.0, site: "razorpay.com" }
+  - { name: Flipkart, feed: "https://blog.flipkart.tech/feed", weight: 1.0, site: "flipkart.com" }
+  - { name: Swiggy, hn: "bytes.swiggy.com", weight: 1.0, site: "swiggy.com" }
+  - { name: Zomato, hn: "blog.zomato.com", weight: 1.0, site: "zomato.com" }
