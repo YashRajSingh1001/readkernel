@@ -17,7 +17,8 @@ with every source linked. It is built to run at zero cost.
 | Phase 3 | Make it yours (topics, 5/10/15, format, daily/weekly) with live preview, preferences link in every email, Google sign-in, synced saves | **built** (sign-in needs setup) |
 | Phase 4 | Blog, guides, newsletter reviews, compare, contact, privacy, terms | **built** |
 | Phase 5 | Archive search, story timelines, weekly digest, Telegram, listen mode | **built** (Telegram needs a bot) |
-| 2 | Chrome new-tab extension, MCP server for AI assistants | later |
+| 2 | MCP server for AI assistants (read-only: brief, feed, archive search, story timelines) | **working** |
+| 2 | Chrome new-tab extension | later |
 
 ## How the pipeline works
 
@@ -172,6 +173,35 @@ Sign-in is off until you turn it on, so the site never shows a broken login.
 3. Vercel environment variables: `NEXT_PUBLIC_SUPABASE_URL`,
    `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (same values as the server ones) and
    `NEXT_PUBLIC_AUTH_ENABLED=1`. Redeploy.
+
+## MCP server (for AI assistants)
+
+`pipeline/kernel/mcp_server.py` lets Claude Code, Claude Desktop, Cursor or any
+other MCP client read ReadKernel. It is read-only and reads the same data as
+the website: Supabase with the **publishable** key, or `pipeline/data` files
+when no database is set. It never uses the secret key.
+
+| Tool | What it returns |
+| --- | --- |
+| `get_brief` | A day's top stories (latest by default), with summaries and sources |
+| `get_feed` | The whole day's stories, optionally one topic |
+| `search_stories` | Archive search over headlines and summaries |
+| `get_story_thread` | One ongoing story, day by day |
+| `list_editions` | The days that have a brief, with each lead headline |
+| `get_top_discussions` | The day's top Hacker News posts |
+| `list_sources` | The news sources and their topics |
+
+It also serves the latest brief as the resource `readkernel://brief/latest`.
+
+```bash
+cd pipeline
+python3.12 -m venv .venv && .venv/bin/pip install -r requirements-mcp.txt   # Python 3.10+
+# .env: SUPABASE_URL + SUPABASE_PUBLISHABLE_KEY (optional; otherwise local files)
+claude mcp add readkernel -e PYTHONPATH="$PWD" -- "$PWD/.venv/bin/python" -m kernel.mcp_server
+```
+
+Then ask Claude Code something like "What's in today's ReadKernel brief?" or
+"Find ReadKernel stories about open-weight models this week".
 
 ## Writing pages
 
