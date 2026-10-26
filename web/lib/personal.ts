@@ -13,8 +13,9 @@ export const FREQUENCIES = [
   { id: "weekly", label: "Once a week (Sunday)" },
 ] as const;
 
-export type Prefs = { topics: string[]; count: number; format: string; frequency: string };
-export const DEFAULT_PREFS: Prefs = { topics: [], count: 10, format: "summaries", frequency: "daily" };
+// companyRead: end the email with one engineering post from a company blog (see /companies).
+export type Prefs = { topics: string[]; count: number; format: string; frequency: string; companyRead: boolean };
+export const DEFAULT_PREFS: Prefs = { topics: [], count: 10, format: "summaries", frequency: "daily", companyRead: true };
 
 export function selectStories(brief: Story[], feed: Story[], topics: string[], count: number): Story[] {
   const n = (COUNTS as readonly number[]).includes(count) ? count : 10;
@@ -33,7 +34,10 @@ export function selectStories(brief: Story[], feed: Story[], topics: string[], c
 }
 
 /** Validate untrusted form input into Prefs. */
-export function parsePrefs(input: { topics?: unknown; count?: unknown; format?: unknown; frequency?: unknown }, validTopics: string[]): Prefs {
+export function parsePrefs(
+  input: { topics?: unknown; count?: unknown; format?: unknown; frequency?: unknown; companyRead?: unknown },
+  validTopics: string[],
+): Prefs {
   const topics = String(input.topics ?? "")
     .split(",")
     .map((t) => t.trim())
@@ -46,5 +50,6 @@ export function parsePrefs(input: { topics?: unknown; count?: unknown; format?: 
     count: (COUNTS as readonly number[]).includes(count) ? count : 10,
     format: FORMATS.some((f) => f.id === format) ? format : "summaries",
     frequency: FREQUENCIES.some((f) => f.id === frequency) ? frequency : "daily",
+    companyRead: String(input.companyRead ?? "1") !== "0",
   };
 }

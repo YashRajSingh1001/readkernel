@@ -90,6 +90,29 @@ export function PrefsPicker({ value, onChange }: Props) {
           ))}
         </div>
       </fieldset>
+
+      <fieldset>
+        <legend className="font-bold">From company blogs</legend>
+        <p className="mb-3 text-sm text-muted">
+          One extra pick at the end: how a team at Netflix, Uber, Airbnb or similar built something.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { on: true, label: "Yes, include it" },
+            { on: false, label: "No thanks" },
+          ].map((o) => (
+            <button
+              key={o.label}
+              type="button"
+              aria-pressed={value.companyRead === o.on}
+              onClick={() => onChange({ ...value, companyRead: o.on })}
+              className={chip(value.companyRead === o.on)}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </fieldset>
     </div>
   );
 }

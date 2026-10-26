@@ -1,0 +1,54 @@
+# Company blogs: how real companies build things.
+#
+# Engineering and data science write-ups, kept apart from the daily news:
+# companies post a few times a month and each post has one source, so they
+# would never win a ranking built on "how many outlets covered this today".
+#
+# Each company:
+#   name     shown on the page
+#   feed     RSS or Atom feed
+#   hn       for companies with no feed: a piece of their blog's address. We
+#            find their posts through Hacker News search, which catches
+#            nearly every post someone shares there.
+#   weight   how much we trust it when ranking (1.0 = normal)
+#
+# After editing, run: python -m kernel.company_blogs --dry-run
+
+companies:
+  # --- Big consumer tech -------------------------------------------------------
+  - { name: Netflix, feed: "https://netflixtechblog.com/feed", weight: 1.3 }
+  - { name: Uber, hn: "uber.com/blog", weight: 1.3 }
+  - { name: Meta, feed: "https://engineering.fb.com/feed/", weight: 1.3 }
+  - { name: Airbnb, feed: "https://medium.com/feed/airbnb-engineering", weight: 1.2 }
+  - { name: Spotify, feed: "https://engineering.atspotify.com/feed/", weight: 1.2 }
+  - { name: Pinterest, feed: "https://medium.com/feed/pinterest-engineering", weight: 1.1 }
+  - { name: LinkedIn, hn: "linkedin.com/blog/engineering", weight: 1.1 }
+  - { name: Dropbox, feed: "https://dropbox.tech/feed", weight: 1.1 }
+  - { name: Lyft, feed: "https://eng.lyft.com/feed", weight: 1.0 }
+  - { name: DoorDash, hn: "careersatdoordash.com/blog", weight: 1.0 }
+  - { name: Instacart, feed: "https://tech.instacart.com/feed", weight: 1.0 }
+  - { name: Booking.com, feed: "https://medium.com/feed/booking-com-development", weight: 1.0 }
+  - { name: Etsy, feed: "https://www.etsy.com/codeascraft/rss", weight: 1.0 }
+  - { name: Grab, feed: "https://engineering.grab.com/feed.xml", weight: 1.0 }
+
+  # --- Developer and AI companies ----------------------------------------------
+  - { name: Anthropic, hn: "anthropic.com/engineering", weight: 1.3 }
+  - { name: GitHub, feed: "https://github.blog/engineering/feed/", weight: 1.1 }
+  - { name: Stripe, feed: "https://stripe.com/blog/feed.rss", weight: 1.1 }
+  - { name: Shopify, feed: "https://shopify.engineering/blog.atom", weight: 1.1 }
+  - { name: Databricks, feed: "https://www.databricks.com/feed", weight: 0.9 }
+  - { name: Cursor, hn: "cursor.com/blog", weight: 1.0 }
+  - { name: Figma, feed: "https://www.figma.com/blog/feed/atom.xml", weight: 0.8 }
+  - { name: Canva, feed: "https://www.canva.dev/blog/engineering/feed", weight: 0.9 }
+  - { name: AWS Architecture, feed: "https://aws.amazon.com/blogs/architecture/feed/", weight: 0.9 }
+
+  # --- Research labs -----------------------------------------------------------
+  - { name: Google Research, feed: "https://research.google/blog/rss/", weight: 1.2 }
+  - { name: Microsoft Research, feed: "https://www.microsoft.com/en-us/research/feed/", weight: 1.1 }
+
+  # --- India -------------------------------------------------------------------
+  - { name: Hotstar, feed: "https://blog.hotstar.com/feed", weight: 1.0 }
+  - { name: Razorpay, feed: "https://engineering.razorpay.com/feed", weight: 1.0 }
+  - { name: Flipkart, feed: "https://blog.flipkart.tech/feed", weight: 1.0 }
+  - { name: Swiggy, hn: "bytes.swiggy.com", weight: 1.0 }
+  - { name: Zomato, hn: "blog.zomato.com", weight: 1.0 }

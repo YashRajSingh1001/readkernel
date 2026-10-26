@@ -13,6 +13,17 @@ from datetime import date
 from html import escape
 from urllib.parse import quote
 
+# Same ids as company_blogs.CATEGORIES (kept short here for the email's label).
+COMPANY_LABELS = {
+    "ai": "AI & LLMs",
+    "ml": "Machine learning",
+    "data": "Data science",
+    "infra": "Infrastructure",
+    "apps": "Apps & product",
+    "security": "Security",
+    "engineering": "Engineering practice",
+}
+
 TOPIC_LABELS = {
     "ai": "AI",
     "tech": "Tech",
@@ -81,6 +92,15 @@ def render(
         for src in s["sources"][:4]:
             lines.append(f"   - {src['name']}: {src['url']}")
         lines.append("")
+    reads = edition.get("company_reads") or []
+    if reads:
+        lines.append("FROM COMPANY BLOGS")
+        for r in reads:
+            lines.append(f"- {r['company']}: {r['title']}")
+            if r.get("summary"):
+                lines.append(f"  {r['summary']}")
+            lines.append(f"  {r['link']}")
+        lines += [f"  More: {site_url}/companies", ""]
     lines += [
         f"Read on the web: {day_url}",
         f"Change topics, length or format: {urls['manage']}",
@@ -90,6 +110,7 @@ def render(
 
     # --- html -------------------------------------------------------------
     cards = "".join(_story_html(i, s, fmt) for i, s in enumerate(stories, 1))
+    cards += _company_html(reads, site_url)
     html = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light only"><title>{escape(subject)}</title></head>
@@ -114,6 +135,27 @@ def render(
   </td></tr>
 </table></td></tr></table></body></html>"""
     return subject, html, text
+
+
+def _company_html(reads: list[dict], site_url: str) -> str:
+    """The closing "From company blogs" block: how real teams built something."""
+    if not reads:
+        return ""
+    items = "".join(
+        f"""
+    <div style="margin-top:14px;">
+      <div style="font-family:{SANS};font-size:12px;color:{MUTED};"><strong style="color:{INK};">{escape(r['company'])}</strong> &nbsp;·&nbsp; {escape(COMPANY_LABELS.get(r.get('category', ''), 'Engineering'))}</div>
+      <div style="margin-top:4px;font-family:{SERIF};font-size:18px;line-height:1.3;font-weight:bold;"><a href="{escape(r['link'])}" style="color:{INK};text-decoration:none;">{escape(r['title'])}</a></div>
+      {f'<p style="margin:6px 0 0 0;font-family:{SANS};font-size:14px;line-height:1.5;color:{INK};">{escape(r["summary"])}</p>' if r.get('summary') else ''}
+    </div>"""
+        for r in reads
+    )
+    return f"""
+  <tr><td style="padding:20px 16px;background:{CARD};border:1px solid {LINE};border-radius:10px;">
+    <div style="font-family:{SANS};font-size:12px;letter-spacing:1px;text-transform:uppercase;color:{ACCENT};">From company blogs</div>{items}
+    <div style="margin-top:14px;font-family:{SANS};font-size:13px;"><a href="{escape(site_url)}/companies" style="color:{ACCENT};">More from engineering teams &rarr;</a></div>
+  </td></tr>
+  <tr><td style="height:8px;"></td></tr>"""
 
 
 def _story_html(rank: int, story: dict, fmt: str = "summaries") -> str:

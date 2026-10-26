@@ -21,14 +21,14 @@ export * from "./format";
 
 const STORY_KEY_RE = /^[a-z0-9-]{6,40}$/;
 
-function supabase() {
+export function supabase() {
   if (process.env.READ_LOCAL_DATA === "1") return null;
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_PUBLISHABLE_KEY;
   return url && key ? { url: url.replace(/\/$/, ""), key } : null;
 }
 
-async function rest<T>(query: string): Promise<T> {
+export async function rest<T>(query: string): Promise<T> {
   const db = supabase()!;
   const headers: Record<string, string> = { apikey: db.key };
   if (db.key.startsWith("eyJ")) headers.Authorization = `Bearer ${db.key}`; // legacy anon key
@@ -64,7 +64,7 @@ function toEdition(row: EditionRow): Edition {
   return { date: row.date, generated_at: row.generated_at, ai: row.ai, stories, feed, discussions: row.discussions ?? [] };
 }
 
-function dataDir() {
+export function dataDir() {
   // Ignore hint: this folder is read at runtime, not bundled into the build.
   return process.env.LOCAL_DATA_DIR || path.join(/*turbopackIgnore: true*/ process.cwd(), "..", "pipeline", "data");
 }

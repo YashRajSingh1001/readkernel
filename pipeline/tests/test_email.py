@@ -75,3 +75,38 @@ def test_reply_to_header_when_set(tmp_path):
     mailer.send(message_for(EDITION, "a@example.com", "tok", "https://r.example"))
     parsed = message_from_bytes(next(tmp_path.glob("*.eml")).read_bytes())
     assert parsed["Reply-To"] == "hello@r.example"
+
+
+READ = {"company": "Uber", "title": "Retry storms", "summary": "Uber stopped retry storms.", "link": "https://uber.com/blog/x",
+        "category": "infra", "depth": 4, "score": 5.2, "url": "https://uber.com/blog/x"}
+
+
+def test_company_read_appears_unless_turned_off():
+    from kernel.send import personal_edition
+
+    edition = {**EDITION, "feed": EDITION["stories"]}
+    mine = personal_edition(edition, [], {}, False, [READ])
+    _, html, text = render(mine, "https://r.example", "t")
+    assert "From company blogs" in html and "Retry storms" in html and "https://r.example/companies" in html
+    assert "FROM COMPANY BLOGS" in text and "https://uber.com/blog/x" in text
+    off = personal_edition(edition, [], {"company_read": False}, False, [READ])
+    assert "From company blogs" not in render(off, "https://r.example", "t")[1]
+
+
+def test_company_reads_pick_best_new_post_per_company(tmp_path):
+    import json
+    from datetime import datetime, timedelta, timezone
+
+    from kernel.send import load_company_reads
+
+    now = datetime.now(timezone.utc)
+    rows = [
+        {**READ, "url": "a", "title": "Old", "added_at": (now - timedelta(days=3)).isoformat(), "score": 9},
+        {**READ, "url": "b", "title": "Shallow", "company": "Meta", "depth": 1, "added_at": now.isoformat(), "score": 8},
+        {**READ, "url": "c", "title": "Best", "added_at": now.isoformat(), "score": 6},
+        {**READ, "url": "d", "title": "Second Uber", "added_at": now.isoformat(), "score": 5},
+        {**READ, "url": "e", "title": "Netflix", "company": "Netflix", "added_at": now.isoformat(), "score": 4},
+    ]
+    (tmp_path / "company_posts.json").write_text(json.dumps(rows), encoding="utf-8")
+    assert [r["title"] for r in load_company_reads(None, tmp_path, weekly=False)] == ["Best"]
+    assert [r["title"] for r in load_company_reads(None, tmp_path, weekly=True)] == ["Old", "Netflix"]  # one per company; depth 1 never

@@ -1,10 +1,12 @@
 /* eslint-disable @next/next/no-img-element -- source icons from Google's icon service */
 import Link from "next/link";
 
+import { CompanyPostCard } from "@/components/CompanyPostCard";
 import { Container } from "@/components/Container";
 import { SignupForm } from "@/components/SignupForm";
 import { StoryCard } from "@/components/StoryCard";
 import { faviconUrl, formatDate, getLatestEdition } from "@/lib/brief";
+import { highlights, listCompanyPosts } from "@/lib/companies";
 import { FEATURED_SOURCES, SOURCES } from "@/lib/sources";
 
 const STEPS = [
@@ -35,8 +37,9 @@ const PERKS = [
 ];
 
 export default async function Home() {
-  const edition = await getLatestEdition();
+  const [edition, companyPosts] = await Promise.all([getLatestEdition(), listCompanyPosts()]);
   const [first, ...rest] = edition?.stories ?? [];
+  const companyReads = highlights(companyPosts, 3);
   const now = edition ? Date.parse(edition.generated_at) : 0;
 
   return (
@@ -113,6 +116,29 @@ export default async function Home() {
               + {Math.max(0, edition.stories.length - 4)} more in today&apos;s edition
             </Link>
           </div>
+        </Container>
+      )}
+
+      {/* Company blogs */}
+      {companyReads.length > 0 && (
+        <Container className="pb-14">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="font-mono text-xs tracking-wide text-label uppercase">From company blogs</p>
+              <h2 className="mt-1 text-3xl font-extrabold tracking-tight">How real companies build</h2>
+            </div>
+            <Link href="/companies" className="hidden text-sm font-medium text-accent hover:underline sm:inline">
+              All company posts →
+            </Link>
+          </div>
+          <div className="mt-6 rounded-2xl border border-line bg-card px-4 sm:px-6">
+            {companyReads.map((p) => (
+              <CompanyPostCard key={p.url} post={p} variant="compact" />
+            ))}
+          </div>
+          <Link href="/companies" className="mt-4 block text-center text-sm font-medium text-accent hover:underline sm:hidden">
+            All company posts →
+          </Link>
         </Container>
       )}
 

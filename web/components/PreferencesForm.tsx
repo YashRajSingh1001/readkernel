@@ -24,6 +24,7 @@ export function PreferencesForm({ initial, action, token }: Props) {
       <input type="hidden" name="story_count" value={prefs.count} />
       <input type="hidden" name="format" value={prefs.format} />
       <input type="hidden" name="frequency" value={prefs.frequency} />
+      <input type="hidden" name="companyRead" value={prefs.companyRead ? "1" : "0"} />
       <div className="mt-8 flex flex-wrap items-center gap-4">
         <button
           type="submit"

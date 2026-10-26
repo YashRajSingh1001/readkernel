@@ -4,7 +4,7 @@ import { randomBytes } from "crypto";
 import { headers } from "next/headers";
 
 import type { Story } from "@/lib/format";
-import { selectStories, type Prefs } from "@/lib/personal";
+import { DEFAULT_PREFS, selectStories, type Prefs } from "@/lib/personal";
 import { adminRest } from "./admin-db";
 import { renderBrief } from "./brief-email";
 import { isPreviewTransport, sendMail } from "./mailer";
@@ -19,11 +19,12 @@ type Subscriber = {
   story_count: number;
   format: string;
   frequency: string;
+  company_read: boolean;
 };
 
 export type ManagedSubscriber = Pick<Subscriber, "email" | "status"> & { prefs: Prefs };
 
-const COLUMNS = "id,email,status,token,confirm_sent_at,topics,story_count,format,frequency";
+const COLUMNS = "id,email,status,token,confirm_sent_at,topics,story_count,format,frequency,company_read";
 // Don't send the same address another email from the sign-up form more often than this.
 const RESEND_COOLDOWN_MS = 10 * 60 * 1000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -58,7 +59,13 @@ async function siteUrl(): Promise<string> {
 }
 
 function prefsColumns(prefs: Prefs) {
-  return { topics: prefs.topics, story_count: prefs.count, format: prefs.format, frequency: prefs.frequency };
+  return {
+    topics: prefs.topics,
+    story_count: prefs.count,
+    format: prefs.format,
+    frequency: prefs.frequency,
+    company_read: prefs.companyRead,
+  };
 }
 
 async function findBy(column: "email" | "token", value: string): Promise<Subscriber | null> {
@@ -199,7 +206,13 @@ export async function getByToken(token: string): Promise<ManagedSubscriber | nul
   return {
     email: sub.email,
     status: sub.status,
-    prefs: { topics: sub.topics ?? [], count: sub.story_count ?? 10, format: sub.format ?? "summaries", frequency: sub.frequency ?? "daily" },
+    prefs: {
+      topics: sub.topics ?? [],
+      count: sub.story_count ?? 10,
+      format: sub.format ?? "summaries",
+      frequency: sub.frequency ?? "daily",
+      companyRead: sub.company_read ?? true,
+    },
   };
 }
 
@@ -230,7 +243,7 @@ export async function ensureAccountSubscription(userId: string, email: string, p
       status: "active",
       confirmed_at: new Date().toISOString(),
       user_id: userId,
-      ...prefsColumns(prefs ?? { topics: [], count: 10, format: "summaries", frequency: "daily" }),
+      ...prefsColumns(prefs ?? DEFAULT_PREFS),
     },
     prefer: "return=minimal",
   });

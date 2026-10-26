@@ -22,6 +22,8 @@ type Props = {
   topic: string;
   headline: string;
   size?: "lead" | "standard" | "thumb";
+  /** Text on the no-photo card; defaults to the topic name. */
+  label?: string;
   /** Lead source, shown on the no-photo card. */
   sourceName?: string;
   sourceUrl?: string;
@@ -32,12 +34,12 @@ type Props = {
  * No photo (some publishers block automated visits), or it fails to load: a
  * compact branded card with the topic and the publisher instead.
  */
-export function StoryImage({ src, credit, topic, headline, size = "standard", sourceName, sourceUrl }: Props) {
+export function StoryImage({ src, credit, topic, headline, size = "standard", sourceName, sourceUrl, label: labelText }: Props) {
   const [failed, setFailed] = useState(false);
   const ratio = size === "thumb" ? "aspect-square" : size === "lead" ? "aspect-[16/9]" : "aspect-[16/10]";
   const radius = size === "thumb" ? "rounded-lg" : "rounded-xl";
   const tint = TOPIC_TINT[topic] ?? TOPIC_TINT.tech;
-  const label = TOPICS[topic] ?? topic;
+  const label = labelText ?? TOPICS[topic] ?? topic;
 
   if (!src || failed) {
     if (size === "thumb") {

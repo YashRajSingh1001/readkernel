@@ -117,7 +117,12 @@ def _page_description(client: httpx.Client, url: str) -> str:
                     break
     except httpx.HTTPError:
         return ""
-    for tag in _DESC_RE.findall(body.decode("utf-8", errors="ignore")):
+    return page_description(body.decode("utf-8", errors="ignore"))
+
+
+def page_description(html_text: str) -> str:
+    """The short description a page declares for link previews."""
+    for tag in _DESC_RE.findall(html_text):
         match = _CONTENT_RE.search(tag)
         if match:
             return clean_text(html.unescape(match.group(1)))[:400]

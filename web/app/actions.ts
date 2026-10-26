@@ -25,6 +25,7 @@ function prefsFrom(form: FormData): Prefs | undefined {
       count: form.get("story_count"),
       format: form.get("format"),
       frequency: form.get("frequency"),
+      companyRead: form.get("companyRead"),
     },
     Object.keys(TOPICS),
   );

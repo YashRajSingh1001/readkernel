@@ -41,6 +41,17 @@ class Supabase:
             )
             response.raise_for_status()
 
+    def insert_new(self, table: str, rows: list[dict], key: str) -> None:
+        """Insert rows, silently skipping any whose `key` column already exists."""
+        if rows:
+            response = self.client.post(
+                f"{self.base}/{table}",
+                params={"on_conflict": key},
+                json=rows,
+                headers={"Prefer": "resolution=ignore-duplicates,return=minimal"},
+            )
+            response.raise_for_status()
+
     def delete(self, table: str, **filters: str) -> None:
         params = {k: f"eq.{v}" for k, v in filters.items()}
         response = self.client.delete(f"{self.base}/{table}", params=params)

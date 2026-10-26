@@ -19,6 +19,34 @@ export type Story = {
   thread_id?: string | null; // same id = same ongoing story across days
 };
 
+/** An engineering or data science post from a company blog (see /companies). */
+export type CompanyPost = {
+  url: string; // cleaned-up address, unique
+  link: string; // the address readers open
+  title: string;
+  company: string;
+  published: string;
+  summary: string;
+  category: string;
+  depth: number | null; // 1 = announcement ... 5 = deep technical write-up
+  score: number;
+  image_url: string | null;
+  hn_points: number | null;
+  found_via: "feed" | "hn";
+  added_at?: string;
+};
+
+// Same ids as pipeline/kernel/company_blogs.py CATEGORIES.
+export const COMPANY_CATEGORIES: Record<string, string> = {
+  ai: "AI & LLMs",
+  ml: "Machine learning",
+  data: "Data science & analytics",
+  infra: "Infrastructure",
+  apps: "Apps & product",
+  security: "Security",
+  engineering: "Engineering practice",
+};
+
 export type Discussion = {
   title: string;
   url: string;

@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { CompanyPostCard } from "@/components/CompanyPostCard";
 import { Container } from "@/components/Container";
 import { TOPICS, formatDate, searchStories } from "@/lib/brief";
+import { searchCompanyPosts } from "@/lib/companies";
 
 export const metadata: Metadata = {
   title: "Search",
@@ -48,7 +50,8 @@ function SearchBox({ q }: { q: string }) {
 async function Results({ searchParams }: { searchParams: PageProps<"/search">["searchParams"] }) {
   const { q } = await searchParams;
   const query = typeof q === "string" ? q.trim() : "";
-  const results = query.length >= 2 ? await searchStories(query) : [];
+  const [results, companyResults] =
+    query.length >= 2 ? await Promise.all([searchStories(query), searchCompanyPosts(query)]) : [[], []];
 
   return (
     <>
@@ -73,6 +76,14 @@ async function Results({ searchParams }: { searchParams: PageProps<"/search">["s
           </li>
         ))}
       </ul>
+      {companyResults.length > 0 && (
+        <section className="mt-10">
+          <h2 className="font-mono text-xs tracking-wide text-label uppercase">From company blogs</h2>
+          {companyResults.map((p) => (
+            <CompanyPostCard key={p.url} post={p} variant="compact" />
+          ))}
+        </section>
+      )}
       {query.length < 2 && (
         <p className="mt-6 text-sm text-muted">
           Tip: use quotes for exact phrases, like &quot;open weights&quot;, and a minus to exclude a word.

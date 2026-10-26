@@ -12,6 +12,7 @@ const icon = {
   top: "M4 18 9 12l4 4 7-9M14 7h6v6",
   saved: "M6 3h12v18l-6-4-6 4z",
   search: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zm9 16-3.5-3.5",
+  companies: "M4 21V5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v16M14 10h5a1 1 0 0 1 1 1v10M3 21h18M8 8h2M8 12h2M8 16h2",
 };
 
 function Icon({ d }: { d: string }) {
@@ -53,6 +54,7 @@ export function FeedNav({ counts, total, discussions }: Props) {
           .map((t) => item(`/feed/${t}`, TOPICS[t], counts[t]))}
         <p className="mt-4 mb-1 px-3 font-mono text-[11px] tracking-wide text-muted uppercase">More</p>
         {item("/feed/top", "Top articles", discussions, icon.top)}
+        {item("/companies", "Company blogs", undefined, icon.companies)}
         {item("/saved", "Saved", undefined, icon.saved)}
         {item("/search", "Search", undefined, icon.search)}
       </nav>

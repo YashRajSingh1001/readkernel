@@ -65,6 +65,12 @@ jobs:
       - name: Build today's brief
         run: python -m kernel.run
 
+      # New engineering and data science posts from company blogs. A failure
+      # here must never stop the brief going out.
+      - name: Company blogs
+        continue-on-error: true
+        run: python -m kernel.company_blogs
+
       - name: Email subscribers
         if: github.event_name == 'schedule' || inputs.send_email
         run: python -m kernel.send

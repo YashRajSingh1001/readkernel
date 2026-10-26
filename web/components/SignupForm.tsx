@@ -3,12 +3,13 @@
 import { useActionState } from "react";
 
 import { subscribeAction, type FormState } from "@/app/actions";
+import type { Prefs } from "@/lib/personal";
 
 type Props = {
   /** Smaller card used inside the brief; the homepage uses the large hero form. */
   compact?: boolean;
   /** "Make it yours" choices sent with the sign-up (builder page). */
-  prefs?: { topics: string[]; count: number; format: string; frequency: string };
+  prefs?: Prefs;
   buttonLabel?: string;
 };
 
@@ -43,6 +44,7 @@ export function SignupForm({ compact = false, prefs, buttonLabel = "Get the dail
           <input type="hidden" name="story_count" value={prefs.count} />
           <input type="hidden" name="format" value={prefs.format} />
           <input type="hidden" name="frequency" value={prefs.frequency} />
+          <input type="hidden" name="companyRead" value={prefs.companyRead ? "1" : "0"} />
         </>
       )}
       <button
