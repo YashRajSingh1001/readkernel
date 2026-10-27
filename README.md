@@ -19,8 +19,9 @@ with every source linked. It is built to run at zero cost.
 | Phase 3 | Make it yours (topics, 5/10/15, format, daily/weekly) with live preview, preferences link in every email, Google sign-in, synced saves | **built** (sign-in needs setup) |
 | Phase 4 | Blog, guides, newsletter reviews, compare, contact, privacy, terms | **built** |
 | Phase 5 | Archive search, story timelines, weekly digest, Telegram, listen mode | **built** (Telegram needs a bot) |
-| 2 | MCP server for AI assistants (read-only: brief, feed, archive search, story timelines) | **working** |
-| 2 | Chrome new-tab extension | later |
+| 2 | MCP for AI assistants: hosted at `https://readkernel.in/mcp` (no install) and a local Python server (below) | **working** |
+| 2 | Chrome new-tab extension (`extension/`) | **built** (not yet on the Web Store) |
+| 2 | Agents: Ask ReadKernel chat (`/ask`), fact-check agent, watch alerts | **working** |
 
 ## How the pipeline works
 
@@ -177,6 +178,25 @@ Sign-in is off until you turn it on, so the site never shows a broken login.
    `NEXT_PUBLIC_AUTH_ENABLED=1`. Redeploy.
 
 ## MCP server (for AI assistants)
+
+There are two ways to connect, with the same kind of read-only tools:
+
+| | Hosted | Local |
+| --- | --- | --- |
+| Address | `https://readkernel.in/mcp` | runs on your computer |
+| Setup | paste the address into your assistant; nothing to install | Python + `requirements-mcp.txt` (below) |
+| Code | `web/app/mcp/route.ts`, tools in `web/lib/tools.ts` | `pipeline/kernel/mcp_server.py` |
+| Extra | company blog posts | works offline on local `pipeline/data` files; `list_editions`, `list_sources`, a latest-brief resource |
+
+Hosted, in Claude Code:
+
+```bash
+claude mcp add --transport http readkernel https://readkernel.in/mcp
+```
+
+More clients (Claude.ai, Cursor) on [readkernel.in/tools](https://readkernel.in/tools).
+
+### Local server
 
 `pipeline/kernel/mcp_server.py` lets Claude Code, Claude Desktop, Cursor or any
 other MCP client read ReadKernel. It is read-only and reads the same data as

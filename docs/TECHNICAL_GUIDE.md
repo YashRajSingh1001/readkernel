@@ -409,7 +409,7 @@ sequenceDiagram
 
 - Files: `web/lib/server/agent.ts` (the loop), `web/app/api/ask/route.ts` (limits), `web/components/AskChat.tsx` (the chat).
 - At most 5 rounds of tool use per question, then it must answer. Follow-up questions keep the last 6 messages as context.
-- Answers only from tool results, never from memory; off-topic requests are declined.
+- Answers only from tool results, never from memory, and must not stretch an item to fit the question; off-topic requests are declined.
 - If the model forgets to link, the sources it used are listed under the answer automatically.
 - Limits to protect the free quota: 12 questions per visitor per 10 minutes, 600 characters per message.
 - Tested 27 October 2026: "What has Nvidia been up to?" → one search, four facts, sources listed.
@@ -451,6 +451,10 @@ server exposes the six news tools to Claude, Cursor, VS Code and others. No key 
   brand-new major version of the MCP library. Tested with the **official MCP client library**
   (`@modelcontextprotocol/sdk` 1.32.2): connect, list tools, and call each tool, including bad input.
 - Every tool is marked read-only for clients. Setup instructions for readers: [`/tools`](https://readkernel.in/tools).
+- **A second, local MCP server** was added by a collaborator: `pipeline/kernel/mcp_server.py` (Python,
+  stdio). It runs on the user's own computer, reads Supabase with the publishable key or the local
+  `pipeline/data` files, and adds `list_editions`, `list_sources` and a latest-brief resource. Use the
+  hosted one for zero setup, the local one for offline work or development. See the README.
 
 ### 7.5 Chrome extension — `extension/`
 

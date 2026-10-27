@@ -102,6 +102,7 @@ flowchart TD
 | **Fact-check agent** | Every morning | Checks, rewrites and re-checks summaries before anything is published. |
 | **Watch alerts agent** | Every morning, on the settings page | Matches each day's news against each reader's plain-English wishes. |
 | **MCP server** | `https://readkernel.in/mcp` | Lets Claude, Cursor and other AI assistants use ReadKernel's 6 news tools. |
+| **Local MCP server** | `pipeline/kernel/mcp_server.py` | The same idea run on your own computer (works offline; by a collaborator). |
 | **Chrome extension** | `extension/` folder | Today's brief in every new tab, offline-ready. |
 | **Public API** | `/api/v1/today` | Today's brief as JSON (used by the extension). |
 
