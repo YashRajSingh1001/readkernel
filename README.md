@@ -2,6 +2,8 @@
 
 The day's tech and AI news, boiled down to the stories that matter.
 
+**Docs:** [OVERVIEW.md](docs/OVERVIEW.md) (one page, with diagrams) · [TECHNICAL_GUIDE.md](docs/TECHNICAL_GUIDE.md) (everything, with the reasons behind each choice)
+
 ReadKernel reads 56 tech and AI news sources, merges articles about the same
 event into one story, ranks them, and writes a short summary for each one,
 with every source linked. It is built to run at zero cost.
