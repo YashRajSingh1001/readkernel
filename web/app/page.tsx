@@ -60,12 +60,15 @@ export default async function Home() {
           <SignupForm />
           <p className="mt-3 text-xs text-muted">Free. One email a day. Unsubscribe with one click.</p>
         </div>
-        <div className="mt-6 flex justify-center gap-6 text-sm font-medium">
+        <div className="mt-6 flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm font-medium">
           <Link href="/today" className="hover:text-accent">
             Read today&apos;s brief →
           </Link>
           <Link href="/feed" className="hover:text-accent">
             Open the feed →
+          </Link>
+          <Link href="/tools" className="hover:text-accent">
+            Use it in Claude or Chrome →
           </Link>
         </div>
       </Container>
