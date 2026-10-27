@@ -1,13 +1,18 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import { TOPICS } from "@/lib/format";
 import { parsePrefs, type Prefs } from "@/lib/personal";
 import { adminConfigured } from "@/lib/server/admin-db";
 import { serverUser } from "@/lib/supabase/server";
 import {
+  MAX_WATCHES,
+  addWatch,
   confirm,
   ensureAccountSubscription,
   normaliseEmail,
+  removeWatch,
   savePreferences,
   subscribe,
   unsubscribe,
@@ -89,5 +94,29 @@ export async function saveAccountPreferencesAction(_prev: FormState, form: FormD
   } catch (err) {
     console.error("[account preferences]", err);
     return { ok: false, message: "Something went wrong. Please try again in a minute." };
+  }
+}
+
+/** Watch alerts: add one plain-English wish (from the settings page). */
+export async function addWatchAction(_prev: FormState, form: FormData): Promise<FormState> {
+  try {
+    const result = await addWatch(String(form.get("token") ?? ""), String(form.get("description") ?? ""));
+    if (result === "too-short") return { ok: false, message: "Describe what to watch in a few words." };
+    if (result === "too-many") return { ok: false, message: `You can watch up to ${MAX_WATCHES} things. Remove one first.` };
+    if (result === "invalid-link") return { ok: false, message: "This link isn't valid any more. Use the link in your latest email." };
+    revalidatePath("/preferences");
+    return { ok: true, message: "Added. Matches will appear at the top of your next email." };
+  } catch (err) {
+    console.error("[watches]", err);
+    return { ok: false, message: "Something went wrong. Please try again in a minute." };
+  }
+}
+
+export async function removeWatchAction(form: FormData): Promise<void> {
+  try {
+    await removeWatch(String(form.get("token") ?? ""), String(form.get("id") ?? ""));
+    revalidatePath("/preferences");
+  } catch (err) {
+    console.error("[watches]", err);
   }
 }

@@ -8,7 +8,8 @@
 
 Each reader gets their own picks (topics, 5/10/15 stories, summaries /
 headlines / images), plus the best new company blog post unless they turned
-that off. Every successful send is logged in email_sends, so
+that off, and at the top any matches for the things they asked to watch.
+Every successful send is logged in email_sends, so
 running it twice only reaches people who were missed.
 """
 
@@ -97,6 +98,30 @@ def load_company_reads(db: Supabase | None, data_dir, weekly: bool) -> list[dict
     return picked[: 3 if weekly else 1]
 
 
+def load_alerts(db: Supabase | None, day: str, weekly: bool) -> dict[str, list[dict]]:
+    """Watch-alert matches (from kernel.watches) for each subscriber: today's, or the week's."""
+    if not db:
+        return {}
+    start = (date.fromisoformat(day) - timedelta(days=6)).isoformat() if weekly else day
+    try:
+        rows = db.select(
+            "watch_hits",
+            {
+                "select": "title,summary,url,reason,edition_date,watches!inner(subscriber_id,description)",
+                "and": f"(edition_date.gte.{start},edition_date.lte.{day})",
+                "order": "found_at.asc",
+            },
+        )
+    except httpx.HTTPError as exc:
+        print(f"[send] watch alerts unavailable: {exc}")
+        return {}
+    alerts: dict[str, list[dict]] = {}
+    for row in rows:
+        watch = row.pop("watches")
+        alerts.setdefault(watch["subscriber_id"], []).append({**row, "wish": watch["description"]})
+    return {k: v[:8] for k, v in alerts.items()}
+
+
 def message_for(
     edition: dict, email: str, token: str | None, site_url: str, fmt: str = "summaries"
 ) -> Message:
@@ -111,18 +136,24 @@ def message_for(
 
 
 def personal_edition(
-    edition: dict, pool: list[dict], sub: dict, weekly: bool, company_reads: list[dict] | None = None
+    edition: dict,
+    pool: list[dict],
+    sub: dict,
+    weekly: bool,
+    company_reads: list[dict] | None = None,
+    all_alerts: dict[str, list[dict]] | None = None,
 ) -> dict:
     """The edition as this subscriber should see it."""
     topics = sub.get("topics") or []
     reads = company_reads if sub.get("company_read", True) is not False else []
+    alerts = (all_alerts or {}).get(sub.get("id"), [])
     count = sub.get("story_count") or 10
     if weekly:
         wanted = [s for s in pool if not topics or s["topic"] in topics]
         stories = weekly_stories(wanted, count)
     else:
         stories = select_stories(edition["stories"], edition["feed"], topics, count)
-    return {**edition, "stories": stories, "weekly": weekly, "company_reads": reads or []}
+    return {**edition, "stories": stories, "weekly": weekly, "company_reads": reads or [], "alerts": alerts}
 
 
 def main() -> None:
@@ -146,6 +177,8 @@ def main() -> None:
         sys.exit(f"[send] no edition for {day}; run `python -m kernel.run` first")
     week = load_week(db, day) if (args.weekly and db) else edition["feed"]
     company_reads = load_company_reads(db, settings.data_dir, args.weekly)
+    alerts = load_alerts(db, day, args.weekly)
+    print(f"[send] watch alerts for {len(alerts)} readers")
     print(f"[send] company read: {', '.join(r['title'][:60] for r in company_reads) or 'none new'}")
 
     if args.to:
@@ -175,8 +208,8 @@ def main() -> None:
     print(f"[send] {kind} {day}: {len(subscribers)} readers, {len(already)} already sent, {len(todo)} to send")
     if args.dry_run:
         for s in todo:
-            mine = personal_edition(edition, week, s, args.weekly, company_reads)
-            print(f"   {s['email']}: {len(mine['stories'])} stories, {s.get('format') or 'summaries'}")
+            mine = personal_edition(edition, week, s, args.weekly, company_reads, alerts)
+            print(f"   {s['email']}: {len(mine['stories'])} stories, {len(mine['alerts'])} alerts, {s.get('format') or 'summaries'}")
         return
 
     mailer = make_mailer(settings)
@@ -185,8 +218,8 @@ def main() -> None:
     try:
         for s in todo:
             try:
-                mine = personal_edition(edition, week, s, args.weekly, company_reads)
-                if not mine["stories"]:
+                mine = personal_edition(edition, week, s, args.weekly, company_reads, alerts)
+                if not mine["stories"] and not mine["alerts"]:
                     continue  # nothing in their topics this time
                 fmt = s.get("format") if s.get("format") in VALID_FORMATS else "summaries"
                 mailer.send(message_for(mine, s["email"], s["token"], settings.site_url, fmt))

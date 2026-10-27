@@ -20,6 +20,8 @@ const COLUMNS = [
       { href: "/brief/customize", label: "Build your brief" },
       { href: "/#subscribe", label: "Subscribe" },
       { href: "/rss.xml", label: "RSS" },
+      { href: "/tools", label: "Chrome & AI assistants" },
+      { href: "/ask", label: "Ask ReadKernel" },
     ],
   },
   {

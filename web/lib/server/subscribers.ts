@@ -298,3 +298,38 @@ ${button(link, "Change my brief")}`,
     ),
   });
 }
+
+// --- Watch alerts (see pipeline/kernel/watches.py) ---------------------------
+
+export const MAX_WATCHES = 3;
+export type Watch = { id: string; description: string };
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+export async function listWatches(token: string): Promise<Watch[]> {
+  const sub = await findBy("token", token);
+  if (!sub) return [];
+  return adminRest<Watch[]>(`watches?select=id,description&subscriber_id=eq.${sub.id}&order=created_at.asc`);
+}
+
+export type AddWatchResult = "added" | "invalid-link" | "too-many" | "too-short";
+
+export async function addWatch(token: string, raw: string): Promise<AddWatchResult> {
+  const description = raw.replace(/\s+/g, " ").trim().slice(0, 160);
+  if (description.length < 3) return "too-short";
+  const sub = await findBy("token", token);
+  if (!sub) return "invalid-link";
+  const existing = await adminRest<Watch[]>(`watches?select=id,description&subscriber_id=eq.${sub.id}`);
+  if (existing.length >= MAX_WATCHES) return "too-many";
+  if (existing.some((w) => w.description.toLowerCase() === description.toLowerCase())) return "added";
+  await adminRest("watches", { method: "POST", body: { subscriber_id: sub.id, description }, prefer: "return=minimal" });
+  return "added";
+}
+
+export async function removeWatch(token: string, id: string): Promise<boolean> {
+  if (!UUID_RE.test(id)) return false;
+  const sub = await findBy("token", token);
+  if (!sub) return false;
+  // Filtering on both ids means a token can only ever remove its own watches.
+  await adminRest(`watches?id=eq.${id}&subscriber_id=eq.${sub.id}`, { method: "DELETE", prefer: "return=minimal" });
+  return true;
+}

@@ -15,17 +15,18 @@ Last updated: 27 October 2026.
 4. [The daily pipeline, step by step](#4-the-daily-pipeline-step-by-step)
 5. [The AI models](#5-the-ai-models)
 6. [Company blogs](#6-company-blogs)
-7. [The database](#7-the-database)
-8. [The website](#8-the-website)
-9. [Email](#9-email)
-10. [Hosting, domain and the daily schedule](#10-hosting-domain-and-the-daily-schedule)
-11. [Security and privacy](#11-security-and-privacy)
-12. [Testing](#12-testing)
-13. [Costs and free-tier limits](#13-costs-and-free-tier-limits)
-14. [Settings reference](#14-settings-reference)
-15. [Everyday tasks](#15-everyday-tasks)
-16. [Decisions and lessons from the build](#16-decisions-and-lessons-from-the-build)
-17. [What's next](#17-whats-next)
+7. [Agents and integrations](#7-agents-and-integrations)
+8. [The database](#8-the-database)
+9. [The website](#9-the-website)
+10. [Email](#10-email)
+11. [Hosting, domain and the daily schedule](#11-hosting-domain-and-the-daily-schedule)
+12. [Security and privacy](#12-security-and-privacy)
+13. [Testing](#13-testing)
+14. [Costs and free-tier limits](#14-costs-and-free-tier-limits)
+15. [Settings reference](#15-settings-reference)
+16. [Everyday tasks](#16-everyday-tasks)
+17. [Decisions and lessons from the build](#17-decisions-and-lessons-from-the-build)
+18. [What's next](#18-whats-next)
 
 ---
 
@@ -221,7 +222,33 @@ model's own memory. (Added after the AI once wrote "2024" into a 2026 story.) To
 model name and the story's links. The same story the next run is not summarised again, which saves
 AI calls. Changing the prompt bumps the version and refreshes everything.
 
-### 4.6 Photos — `kernel/images.py`
+### 4.6 Fact-check agent — `kernel/factcheck.py`
+
+A second AI pass that reviews every AI-written story **before** it is saved. It sees the same article
+snippets the summariser saw, next to the headline, summary and "why it matters" that were written,
+and lists any claim the snippets don't support (names, numbers, dates, years, causes, quotes).
+
+```mermaid
+flowchart LR
+    A["AI summary"] --> B{"Every claim in<br/>the snippets?"}
+    B -- yes --> OK["Publish as written"]
+    B -- no --> C["Agent rewrites it<br/>from the snippets"]
+    C --> D{"Check the<br/>rewrite again"}
+    D -- yes --> FIX["Publish the correction"]
+    D -- no --> FB["Use the publisher's<br/>own words instead"]
+```
+
+- Checks 5 stories per AI call. A rewrite is **never** published without being checked again.
+- Verdicts are cached, so each story is checked once, even across runs.
+- Stories that use the publisher's own text (no AI summary) are not checked.
+- Each run logs the result, for example `fact-check: 26 ok, 4 fixed, 0 replaced by the publisher's
+  words`, plus a line for every correction saying what was unsupported.
+
+*Why:* the summariser is told to use only snippet facts, but models still slip (the "2024" incident).
+A second, narrow job ("is this claim in the text?") catches far more than a longer prompt could.
+First real run (27 October 2026): 30 stories, 26 confirmed, 4 corrected.
+
+### 4.7 Photos — `kernel/images.py`
 
 Uses the photo in the RSS entry, or else the article page's `og:image`. If a publisher blocks
 automated visits (Bloomberg, MarkTechPost), it tries up to **3 other outlets** covering the same
@@ -229,18 +256,18 @@ story. Photos are shown **from the publisher's own site with a credit line**; we
 re-host them. With no photo at all, the website shows a designed card with the topic and the
 publisher's logo instead of an empty box.
 
-### 4.7 Story timelines — `kernel/threads.py`
+### 4.8 Story timelines — `kernel/threads.py`
 
 Compares today's stories with the last 7 days (embedding similarity of 0.82 or more). A match
 shares a `thread_id`, which powers the **"This story so far"** timeline on a story's page and keeps
 the weekly digest to one entry per ongoing story.
 
-### 4.8 Top articles — `kernel/discussions.py`
+### 4.9 Top articles — `kernel/discussions.py`
 
 The top 25 Hacker News posts of the last 36 hours, ranked by points, each with a one-line AI
 summary written from the page's own description (one AI call for the whole list).
 
-### 4.9 Save — `kernel/store.py`
+### 4.10 Save — `kernel/store.py`
 
 Writes the edition, its 30 stories (10 marked with their brief position) and the discussions to
 Supabase, and also to `pipeline/data/latest.json` and `brief-<date>.json`. The JSON files let the
@@ -343,10 +370,110 @@ flowchart TD
 
 ---
 
-## 7. The database
+## 7. Agents and integrations
+
+"Agentic" here means the AI is given **tools** and decides for itself which to use, in what order,
+until it reaches a goal, instead of answering one fixed prompt. All of it runs on the same free Groq
+model (`gpt-oss-120b` supports tool calling).
+
+### 7.1 One set of news tools — `web/lib/tools.ts`
+
+Every agent and integration uses the same six read-only tools, so they all behave the same:
+
+| Tool | What it returns |
+| --- | --- |
+| `get_today_news` | Today's top 10 (or all ~30 with `scope: feed`), optionally one topic |
+| `get_brief_by_date` | Any past day's brief |
+| `search_news` | Archive search over stories and company blog posts |
+| `get_story` | One story with all sources and its timeline across days |
+| `get_top_articles` | Today's most-discussed Hacker News posts |
+| `get_company_posts` | Company blog posts, by company, subject, newest or best |
+
+Each story and post comes with a ready-made citation (`cite: "[Bloomberg](https://…)"`), so answers
+link the exact source. Bad input comes back as a readable error the agent can fix and retry.
+
+### 7.2 Ask ReadKernel — `/ask`
+
+```mermaid
+sequenceDiagram
+    participant R as Reader
+    participant A as Agent (Groq)
+    participant T as News tools
+    R->>A: "What has Nvidia been up to?"
+    A->>T: search_news("Nvidia")
+    T-->>A: 10 stories with sources
+    A->>T: get_story(key) (if it wants the timeline)
+    T-->>A: the story over several days
+    A-->>R: Short answer, every fact linked
+```
+
+- Files: `web/lib/server/agent.ts` (the loop), `web/app/api/ask/route.ts` (limits), `web/components/AskChat.tsx` (the chat).
+- At most 5 rounds of tool use per question, then it must answer. Follow-up questions keep the last 6 messages as context.
+- Answers only from tool results, never from memory; off-topic requests are declined.
+- If the model forgets to link, the sources it used are listed under the answer automatically.
+- Limits to protect the free quota: 12 questions per visitor per 10 minutes, 600 characters per message.
+- Tested 27 October 2026: "What has Nvidia been up to?" → one search, four facts, sources listed.
+  "What did Uber write about AI?" → its first, filtered search found nothing, so it **retried by
+  itself** without the filter and found Uber's AutoClean post.
+- Needs `GROQ_API_KEY` in Vercel's environment variables.
+
+### 7.3 Watch alerts — `kernel/watches.py` and the settings page
+
+Readers write up to 3 wishes in plain English on their settings page (`/preferences`), such as
+"UPI and digital payment rules in India". Each morning, after the brief and company blogs:
+
+1. **Shortlist (free):** the local embedding model compares each wish with every story and new
+   company post, keeping the 6 closest above a similarity floor (0.45).
+2. **Confirm (AI):** Groq looks at each wish's shortlist (4 wishes per call) and keeps only items
+   clearly about that wish, each with a one-line reason.
+3. **Save once:** matches go to `watch_hits`, keyed by wish + story, so the same story is never
+   alerted twice for the same wish.
+4. **Email:** `kernel.send` puts matches in a "Your watch alerts" box at the **top** of that reader's
+   email (the week's matches in the Sunday digest). A reader with alerts but no stories in their
+   topics still gets the email.
+
+Tested on 27 October 2026's real news: "Nvidia investments and deals" matched the Meta share-sale
+story (Nvidia may buy in); "OpenAI model launches" matched GPT-6.1 Terra; "cricket scores" matched
+nothing, correctly, even though 6 items were shortlisted.
+
+*Why two stages:* checking every wish against every story with the AI would cost hundreds of calls a
+day. The free local model narrows it down; the AI only judges the few close calls.
+
+### 7.4 MCP server — `https://readkernel.in/mcp`
+
+MCP (Model Context Protocol) is the standard way AI assistants plug into outside tools. ReadKernel's
+server exposes the six news tools to Claude, Cursor, VS Code and others. No key needed.
+
+- File: `web/app/mcp/route.ts`. It speaks MCP's *Streamable HTTP* transport in its simplest stateless
+  form: each POST carries JSON-RPC messages and gets a JSON answer (`initialize`, `tools/list`,
+  `tools/call`, `ping`). No sessions or streams, because every tool is a quick read-only lookup.
+- Written by hand (about 100 lines) rather than with the official Next.js adapter, which needs a
+  brand-new major version of the MCP library. Tested with the **official MCP client library**
+  (`@modelcontextprotocol/sdk` 1.32.2): connect, list tools, and call each tool, including bad input.
+- Every tool is marked read-only for clients. Setup instructions for readers: [`/tools`](https://readkernel.in/tools).
+
+### 7.5 Chrome extension — `extension/`
+
+Replaces the new-tab page with today's brief: Story of the day, #2–#10, what developers are
+discussing, and the best company posts, plus a search box that uses the reader's own search engine.
+
+- Plain HTML, CSS and JavaScript (Manifest V3), no build step. Details in [`extension/README.md`](../extension/README.md).
+- Reads `https://readkernel.in/api/v1/today`, keeps the last brief in `chrome.storage` (instant
+  and offline), and refreshes it when it's over 30 minutes old.
+- Permissions: `storage` and `search` only; it may talk to readkernel.in and nothing else. All text is
+  inserted as text, never as HTML.
+- Not on the Chrome Web Store yet (one-time $5 developer fee). Until then: `chrome://extensions` →
+  Developer mode → Load unpacked → the `extension` folder.
+
+### 7.6 Public API — `/api/v1/today`
+
+Today's brief as JSON (stories, top articles, company reads), open to any site (CORS) and cached for
+5 minutes. The extension uses it; anyone else may too.
+
+## 8. The database
 
 **Supabase** (managed Postgres), free plan, Tokyo region.
-Project: `klqqroonqhnlcdkybxdm`. Tables are created by 5 SQL files in [`db/migrations/`](../db/migrations),
+Project: `klqqroonqhnlcdkybxdm`. Tables are created by 6 SQL files in [`db/migrations/`](../db/migrations),
 run by hand in Supabase's SQL Editor; each one can safely run again.
 
 | Table | Holds | Who can read it |
@@ -359,6 +486,8 @@ run by hand in Supabase's SQL Editor; each one can safely run again.
 | `subscribers` | Email, status (pending / active / unsubscribed), secret token, topics, 5/10/15, format, daily/weekly, company read on/off, optional user id | Pipeline and website server only |
 | `email_sends` | Log of who got which email (date, subscriber, daily/weekly) | Pipeline and website server only |
 | `saved_stories` | Saved stories of signed-in readers | Only that reader |
+| `watches` | Each reader's watch-alert wishes (up to 3, plain English) | Pipeline and website server only |
+| `watch_hits` | Stories each wish matched, with the agent's reason (never repeated) | Pipeline and website server only |
 
 | Migration | Added |
 | --- | --- |
@@ -367,6 +496,7 @@ run by hand in Supabase's SQL Editor; each one can safely run again.
 | `003_feed.sql` | the 30-story feed (brief position, story keys) |
 | `004_phases.sql` | photos, model releases, timelines, search, discussions, preferences, saved stories |
 | `005_company_posts.sql` | company_posts, the "company read" setting |
+| `006_watches.sql` | watches, watch_hits |
 
 **Why Supabase:** free, real SQL (joins, full-text search, constraints), **Row Level Security**
 (rules inside the database decide who can read what), a ready-made REST API so neither program needs
@@ -377,11 +507,11 @@ style: plain words, `"exact phrases"`, and `-excluded` words.
 
 ---
 
-## 8. The website
+## 9. The website
 
 Folder [`web/`](../web), live at [readkernel.in](https://readkernel.in).
 
-### 8.1 Stack
+### 9.1 Stack
 
 | Piece | Version | Why |
 | --- | --- | --- |
@@ -401,7 +531,7 @@ readers never notice.
 **Local mode:** with no database settings, or with `READ_LOCAL_DATA=1`, the site reads the
 pipeline's JSON files, so it works on a laptop with nothing else set up.
 
-### 8.2 Pages
+### 9.2 Pages
 
 | Page | What it shows |
 | --- | --- |
@@ -414,10 +544,13 @@ pipeline's JSON files, so it works on a laptop with nothing else set up.
 | `/brief/customize` | "Make it yours" builder with a live email preview |
 | `/story/[key]` | One story: photo, all sources, timeline, share, **Listen** (reads this story aloud) |
 | `/search` | Search across all stories and company posts |
+| `/ask` | Ask ReadKernel, the chat agent |
+| `/tools` | How to get the Chrome extension and connect AI assistants |
+| `/mcp`, `/api/v1/today` | The MCP server and the public JSON feed (for programs, not people) |
 | `/saved` | Saved stories (in this browser, or synced when signed in) |
 | `/sources`, `/how-it-works` | The source list and how it works |
 | `/blog`, `/guides`, `/newsletters`, `/compare` | Articles, guides, newsletter reviews |
-| `/confirm`, `/unsubscribe`, `/preferences` | Links from emails |
+| `/confirm`, `/unsubscribe`, `/preferences` | Links from emails; `/preferences` also holds watch alerts |
 | `/account`, `/signin` | Sign-in (when switched on) |
 | `/contact`, `/privacy`, `/terms` | Contact and legal |
 | `/rss.xml`, `/sitemap.xml`, `/robots.txt` | For feed readers and search engines |
@@ -430,9 +563,9 @@ time, number of sources and source logos; missing photos become designed topic c
 
 ---
 
-## 9. Email
+## 10. Email
 
-### 9.1 Sign-up (double opt-in)
+### 10.1 Sign-up (double opt-in)
 
 1. A reader enters their email on the site → a row is created as `pending` with a random secret token.
 2. A **confirmation email** is sent with a link to `/confirm?token=…`.
@@ -442,7 +575,7 @@ time, number of sources and source logos; missing photos become designed topic c
 *Why double opt-in:* it proves the address belongs to the person, keeps spam complaints near zero
 and protects our sending reputation.
 
-### 9.2 The daily send — `kernel/send.py`
+### 10.2 The daily send — `kernel/send.py`
 
 - Every active reader gets **their own** email: their topics, 5/10/15 stories, and format
   (summaries, headlines only, or with photos), plus the company read unless they turned it off.
@@ -452,7 +585,7 @@ and protects our sending reputation.
 - Every email has a **manage link** (`/preferences?token=…`) and **one-click unsubscribe** headers
   (`List-Unsubscribe`, RFC 8058) so Gmail and Outlook show their own Unsubscribe button.
 
-### 9.3 Delivery
+### 10.3 Delivery
 
 | | |
 | --- | --- |
@@ -469,7 +602,7 @@ a robot is more likely to land in spam.
 
 ---
 
-## 10. Hosting, domain and the daily schedule
+## 11. Hosting, domain and the daily schedule
 
 | Piece | Setup | Why |
 | --- | --- | --- |
@@ -484,9 +617,10 @@ a robot is more likely to land in spam.
 1. Install Python packages (cached) and the embedding model (cached).
 2. `python -m kernel.run`: build the brief.
 3. `python -m kernel.company_blogs`: add new company posts (allowed to fail without stopping the rest).
-4. `python -m kernel.send`: email daily readers.
-5. On Sundays (India time): `python -m kernel.send --weekly`.
-6. `python -m kernel.telegram`: post to Telegram (does nothing until a bot is set up).
+4. `python -m kernel.watches`: match the news against readers' watch alerts (also allowed to fail).
+5. `python -m kernel.send`: email daily readers.
+6. On Sundays (India time): `python -m kernel.send --weekly`.
+7. `python -m kernel.telegram`: post to Telegram (does nothing until a bot is set up).
 
 The job can also be started by hand from GitHub → Actions → "Run workflow".
 
@@ -495,7 +629,7 @@ variables, never in the code.
 
 ---
 
-## 11. Security and privacy
+## 12. Security and privacy
 
 - **Database rules (RLS):** the public key can read only public tables. Subscribers, the email log
   and the summary cache can't be read by visitors at all.
@@ -515,11 +649,11 @@ variables, never in the code.
 
 ---
 
-## 12. Testing
+## 13. Testing
 
 | Check | Command | Status |
 | --- | --- | --- |
-| Pipeline tests (43) | `cd pipeline && .venv/Scripts/python -m pytest -q` | all pass |
+| Pipeline tests (53) | `cd pipeline && .venv/Scripts/python -m pytest -q` | all pass |
 | Website types | `cd web && npx tsc --noEmit` | clean |
 | Website lint | `cd web && npx eslint .` | clean |
 | Website build | `cd web && npx next build` | builds |
@@ -527,16 +661,18 @@ variables, never in the code.
 The tests cover fetching and parsing, filtering, grouping, ranking, the summary cache, photos,
 timelines, discussions, saving to the database (with a fake database), email rendering in all formats,
 personal picks, the weekly digest, reply-to, the company read, and company blogs (address cleaning,
-Hacker News filtering, no duplicates, categories, scoring). AI calls are replaced by fakes in tests,
+Hacker News filtering, no duplicates, categories, scoring), the fact-checker (ok, fix and re-check,
+fallback, never publishing an unchecked rewrite, caching) and watch alerts (shortlist, only offered
+items confirmed, no repeats, alerts only in their reader's email). AI calls are replaced by fakes in tests,
 so they're free and repeatable.
 
 ---
 
-## 13. Costs and free-tier limits
+## 14. Costs and free-tier limits
 
 | Service | Free allowance | Our use | Watch out for |
 | --- | --- | --- | --- |
-| Groq | Daily and per-minute token limits | A few dozen calls a day | Big first fills (like 30 days of company posts) take longer because of per-minute limits; the retry logic waits automatically. |
+| Groq | Daily and per-minute token limits | A few dozen calls a day, plus Ask ReadKernel questions | Big first fills (like 30 days of company posts) take longer because of per-minute limits; the retry logic waits automatically. |
 | Supabase | 500 MB database, pauses after 7 days with no activity | A few MB | The daily job keeps it active. |
 | Vercel | Hobby plan | One small site | Hobby is for non-commercial use. |
 | GitHub Actions | Free minutes on public repos; 2,000 min/month on private | ~5 min a day | |
@@ -545,7 +681,7 @@ so they're free and repeatable.
 
 ---
 
-## 14. Settings reference
+## 15. Settings reference
 
 Pipeline settings go in `readkernel/.env` locally and in **GitHub secrets** for the daily job.
 Website settings go in `web/.env.local` locally and in **Vercel → Environment Variables**.
@@ -554,8 +690,8 @@ Templates: [`.env.example`](../.env.example) and [`web/.env.example`](../web/.en
 | Setting | Used by | Value now | Meaning |
 | --- | --- | --- | --- |
 | `LLM_PROVIDER` | pipeline | `groq` | `groq`, `claude`, `openai` or `none` |
-| `GROQ_API_KEY` | pipeline | (secret) | Free key from console.groq.com |
-| `GROQ_MODEL` | pipeline | `openai/gpt-oss-120b` | Model on Groq |
+| `GROQ_API_KEY` | pipeline, website | (secret) | Free key from console.groq.com; the website needs it for Ask ReadKernel |
+| `GROQ_MODEL` | pipeline, website | `openai/gpt-oss-120b` | Model on Groq |
 | `MAX_AGE_HOURS` | pipeline | 36 | How old an article may be |
 | `STORIES_PER_BRIEF` / `FEED_SIZE` | pipeline | 10 / 30 | Brief and feed size |
 | `EMBEDDINGS` | pipeline | `local` | `local` (bge-small) or `simple` (word overlap, no download) |
@@ -577,7 +713,7 @@ Templates: [`.env.example`](../.env.example) and [`web/.env.example`](../web/.en
 
 ---
 
-## 15. Everyday tasks
+## 16. Everyday tasks
 
 | Task | How |
 | --- | --- |
@@ -587,13 +723,17 @@ Templates: [`.env.example`](../.env.example) and [`web/.env.example`](../web/.en
 | Send yourself a test email | `python -m kernel.send --to you@example.com` |
 | See who would get the email | `python -m kernel.send --dry-run` |
 | Run the website locally | `cd web && npm run dev` (or `npm run dev -- --port 3200`) |
-| Change the database | Write `db/migrations/006_….sql`, run it in Supabase's SQL Editor **before** pushing code that needs it. |
+| Change the database | Write `db/migrations/007_….sql`, run it in Supabase's SQL Editor **before** pushing code that needs it. |
 | Publish website changes | `git add .`, `git commit -m "…"`, `git push`; Vercel rebuilds automatically. |
 | Check the morning job | GitHub → Actions → the latest "daily-brief" run. |
+| See what the fact-checker corrected | In that run's log, the "Build today's brief" step: lines starting `[fact-check]`. |
+| Test watch matching | `python -m kernel.watches --dry-run` |
+| Load the extension | `chrome://extensions` → Developer mode → Load unpacked → `extension/` |
+| Connect an assistant | Claude Code: `claude mcp add --transport http readkernel https://readkernel.in/mcp` |
 
 ---
 
-## 16. Decisions and lessons from the build
+## 17. Decisions and lessons from the build
 
 In the order they happened (October 2026):
 
@@ -612,15 +752,18 @@ In the order they happened (October 2026):
 | Company blogs added | 30 companies, Hacker News for blogs with no feed, no duplicates, 7 subjects, depth rating. |
 | Uber posts missing (country part in the address) | Addresses are cleaned before comparing. |
 | Today's numbering jumped (topic groups) | Plain #1–#10 list; menu highlights the current page; Listen only on story pages; company logo strip. |
+| Made ReadKernel agentic | One shared set of news tools; MCP server, Chrome extension, fact-check agent, Ask ReadKernel, watch alerts. |
+| Ask's first answers cited as 【6†source】 or not at all | Ready-made `cite` field on every item; stray markers removed; sources listed automatically if an answer links nothing. |
+| Fact-check cache never saved on a fresh database | An empty cache was treated as "no cache"; fixed (`is not None`). |
 
 ---
 
-## 17. What's next
+## 18. What's next
 
 | Item | State |
 | --- | --- |
-| Chrome new-tab extension | Iteration 2 |
-| MCP server (lets AI assistants read ReadKernel) | Iteration 2 |
+| Chrome extension on the Web Store | Built; needs the one-time $5 developer account and screenshots |
+| More agents: story deep-dive, weekly analyst, source scout, run doctor | Ideas |
 | Google sign-in | Built; needs Google set up in Supabase and `NEXT_PUBLIC_AUTH_ENABLED=1` |
 | Telegram channel | Built; needs a bot from @BotFather and two secrets |
 | Delete the duplicate Vercel project `readkernel-5d84` | To do |

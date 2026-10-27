@@ -5,8 +5,9 @@ import { Suspense } from "react";
 import { savePreferencesAction } from "@/app/actions";
 import { Container } from "@/components/Container";
 import { PreferencesForm } from "@/components/PreferencesForm";
+import { WatchList } from "@/components/WatchList";
 import { adminConfigured } from "@/lib/server/admin-db";
-import { getByToken } from "@/lib/server/subscribers";
+import { MAX_WATCHES, getByToken, listWatches } from "@/lib/server/subscribers";
 
 export const metadata: Metadata = { title: "Your brief settings", robots: { index: false } };
 
@@ -45,6 +46,7 @@ async function Settings({ searchParams }: { searchParams: PageProps<"/preference
         {subscriber.status === "unsubscribed" && " You're unsubscribed; saving will start your emails again."}
       </p>
       <PreferencesForm initial={subscriber.prefs} action={savePreferencesAction} token={token} />
+      <WatchList token={token} watches={await listWatches(token).catch(() => [])} max={MAX_WATCHES} />
       <p className="mt-10 text-sm text-muted">
         Want to stop the emails?{" "}
         <Link href={`/unsubscribe?token=${encodeURIComponent(token)}`} className="underline">

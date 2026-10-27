@@ -71,6 +71,11 @@ jobs:
         continue-on-error: true
         run: python -m kernel.company_blogs
 
+      # Readers' watch alerts: match today's news against what they asked to watch.
+      - name: Watch alerts
+        continue-on-error: true
+        run: python -m kernel.watches
+
       - name: Email subscribers
         if: github.event_name == 'schedule' || inputs.send_email
         run: python -m kernel.send

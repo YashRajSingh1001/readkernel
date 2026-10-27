@@ -83,6 +83,15 @@ def render(
 
     # --- plain text -------------------------------------------------------
     lines = [f"ReadKernel · {label} · {long_date(edition['date'])}", f"{len(stories)} stories", ""]
+    alerts = edition.get("alerts") or []
+    if alerts:
+        lines.append("YOUR WATCH ALERTS")
+        for a in alerts:
+            lines.append(f"- You asked about \"{a['wish']}\": {a['title']}")
+            if a.get("reason"):
+                lines.append(f"  {a['reason']}")
+            lines.append(f"  {a['url']}")
+        lines.append("")
     for i, s in enumerate(stories, 1):
         lines.append(f"{i}. {s['headline']}  [{TOPIC_LABELS.get(s['topic'], s['topic'])}]")
         if show_text and s.get("summary"):
@@ -109,7 +118,7 @@ def render(
     text = "\n".join(lines)
 
     # --- html -------------------------------------------------------------
-    cards = "".join(_story_html(i, s, fmt) for i, s in enumerate(stories, 1))
+    cards = _alerts_html(alerts) + "".join(_story_html(i, s, fmt) for i, s in enumerate(stories, 1))
     cards += _company_html(reads, site_url)
     html = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -135,6 +144,26 @@ def render(
   </td></tr>
 </table></td></tr></table></body></html>"""
     return subject, html, text
+
+
+def _alerts_html(alerts: list[dict]) -> str:
+    """The "Your watch alerts" block at the top: news matching what the reader asked to watch."""
+    if not alerts:
+        return ""
+    items = "".join(
+        f"""
+    <div style="margin-top:12px;">
+      <div style="font-family:{SANS};font-size:12px;color:{MUTED};">You asked about <strong style="color:{INK};">{escape(a['wish'])}</strong></div>
+      <div style="margin-top:3px;font-family:{SERIF};font-size:17px;line-height:1.3;font-weight:bold;"><a href="{escape(a['url'])}" style="color:{INK};text-decoration:none;">{escape(a['title'])}</a></div>
+      {f'<p style="margin:4px 0 0 0;font-family:{SANS};font-size:13px;line-height:1.5;color:{MUTED};">{escape(a["reason"])}</p>' if a.get('reason') else ''}
+    </div>"""
+        for a in alerts
+    )
+    return f"""
+  <tr><td style="height:16px;"></td></tr>
+  <tr><td style="padding:18px 16px;background:{CARD};border:1px solid {ACCENT};border-radius:10px;">
+    <div style="font-family:{SANS};font-size:12px;letter-spacing:1px;text-transform:uppercase;color:{ACCENT};">Your watch alerts</div>{items}
+  </td></tr>"""
 
 
 def _company_html(reads: list[dict], site_url: str) -> str:

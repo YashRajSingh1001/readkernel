@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 
 from .config import load_settings
 from .discussions import collect_discussions, discussion_to_dict
+from .factcheck import fact_check
 from .fetch import fetch_all
 from .filter import filter_articles
 from .group import group_articles
@@ -91,6 +92,8 @@ def main() -> None:
     brief = pick_brief(ranked, top)
     feed = pick_feed(ranked, brief, max(settings.feed_size, len(brief)))
     summarise(feed, llm, cache)
+    checked = fact_check(feed, llm, cache)
+    _log(f"fact-check: {checked['ok']} ok, {checked['fixed']} fixed, {checked['fallback']} replaced by the publisher's words, {checked['unchecked']} not checked")
     brief_rank = {id(s): i for i, s in enumerate(brief, 1)}
 
     with_photo = attach_images(feed, fetch_pages=not args.no_images)
@@ -115,6 +118,7 @@ def main() -> None:
             "kept": len(fresh),
             "stories": len(stories),
             "feed": len(feed),
+            "fact_check": checked,
         },
         # "stories" is the brief (in brief order); "feed" is the whole day, by score.
         "stories": [story_to_dict(s, i) for i, s in enumerate(brief, 1)],

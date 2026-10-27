@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>New tab · ReadKernel</title>
+    <link rel="stylesheet" href="newtab.css" />
+  </head>
+  <body>
+    <header class="top">
+      <a class="logo" href="https://readkernel.in"><span class="dot">●</span> ReadKernel</a>
+      <form id="search" class="search" role="search">
+        <label for="q" class="sr-only">Search the web</label>
+        <input id="q" name="q" type="search" placeholder="Search the web" autocomplete="off" autofocus />
+        <button type="submit" title="Search the web with your usual search engine">Search</button>
+        <button type="button" id="search-news" class="secondary" title="Search ReadKernel's news archive">News</button>
+      </form>
+      <label class="toggle"><input type="checkbox" id="show-summaries" checked /> Summaries</label>
+    </header>
+
+    <main class="layout">
+      <section class="brief" aria-labelledby="brief-title">
+        <p class="label" id="brief-label">Today's brief</p>
+        <h1 id="brief-title">Loading today's news…</h1>
+        <p class="status" id="status" role="status"></p>
+        <div id="lead"></div>
+        <ol id="stories" class="stories"></ol>
+        <a class="more" id="more" href="https://readkernel.in/today">Open the full brief on readkernel.in →</a>
+      </section>
+
+      <aside class="side">
+        <section aria-labelledby="top-title">
+          <p class="label" id="top-title">What developers are discussing</p>
+          <ol id="top" class="compact"></ol>
+        </section>
+        <section aria-labelledby="co-title">
+          <p class="label" id="co-title">From company blogs</p>
+          <ul id="companies" class="compact"></ul>
+          <a class="more" href="https://readkernel.in/companies">More company posts →</a>
+        </section>
+        <p class="foot">
+          Free, every morning, every source linked.
+          <a href="https://readkernel.in/#subscribe">Get it by email</a>
+        </p>
+      </aside>
+    </main>
+
+    <script src="newtab.js"></script>
+  </body>
+</html>

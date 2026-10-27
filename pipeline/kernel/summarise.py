@@ -106,6 +106,7 @@ def summarise(stories: list[Story], llm: LLM | None, cache: SummaryCache | None)
                 result = _ask(story, llm)
                 if result and cache:
                     cache.put(key, result)
+        story.extra["summary_source"] = "ai" if result else "feed"  # the fact-checker reviews the AI's
         result = result or fallback_summary(story)
         story.headline = result["headline"]
         story.summary = result["summary"]
