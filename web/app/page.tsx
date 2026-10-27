@@ -142,6 +142,29 @@ export default async function Home() {
         </Container>
       )}
 
+      {/* ReadKernel everywhere: AI assistants (MCP), Chrome, Ask */}
+      <Container className="pb-14">
+        <Link
+          href="/tools"
+          className="group grid gap-5 rounded-2xl border border-line bg-card p-6 hover:border-ink sm:grid-cols-[1fr_auto] sm:items-center sm:p-8"
+        >
+          <div>
+            <p className="font-mono text-xs tracking-wide text-label uppercase">ReadKernel everywhere</p>
+            <h2 className="mt-1 text-2xl font-extrabold tracking-tight">Use ReadKernel in Claude, Cursor or Chrome</h2>
+            <ul className="mt-3 space-y-1.5 text-sm text-muted">
+              <li>
+                <span className="font-medium text-ink">AI assistants:</span> add one address and ask Claude or Cursor
+                &ldquo;what&apos;s the AI news today?&rdquo;
+              </li>
+              <li>
+                <span className="font-medium text-ink">Chrome:</span> today&apos;s brief in every new tab.
+              </li>
+            </ul>
+          </div>
+          <span className="text-sm font-semibold text-accent group-hover:underline">Set it up →</span>
+        </Link>
+      </Container>
+
       {/* How it works */}
       <section className="border-t border-line bg-sunk py-14">
         <Container size="wide">
