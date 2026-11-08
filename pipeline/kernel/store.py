@@ -14,6 +14,8 @@ from pathlib import Path
 
 import httpx
 
+from .companies import slug
+
 
 class Supabase:
     def __init__(self, url: str, key: str):
@@ -51,6 +53,10 @@ class Supabase:
                 headers={"Prefer": "resolution=ignore-duplicates,return=minimal"},
             )
             response.raise_for_status()
+
+    def delete_before(self, table: str, column: str, before: str) -> None:
+        response = self.client.delete(f"{self.base}/{table}", params={column: f"lt.{before}"})
+        response.raise_for_status()
 
     def delete(self, table: str, **filters: str) -> None:
         params = {k: f"eq.{v}" for k, v in filters.items()}
@@ -141,6 +147,7 @@ def save_supabase(output: dict, db: Supabase) -> None:
             for i, s in enumerate(output.get("feed") or output["stories"], 1)
         ],
     )
+    save_story_companies(output, db)
     if "discussions" in output:
         db.delete("discussions", edition_date=date)
         db.insert(
@@ -160,6 +167,32 @@ def save_supabase(output: dict, db: Supabase) -> None:
                 for i, d in enumerate(output["discussions"], 1)
             ],
         )
+
+
+def save_story_companies(output: dict, db: Supabase) -> None:
+    """Company tags for today's stories. Optional: skipped (with a note) until
+    db/migrations/007 has created the table, so the rest of the save still works."""
+    date = output["date"]
+    rows = {
+        (s["story_key"], slug(name)): {"edition_date": date, "story_key": s["story_key"], "company": slug(name), "name": name}
+        for s in output.get("feed") or output["stories"]
+        if s.get("story_key")
+        for name in s.get("companies") or []
+    }
+    try:
+        db.delete("story_companies", edition_date=date)
+        db.insert("story_companies", list(rows.values()))
+    except httpx.HTTPError as exc:
+        print(f"    [store] company tags not saved (run db/migrations/007?): {exc}")
+
+
+def prune_ask_answers(db: Supabase, today: str, keep_days: int = 3) -> None:
+    """Ask's cached answers are per day; drop old ones so the table stays small."""
+    cutoff = (date.fromisoformat(today) - timedelta(days=keep_days)).isoformat()
+    try:
+        db.delete_before("ask_answers", "created_at", cutoff)
+    except httpx.HTTPError as exc:
+        print(f"    [store] old Ask answers not pruned (run db/migrations/007?): {exc}")
 
 
 def load_recent_stories(db: Supabase | None, data_dir: Path, today: str, days: int = 7) -> list[dict]:

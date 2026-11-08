@@ -22,7 +22,7 @@ from .llm import make_llm
 from .models import Story
 from .rank import pick_brief, pick_feed, rank_stories
 from .sources import load_sources
-from .store import Supabase, SupabaseCache, load_recent_stories, save_files, save_supabase
+from .store import Supabase, SupabaseCache, load_recent_stories, prune_ask_answers, save_files, save_supabase
 from .summarise import SummaryCache, summarise
 from .threads import assign_threads, story_key
 
@@ -48,6 +48,7 @@ def story_to_dict(story: Story, brief_position: int | None = None) -> dict:
         "image_url": story.image_url or None,
         "image_credit": story.image_credit or None,
         "thread_id": story.thread_id or story_key(story),
+        "companies": story.companies,
         "sources": [
             {"name": a.source, "title": a.title, "url": a.url, "published": a.published.isoformat()}
             for a in story.articles
@@ -128,6 +129,7 @@ def main() -> None:
     latest = save_files(output, settings.data_dir)
     if db:
         save_supabase(output, db)
+        prune_ask_answers(db, today)
         _log(f"saved edition {today} to Supabase")
 
     print()
