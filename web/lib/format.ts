@@ -17,7 +17,34 @@ export type Story = {
   image_url?: string | null; // the publisher's own preview photo
   image_credit?: string | null;
   thread_id?: string | null; // same id = same ongoing story across days
+  companies?: string[]; // local files only; the database keeps them in story_companies
 };
+
+/** A company a story is about, and how many stories it shares with another. */
+export type CompanyTag = { slug: string; name: string };
+export type CompanyLink = CompanyTag & { stories: number };
+
+const COMPANY_SUFFIX_RE = /[\s,]+(inc|corp|corporation|co|ltd|limited|llc|plc|gmbh|ag|sa)\.?$/i;
+const COMPANY_ALIASES: Record<string, string> = {
+  "open-ai": "openai",
+  "x-ai": "xai",
+  "meta-platforms": "meta",
+  alphabet: "google",
+  "amazon-web-services": "aws",
+};
+
+/** Same as the pipeline's companies.slug(): "OpenAI Inc." -> "openai". Keep the two in step. */
+export function companySlug(name: string): string {
+  const s = name
+    .trim()
+    .replace(COMPANY_SUFFIX_RE, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return COMPANY_ALIASES[s] ?? s;
+}
+
+export const COMPANY_SLUG_RE = /^[a-z0-9-]{1,60}$/;
 
 /** An engineering or data science post from a company blog (see /companies). */
 export type CompanyPost = {

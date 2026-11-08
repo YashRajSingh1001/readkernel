@@ -10,7 +10,17 @@ import { ShareButtons } from "@/components/ShareButtons";
 import { SourceIcons } from "@/components/SourceIcons";
 import { StoryCard } from "@/components/StoryCard";
 import { StoryImage } from "@/components/StoryImage";
-import { TOPICS, domainOf, formatDate, getEdition, getLatestEdition, getStory, getThread, timeAgo } from "@/lib/brief";
+import {
+  TOPICS,
+  domainOf,
+  formatDate,
+  getEdition,
+  getLatestEdition,
+  getStory,
+  getStoryCompanies,
+  getThread,
+  timeAgo,
+} from "@/lib/brief";
 import { siteUrl } from "@/lib/site";
 
 // Pre-build today's stories; older ones render on first visit.
@@ -46,9 +56,10 @@ async function StoryView({ params }: { params: PageProps<"/story/[key]">["params
   const story = await getStory(key);
   if (!story) notFound();
 
-  const [edition, thread] = await Promise.all([
+  const [edition, thread, companies] = await Promise.all([
     getEdition(story.edition_date),
     story.thread_id ? getThread(story.thread_id) : Promise.resolve([]),
+    getStoryCompanies(key, story.edition_date),
   ]);
   const related = (edition?.feed ?? [])
     .filter((s) => s.topic === story.topic && s.story_key !== key)
@@ -101,6 +112,21 @@ async function StoryView({ params }: { params: PageProps<"/story/[key]">["params
           <p className="mt-5 border-l-2 border-accent pl-4 leading-relaxed text-muted">
             <span className="font-medium text-ink">Why it matters: </span>
             {story.why_it_matters}
+          </p>
+        )}
+
+        {companies.length > 0 && (
+          <p className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <span className="text-muted">Companies:</span>
+            {companies.map((c) => (
+              <Link
+                key={c.slug}
+                href={`/company/${c.slug}`}
+                className="rounded-full border border-line px-2.5 py-0.5 font-medium hover:border-ink"
+              >
+                {c.name}
+              </Link>
+            ))}
           </p>
         )}
 
