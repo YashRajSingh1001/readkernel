@@ -43,6 +43,7 @@ def test_save_supabase_replaces_the_days_stories():
         ("POST", "/rest/v1/editions", None),
         ("DELETE", "/rest/v1/stories", "eq.2026-10-18"),
         ("POST", "/rest/v1/stories", None),
+        ("DELETE", "/rest/v1/story_companies", "eq.2026-10-18"),  # no tags, so nothing to insert
     ]
     stories = json.loads(seen[2].content)
     assert [s["position"] for s in stories] == [1, 2]
