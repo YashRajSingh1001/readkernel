@@ -1,18 +1,19 @@
 import type { MetadataRoute } from "next";
 
-import { TOPICS, getLatestEdition, listEditions } from "@/lib/brief";
+import { TOPICS, getLatestEdition, listEditions, listRecentCompanies } from "@/lib/brief";
 import { listEntries } from "@/lib/content";
 import { siteUrl } from "@/lib/site";
 
 // Tells search engines which pages exist.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const site = siteUrl();
-  const [editions, latest, blog, guides, reviews] = await Promise.all([
+  const [editions, latest, blog, guides, reviews, companies] = await Promise.all([
     listEditions(365),
     getLatestEdition(),
     listEntries("blog"),
     listEntries("guides"),
     listEntries("newsletters"),
+    listRecentCompanies(30),
   ]);
   const updated = latest ? new Date(latest.generated_at) : new Date(0);
 
@@ -35,6 +36,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "never" as const,
       priority: 0.6,
     })),
+    ...companies.map((c) => ({ url: `${site}/company/${c.slug}`, lastModified: updated, changeFrequency: "daily" as const, priority: 0.5 })),
     ...(latest?.feed ?? [])
       .filter((s) => s.story_key)
       .map((s) => ({ url: `${site}/story/${s.story_key}`, lastModified: updated, priority: 0.6 })),
