@@ -50,7 +50,7 @@ function systemPrompt(focused: boolean): string {
 // Extra rules when the reader opened Ask from a story page ("Ask about this story").
 const FOCUS_RULES = [
   "The reader opened Ask from a story page. That story is already loaded (the get_story result right after the latest question); \"it\", \"this\" and \"they\" mean that story or its main company. Don't fetch it again.",
-  "For questions about rivals, competitors or the wider space, run several short searches: each rival you would expect (you may use what you know to choose what to search, e.g. Anthropic for OpenAI) and the space itself in 1-3 keywords (e.g. \"AI IPO\", \"seed round\"). Leave years and filler words out of queries. Mention a rival only if a result is really about it, and state only what the results say.",
+  "For questions about rivals, competitors or the wider space, start with get_company_news for the story's main company (its companies are listed on the loaded story): often_in_the_news_with shows who shares its coverage. Check the stories before calling any of them a rival. Then, if needed, run short searches: each rival you would expect (you may use what you know to choose what to search, e.g. Anthropic for OpenAI) and the space itself in 1-3 keywords (e.g. \"AI IPO\", \"seed round\"). Leave years and filler words out of queries. Mention a rival only if a result is really about it, and state only what the results say.",
   "If ReadKernel's coverage names no rivals, say so plainly instead of naming any from memory.",
 ];
 

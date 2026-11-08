@@ -378,14 +378,15 @@ model (`gpt-oss-120b` supports tool calling).
 
 ### 7.1 One set of news tools — `web/lib/tools.ts`
 
-Every agent and integration uses the same six read-only tools, so they all behave the same:
+Every agent and integration uses the same seven read-only tools, so they all behave the same:
 
 | Tool | What it returns |
 | --- | --- |
 | `get_today_news` | Today's top 10 (or all ~30 with `scope: feed`), optionally one topic |
 | `get_brief_by_date` | Any past day's brief |
 | `search_news` | Archive search over stories and company blog posts |
-| `get_story` | One story with all sources and its timeline across days |
+| `get_story` | One story with all sources, its companies and its timeline across days |
+| `get_company_news` | Every story about one company, and the companies most often in the same stories |
 | `get_top_articles` | Today's most-discussed Hacker News posts |
 | `get_company_posts` | Company blog posts, by company, subject, newest or best |
 
@@ -442,7 +443,7 @@ day. The free local model narrows it down; the AI only judges the few close call
 ### 7.4 MCP server — `https://readkernel.in/mcp`
 
 MCP (Model Context Protocol) is the standard way AI assistants plug into outside tools. ReadKernel's
-server exposes the six news tools to Claude, Cursor, VS Code and others. No key needed.
+server exposes the seven news tools to Claude, Cursor, VS Code and others. No key needed.
 
 - File: `web/app/mcp/route.ts`. It speaks MCP's *Streamable HTTP* transport in its simplest stateless
   form: each POST carries JSON-RPC messages and gets a JSON answer (`initialize`, `tools/list`,

@@ -35,6 +35,8 @@ function describe(step: Step): string {
       return `Read the brief for ${String(a.date ?? "")}`;
     case "get_story":
       return "Read the story and its timeline";
+    case "get_company_news":
+      return `Checked ${String(a.company ?? "company")} news`;
     case "get_top_articles":
       return "Checked Top articles";
     case "get_company_posts":
