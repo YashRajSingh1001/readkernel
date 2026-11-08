@@ -214,13 +214,18 @@ Groq writes, for each story in the feed:
 - **summary** (2–3 sentences of concrete facts),
 - **why it matters** (one sentence),
 - **kind**: `news` or `model_release` (powers the "Model release" badge).
+- **companies**: the companies the story is about, from the same call (no extra AI request).
+  `kernel/companies.py` keeps only names the articles really contain, drops the news outlets, merges
+  spellings into one slug ("OpenAI Inc." = `openai`) and keeps at most 4. They are saved to
+  `story_companies` and power `/company/<slug>`, the story-page chips and `get_company_news`.
 
 The prompt forbids adding any fact not in the article snippets, including years and dates from the
 model's own memory. (Added after the AI once wrote "2024" into a 2026 story.) Today's date is passed in.
 
 **Cache:** each summary is stored under a key made of the prompt version (`PROMPT_VERSION = 3`), the
 model name and the story's links. The same story the next run is not summarised again, which saves
-AI calls. Changing the prompt bumps the version and refreshes everything.
+AI calls. Changing the prompt bumps the version and refreshes everything. (Adding `companies` did not
+bump it: summaries cached before that simply have no tags, rather than costing a second AI call each.)
 
 ### 4.6 Fact-check agent — `kernel/factcheck.py`
 
@@ -413,6 +418,15 @@ sequenceDiagram
 - Answers only from tool results, never from memory, and must not stretch an item to fit the question; off-topic requests are declined.
 - If the model forgets to link, the sources it used are listed under the answer automatically.
 - Limits to protect the free quota: 12 questions per visitor per 10 minutes, 600 characters per message.
+- **Ask about this story:** every story page links to `/ask?story=<key>`. The story and its timeline are
+  loaded before the first question, and the suggestions change to "Who are the competitors here?",
+  "What else is happening in this space?" and so on. For rivals the agent starts with `get_company_news`.
+- **Shared answers:** the suggested first questions (on `/ask` and on story pages) are answered once per
+  story per day and stored in `ask_answers`, so later readers get the stored answer with no AI call (and
+  without counting against their question limit). Fallback and error answers are never stored. The daily
+  run deletes stored answers older than 3 days. Files: `web/lib/ask.ts`, `web/lib/server/ask-cache.ts`.
+- **Test set:** `web/scripts/ask-check/` asks a fixed list of questions and writes a report to read
+  against a checklist, so prompt changes are judged before and after, not by trying a chat or two.
 - Tested 27 October 2026: "What has Nvidia been up to?" → one search, four facts, sources listed.
   "What did Uber write about AI?" → its first, filtered search found nothing, so it **retried by
   itself** without the filter and found Uber's AutoClean post.
@@ -478,7 +492,7 @@ Today's brief as JSON (stories, top articles, company reads), open to any site (
 ## 8. The database
 
 **Supabase** (managed Postgres), free plan, Tokyo region.
-Project: `klqqroonqhnlcdkybxdm`. Tables are created by 6 SQL files in [`db/migrations/`](../db/migrations),
+Project: `klqqroonqhnlcdkybxdm`. Tables are created by 7 SQL files in [`db/migrations/`](../db/migrations),
 run by hand in Supabase's SQL Editor; each one can safely run again.
 
 | Table | Holds | Who can read it |
@@ -493,6 +507,8 @@ run by hand in Supabase's SQL Editor; each one can safely run again.
 | `saved_stories` | Saved stories of signed-in readers | Only that reader |
 | `watches` | Each reader's watch-alert wishes (up to 3, plain English) | Pipeline and website server only |
 | `watch_hits` | Stories each wish matched, with the agent's reason (never repeated) | Pipeline and website server only |
+| `story_companies` | Which companies each story is about (slug + name), one row per story per company per day | Everyone |
+| `ask_answers` | Stored answers to Ask's suggested questions, per story per day | Website server and pipeline only |
 
 | Migration | Added |
 | --- | --- |
@@ -502,6 +518,7 @@ run by hand in Supabase's SQL Editor; each one can safely run again.
 | `004_phases.sql` | photos, model releases, timelines, search, discussions, preferences, saved stories |
 | `005_company_posts.sql` | company_posts, the "company read" setting |
 | `006_watches.sql` | watches, watch_hits |
+| `007_companies_and_ask_cache.sql` | story_companies, ask_answers |
 
 **Why Supabase:** free, real SQL (joins, full-text search, constraints), **Row Level Security**
 (rules inside the database decide who can read what), a ready-made REST API so neither program needs
@@ -547,7 +564,8 @@ pipeline's JSON files, so it works on a laptop with nothing else set up.
 | `/companies` | Company blogs, with subject and company filters and a logo strip |
 | `/brief`, `/brief/[date]` | The archive and any past day |
 | `/brief/customize` | "Make it yours" builder with a live email preview |
-| `/story/[key]` | One story: photo, all sources, timeline, share, **Listen** (reads this story aloud) |
+| `/story/[key]` | One story: photo, its companies, all sources, timeline, share, **Listen** (reads this story aloud), **Ask about this story** |
+| `/company/[slug]` | Every story about one company, the companies it is most often in the news with, and its engineering blog posts |
 | `/search` | Search across all stories and company posts |
 | `/ask` | Ask ReadKernel, the chat agent |
 | `/tools` | How to get the Chrome extension and connect AI assistants |

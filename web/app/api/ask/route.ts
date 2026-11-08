@@ -1,6 +1,9 @@
 // POST /api/ask: one turn of the Ask ReadKernel chat (see lib/server/agent.ts).
 
+import { isSharedQuestion } from "@/lib/ask";
+import { getLatestEdition } from "@/lib/brief";
 import { AgentUnavailable, askAgent, type ChatTurn } from "@/lib/server/agent";
+import { askCacheKey, readCachedAnswer, saveCachedAnswer } from "@/lib/server/ask-cache";
 
 const MAX_TURNS = 6; // the last few messages give follow-up questions their context
 const MAX_CHARS = 600;
@@ -33,25 +36,42 @@ function parse(body: unknown): ChatTurn[] | null {
   return turns as ChatTurn[];
 }
 
+const STORY_KEY_RE = /^[a-z0-9-]{6,40}$/;
+
 export async function POST(request: Request) {
-  const ip = (request.headers.get("x-forwarded-for") ?? "local").split(",")[0].trim();
-  if (!allowed(ip)) {
-    return Response.json({ error: "You've asked a lot in a short time. Please wait a few minutes." }, { status: 429 });
-  }
   let turns: ChatTurn[] | null = null;
   let storyKey: string | undefined;
   try {
     const body = await request.json();
     turns = parse(body);
     // Set when Ask was opened from a story page; an unknown key is ignored.
-    if (typeof body?.story === "string" && body.story) storyKey = body.story.slice(0, 40);
+    if (typeof body?.story === "string" && STORY_KEY_RE.test(body.story)) storyKey = body.story;
   } catch {
     // fall through
   }
   if (!turns) return Response.json({ error: "Send a question." }, { status: 400 });
 
+  // A suggested first question: today's answer may already be stored. Checked
+  // before the rate limit, because a stored answer costs no AI.
+  let cacheKey: string | null = null;
+  if (turns.length === 1 && isSharedQuestion(turns[0].content, storyKey)) {
+    const edition = await getLatestEdition();
+    if (edition) {
+      cacheKey = askCacheKey(edition.date, turns[0].content, storyKey);
+      const hit = await readCachedAnswer(cacheKey);
+      if (hit) return Response.json({ ...hit, complete: true });
+    }
+  }
+
+  const ip = (request.headers.get("x-forwarded-for") ?? "local").split(",")[0].trim();
+  if (!allowed(ip)) {
+    return Response.json({ error: "You've asked a lot in a short time. Please wait a few minutes." }, { status: 429 });
+  }
+
   try {
-    return Response.json(await askAgent(turns, { storyKey }));
+    const result = await askAgent(turns, { storyKey });
+    if (cacheKey && result.complete) await saveCachedAnswer(cacheKey, { answer: result.answer, steps: result.steps });
+    return Response.json(result);
   } catch (err) {
     console.error("[ask]", err);
     const message =
