@@ -16,7 +16,8 @@ const MAX_TOOL_RESULT = 12_000; // characters of tool output passed back to the 
 
 export type ChatTurn = { role: "user" | "assistant"; content: string };
 export type AgentStep = { tool: string; args: Record<string, unknown> };
-export type AgentAnswer = { answer: string; steps: AgentStep[] };
+// complete: the model wrote a real answer (not a "sorry" fallback), so it can be cached.
+export type AgentAnswer = { answer: string; steps: AgentStep[]; complete: boolean };
 
 type ToolCall = { id: string; type: "function"; function: { name: string; arguments: string } };
 type Message =
@@ -78,6 +79,8 @@ async function callModel(messages: Message[], useTools: boolean): Promise<{ cont
     });
     if (res.status === 429 || res.status >= 500) {
       const wait = Number(res.headers.get("retry-after")) || 2 ** attempt;
+      const reason = (await res.text()).slice(0, 200);
+      console.warn(`[ask] Groq ${res.status} (attempt ${attempt + 1}), waiting ${Math.min(wait, 8)}s: ${reason}`);
       await new Promise((r) => setTimeout(r, Math.min(wait, 8) * 1000));
       continue;
     }
@@ -87,6 +90,7 @@ async function callModel(messages: Message[], useTools: boolean): Promise<{ cont
       // Groq rejects the reply. At low temperature it repeats the same slip, so
       // retry a little warmer.
       if (res.status === 400 && body.includes("output_parse_failed")) {
+        console.warn(`[ask] Groq could not parse the reply (attempt ${attempt + 1}); retrying warmer`);
         temperature = 0.7;
         continue;
       }
@@ -157,8 +161,8 @@ export async function askAgent(history: ChatTurn[], options: { storyKey?: string
     const calls = reply.tool_calls ?? [];
     if (calls.length === 0) {
       const answer = tidy(reply.content ?? "");
-      if (!answer) return { answer: "Sorry, I couldn't put an answer together. Try rephrasing.", steps };
-      return { answer: withSources(answer, cites), steps };
+      if (!answer) return { answer: "Sorry, I couldn't put an answer together. Try rephrasing.", steps, complete: false };
+      return { answer: withSources(answer, cites), steps, complete: true };
     }
     messages.push({ role: "assistant", content: reply.content ?? null, tool_calls: calls });
     for (const call of calls.slice(0, 4)) {
@@ -179,5 +183,5 @@ export async function askAgent(history: ChatTurn[], options: { storyKey?: string
       messages.push({ role: "tool", tool_call_id: call.id, content: '{"error":"Too many tools at once; use fewer."}' });
     }
   }
-  return { answer: "Sorry, that took too many steps. Try a narrower question.", steps };
+  return { answer: "Sorry, that took too many steps. Try a narrower question.", steps, complete: false };
 }

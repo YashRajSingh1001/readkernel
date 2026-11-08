@@ -3,23 +3,10 @@
 import Link from "next/link";
 import { Fragment, useRef, useState, type ReactNode } from "react";
 
+import { STORY_SUGGESTIONS, SUGGESTIONS } from "@/lib/ask";
+
 type Step = { tool: string; args: Record<string, unknown> };
 type Turn = { role: "user" | "assistant"; content: string; steps?: Step[]; error?: boolean };
-
-const SUGGESTIONS = [
-  "What's the biggest AI news today?",
-  "What has Nvidia been up to recently?",
-  "How did Uber use AI to clean up its code?",
-  "Any new open-weight models this week?",
-];
-
-// When Ask was opened from a story page.
-const STORY_SUGGESTIONS = [
-  "Who are the competitors here?",
-  "What else is happening in this space?",
-  "How has this story developed?",
-  "Why does this matter?",
-];
 
 export type FocusStory = { key: string; headline: string };
 
