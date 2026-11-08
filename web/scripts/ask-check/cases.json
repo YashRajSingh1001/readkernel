@@ -1,0 +1,39 @@
+{
+  "about": "Fixed questions for Ask ReadKernel. Story cases run twice: 'page' asks the bare question from the story page (story key sent), 'typed' is the old way, typing the story into /ask by hand. Keep this list stable so runs compare.",
+  "story_cases": [
+    {
+      "id": "openai-raise-competitors",
+      "story": "118369de89f0",
+      "headline": "OpenAI secures $11 billion, valuation hits $1.25 trillion",
+      "question": "Who are the competitors here, and how are they doing?"
+    },
+    {
+      "id": "anthropic-ipo-space",
+      "story": "c899b2bfcb58",
+      "headline": "Anthropic proceeds with IPO targeting $1.25-$1.75 trillion valuation",
+      "question": "What else is happening in this space?"
+    },
+    {
+      "id": "fireworks-startup-competitors",
+      "story": "c1e448cbf127",
+      "headline": "Meta chief strategy officer Dave Wehner departs to become CFO of AI startup Fireworks",
+      "question": "What does this startup do and who does it compete with?"
+    },
+    {
+      "id": "nous-arete-space",
+      "story": "3e407aae56c8",
+      "headline": "Nous Research releases Arete-27B, cutting Qwen3.8-27B propaganda to 0.9%",
+      "question": "Who else is releasing open-weight models like this?"
+    },
+    {
+      "id": "binance-developed",
+      "story": "f777d8aa2bf4",
+      "headline": "Binance CFO departs weeks after $6.3 billion hack",
+      "question": "How has this story developed?"
+    }
+  ],
+  "general_cases": [
+    { "id": "today-ai", "question": "What's the biggest AI news today?" },
+    { "id": "off-topic", "question": "Write me a short poem about the sea." }
+  ]
+}

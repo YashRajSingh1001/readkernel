@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Fragment, useRef, useState, type ReactNode } from "react";
 
 type Step = { tool: string; args: Record<string, unknown> };
@@ -12,6 +13,16 @@ const SUGGESTIONS = [
   "Any new open-weight models this week?",
 ];
 
+// When Ask was opened from a story page.
+const STORY_SUGGESTIONS = [
+  "Who are the competitors here?",
+  "What else is happening in this space?",
+  "How has this story developed?",
+  "Why does this matter?",
+];
+
+export type FocusStory = { key: string; headline: string };
+
 // What each tool call looked like, in words.
 function describe(step: Step): string {
   const a = step.args;
@@ -23,7 +34,7 @@ function describe(step: Step): string {
     case "get_brief_by_date":
       return `Read the brief for ${String(a.date ?? "")}`;
     case "get_story":
-      return "Opened a story's timeline";
+      return "Read the story and its timeline";
     case "get_top_articles":
       return "Checked Top articles";
     case "get_company_posts":
@@ -87,7 +98,8 @@ function Markdown({ text }: { text: string }) {
   );
 }
 
-export function AskChat() {
+export function AskChat({ story }: { story?: FocusStory }) {
+  const [focus, setFocus] = useState(story);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -104,7 +116,7 @@ export function AskChat() {
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history.map(({ role, content }) => ({ role, content })) }),
+        body: JSON.stringify({ messages: history.map(({ role, content }) => ({ role, content })), story: focus?.key }),
       });
       const data = await res.json();
       setTurns((t) => [
@@ -123,9 +135,29 @@ export function AskChat() {
 
   return (
     <div>
+      {focus && (
+        <div className="mb-4 flex items-start gap-3 rounded-xl border border-accent/40 bg-accent-soft px-4 py-3 text-sm">
+          <p className="min-w-0 flex-1">
+            <span className="font-mono text-[11px] tracking-wide text-label uppercase">Asking about</span>
+            <Link href={`/story/${focus.key}`} className="mt-0.5 block font-semibold hover:text-accent">
+              {focus.headline}
+            </Link>
+          </p>
+          <button
+            type="button"
+            onClick={() => setFocus(undefined)}
+            disabled={busy}
+            className="shrink-0 text-muted hover:text-ink disabled:opacity-40"
+            aria-label="Stop asking about this story"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {turns.length === 0 && (
         <div className="grid gap-2 sm:grid-cols-2">
-          {SUGGESTIONS.map((s) => (
+          {(focus ? STORY_SUGGESTIONS : SUGGESTIONS).map((s) => (
             <button
               key={s}
               type="button"
@@ -182,7 +214,7 @@ export function AskChat() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           maxLength={600}
-          placeholder={turns.length ? "Ask a follow-up…" : "Ask about any tech or AI news…"}
+          placeholder={turns.length ? "Ask a follow-up…" : focus ? "Ask about this story…" : "Ask about any tech or AI news…"}
           className="min-w-0 flex-1 bg-transparent px-3 py-2 outline-none"
           disabled={busy}
         />

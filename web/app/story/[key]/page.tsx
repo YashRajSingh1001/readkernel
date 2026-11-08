@@ -114,6 +114,17 @@ async function StoryView({ params }: { params: PageProps<"/story/[key]">["params
           )}
         </div>
 
+        <Link
+          href={`/ask?story=${key}`}
+          className="group mt-6 flex items-center justify-between gap-4 rounded-xl border border-line bg-card px-4 py-3 hover:border-ink"
+        >
+          <span>
+            <span className="block font-semibold">Ask about this story</span>
+            <span className="text-sm text-muted">Competitors, the wider space, how it developed. Every answer is linked.</span>
+          </span>
+          <span className="shrink-0 text-sm font-semibold text-accent group-hover:underline">Ask →</span>
+        </Link>
+
         <section className="mt-8">
           <h2 className="text-xl font-bold">Read the coverage</h2>
           <ul className="mt-3 divide-y divide-line">

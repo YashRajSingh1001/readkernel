@@ -43,6 +43,24 @@ function count(args: Record<string, unknown>, key: string, fallback: number, max
   return Number.isFinite(n) ? Math.min(Math.max(1, Math.round(n)), max) : fallback;
 }
 
+const MAX_SEARCH_ATTEMPTS = 6;
+
+/**
+ * The query, then broader versions to try if it finds nothing: years and
+ * bare numbers removed (not names with digits, like GPT-6.1 or Arete-27B),
+ * then one word fewer from the end each time. Queries using "phrases" or
+ * -exclusions are taken as written.
+ */
+export function broaderQueries(query: string): string[] {
+  if (/["]|(^|\s)-\S/.test(query)) return [query];
+  const words = query.split(/\s+/).filter(Boolean);
+  const tries = [query];
+  let kept = words.filter((w) => !/^[$€£₹]?[\d.,%]+[kmbt]?$/i.test(w));
+  if (kept.length === 0) kept = words;
+  for (let n = kept.length; n >= 1; n--) tries.push(kept.slice(0, n).join(" "));
+  return [...new Set(tries)].slice(0, MAX_SEARCH_ATTEMPTS);
+}
+
 // Compact shapes: what an agent needs, with a link for every claim.
 function story(s: Story & { edition_date?: string }, rank?: number) {
   return {
@@ -138,12 +156,19 @@ export const NEWS_TOOLS: NewsTool[] = [
       const query = text(args, "query", 100);
       if (!query || query.length < 2) throw new ToolInputError("query needs at least 2 characters");
       const limit = count(args, "limit", 10, 20);
-      const [stories, posts] = await Promise.all([searchStories(query, limit), searchCompanyPosts(query, 5)]);
-      return {
-        query,
-        stories: stories.slice(0, limit).map((s) => story(s)),
-        company_blog_posts: posts.map(companyPost),
-      };
+      // Every word must match, so one stray word ("2026", "competitors") can
+      // empty the results. If it does, retry with fewer words and say so.
+      for (const attempt of broaderQueries(query)) {
+        const [stories, posts] = await Promise.all([searchStories(attempt, limit), searchCompanyPosts(attempt, 5)]);
+        if (stories.length === 0 && posts.length === 0) continue;
+        return {
+          query,
+          ...(attempt !== query ? { note: `Nothing matched every word of "${query}"; these match "${attempt}".` } : {}),
+          stories: stories.slice(0, limit).map((s) => story(s)),
+          company_blog_posts: posts.map(companyPost),
+        };
+      }
+      return { query, stories: [], company_blog_posts: [] };
     },
   },
   {

@@ -39,15 +39,19 @@ export async function POST(request: Request) {
     return Response.json({ error: "You've asked a lot in a short time. Please wait a few minutes." }, { status: 429 });
   }
   let turns: ChatTurn[] | null = null;
+  let storyKey: string | undefined;
   try {
-    turns = parse(await request.json());
+    const body = await request.json();
+    turns = parse(body);
+    // Set when Ask was opened from a story page; an unknown key is ignored.
+    if (typeof body?.story === "string" && body.story) storyKey = body.story.slice(0, 40);
   } catch {
     // fall through
   }
   if (!turns) return Response.json({ error: "Send a question." }, { status: 400 });
 
   try {
-    return Response.json(await askAgent(turns));
+    return Response.json(await askAgent(turns, { storyKey }));
   } catch (err) {
     console.error("[ask]", err);
     const message =
