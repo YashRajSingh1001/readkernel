@@ -20,7 +20,7 @@ const SPEED = 25; // px per second: slow enough to read the names as they pass
  * stopped, a sideways trackpad swipe or a mouse drag moves through the list.
  * Readers who ask for reduced motion get a still, wrapped list instead (CSS).
  * Names only, not links: the full list lives on /sources. These are sources we
- * read, not partners, and the note under the strip says so.
+ * read, not partners.
  */
 export function SourcesStrip({ sources }: { sources: SourceInfo[] }) {
   const band = useRef<HTMLDivElement>(null);
@@ -221,10 +221,6 @@ export function SourcesStrip({ sources }: { sources: SourceInfo[] }) {
           </ul>
         </div>
       </div>
-      <p className="mt-3 text-sm text-muted">
-        ReadKernel is independent. Names and icons identify the sources we read; no affiliation or endorsement is
-        implied.
-      </p>
     </section>
   );
 }
