@@ -716,9 +716,10 @@ so they're free and repeatable.
 
 ## 15. Settings reference
 
-Pipeline settings go in `readkernel/.env` locally and in **GitHub secrets** for the daily job.
-Website settings go in `web/.env.local` locally and in **Vercel → Environment Variables**.
-Templates: [`.env.example`](../.env.example) and [`web/.env.example`](../web/.env.example).
+Locally, the pipeline and the website both read one file, `readkernel/.env`: the pipeline directly, the website through
+`web/next.config.ts`, which loads it on start. Live, the pipeline's settings are **GitHub secrets**
+and the website's are in **Vercel → Environment Variables**.
+Template: [`.env.example`](../.env.example).
 
 | Setting | Used by | Value now | Meaning |
 | --- | --- | --- | --- |
