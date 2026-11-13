@@ -45,7 +45,7 @@ export function StoryCard({ story, now, rank, variant = "standard", showImage = 
 
   const meta = (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-      {rank != null && <span className="font-mono text-ink tabular-nums">#{rank}</span>}
+      {rank != null && <span className="text-ink tabular-nums">#{rank}</span>}
       <span className="rounded-full bg-accent-soft px-2 py-0.5 font-medium text-accent">
         {TOPICS[story.topic] ?? story.topic}
       </span>

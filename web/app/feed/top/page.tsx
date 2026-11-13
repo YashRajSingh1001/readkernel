@@ -14,12 +14,12 @@ export default async function TopArticlesPage() {
   return (
     <>
       <header className="mb-6">
-        <p className="font-mono text-xs tracking-wide text-label uppercase">
+        <p className="text-sm font-semibold text-label">
           Top articles{edition ? ` · ${formatDate(edition.date)}` : ""}
         </p>
         <h1 className="mt-1 text-4xl font-extrabold tracking-tight">
           What developers are discussing{" "}
-          <span className="font-mono text-lg font-normal text-muted tabular-nums">{items.length}</span>
+          <span className="text-lg font-normal text-muted tabular-nums">{items.length}</span>
         </h1>
         <p className="mt-2 text-muted">The most-upvoted posts on Hacker News in the last day and a half.</p>
       </header>
@@ -30,13 +30,13 @@ export default async function TopArticlesPage() {
         <ol className="divide-y divide-line border-y border-line">
           {items.map((d, i) => (
             <li key={d.url} className="grid grid-cols-[2.25rem_1fr] gap-3 py-4">
-              <span className="pt-0.5 font-mono text-sm text-muted tabular-nums">{i + 1}</span>
+              <span className="pt-0.5 text-sm text-muted tabular-nums">{i + 1}</span>
               <div className="min-w-0">
                 <a href={d.url} target="_blank" rel="noopener noreferrer" className="font-serif text-lg leading-snug font-semibold hover:text-accent">
                   {d.title}
                 </a>
                 {d.summary && <p className="mt-1 text-sm leading-relaxed text-muted">{d.summary}</p>}
-                <p className="mt-1.5 flex flex-wrap gap-x-3 font-mono text-xs text-muted">
+                <p className="mt-1.5 flex flex-wrap gap-x-3 text-xs text-muted">
                   <span>{d.source}</span>
                   {d.points != null && <span className="text-accent">▲ {d.points} points</span>}
                   {d.comments_url && (

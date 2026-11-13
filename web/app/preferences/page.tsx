@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Your brief settings", robots: { inde
 export default function PreferencesPage({ searchParams }: PageProps<"/preferences">) {
   return (
     <Container>
-      <p className="font-mono text-xs tracking-wide text-label uppercase">Your brief</p>
+      <p className="text-sm font-semibold text-label">Your brief</p>
       <h1 className="mt-1 text-4xl font-extrabold tracking-tight">Change your settings</h1>
       <Suspense fallback={<p className="mt-6 text-muted">Loading…</p>}>
         <Settings searchParams={searchParams} />

@@ -11,9 +11,9 @@ export const metadata: Metadata = {
 export default function TermsPage() {
   return (
     <Container>
-      <p className="font-mono text-xs tracking-wide text-label uppercase">Terms</p>
+      <p className="text-sm font-semibold text-label">Terms</p>
       <h1 className="mt-1 text-4xl font-extrabold tracking-tight">Terms of use</h1>
-      <p className="mt-2 font-mono text-xs text-muted">Last updated 18 October 2026</p>
+      <p className="mt-2 text-xs text-muted">Last updated 18 October 2026</p>
 
       <div className="prose-rk mt-8">
         <h2>The service</h2>

@@ -44,7 +44,7 @@ const ROWS: { way: string; good: string; catch: string; readkernel: string }[] =
 export default function ComparePage() {
   return (
     <Container>
-      <p className="font-mono text-xs tracking-wide text-label uppercase">Compare</p>
+      <p className="text-sm font-semibold text-label">Compare</p>
       <h1 className="mt-1 text-4xl font-extrabold tracking-tight">How ReadKernel compares</h1>
       <p className="mt-3 leading-relaxed text-muted">
         Every way of keeping up with tech has a trade-off. Here&apos;s where ReadKernel fits, honestly. Many readers use it

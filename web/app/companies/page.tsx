@@ -35,7 +35,7 @@ export default function CompaniesPage({ searchParams }: PageProps<"/companies">)
   return (
     <Container size="wide">
       <header className="max-w-3xl">
-        <p className="font-mono text-xs tracking-wide text-label uppercase">Company blogs</p>
+        <p className="text-sm font-semibold text-label">Company blogs</p>
         <h1 className="mt-1 text-4xl font-extrabold tracking-tight">How real companies build</h1>
         <p className="mt-2 text-muted">
           Engineering and data science write-ups straight from the teams at {COMPANIES.length} companies. Each one
@@ -44,7 +44,7 @@ export default function CompaniesPage({ searchParams }: PageProps<"/companies">)
       </header>
 
       <section aria-label="Companies we read" className="mt-6 rounded-2xl border border-line bg-sunk px-4 py-5">
-        <p className="text-center font-mono text-xs tracking-wide text-muted uppercase">Reading the blogs of</p>
+        <p className="text-center text-sm font-semibold text-muted">Reading the blogs of</p>
         <ul className="mt-4 flex flex-wrap justify-center gap-x-6 gap-y-3">
           {COMPANIES.map((c) => (
             <li key={c.name}>
@@ -120,7 +120,7 @@ async function Posts({ searchParams }: { searchParams: PageProps<"/companies">["
 
       <div className="mt-8 flex flex-col gap-10 lg:flex-row-reverse">
         <aside className="lg:w-56 lg:shrink-0">
-          <p className="mb-2 font-mono text-[11px] tracking-wide text-muted uppercase">Companies</p>
+          <p className="mb-2 text-xs font-semibold text-muted">Companies</p>
           <ul className="flex flex-wrap gap-1.5 lg:flex-col lg:gap-0">
             {f.company && (
               <li>
@@ -139,7 +139,7 @@ async function Posts({ searchParams }: { searchParams: PageProps<"/companies">["
                   }`}
                 >
                   {name}
-                  <span className="font-mono text-xs opacity-70 tabular-nums">{count}</span>
+                  <span className="text-xs opacity-70 tabular-nums">{count}</span>
                 </Link>
               </li>
             ))}

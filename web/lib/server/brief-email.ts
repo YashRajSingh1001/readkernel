@@ -13,6 +13,7 @@ const LINE = "#e7e4dc";
 const ACCENT = "#c2410c";
 const SERIF = "Georgia, 'Times New Roman', serif";
 const SANS = "-apple-system, 'Segoe UI', Arial, sans-serif";
+const GOTHIC = "'Century Gothic', CenturyGothic, 'Trebuchet MS', Arial, sans-serif"; // the wordmark
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -87,9 +88,9 @@ export function renderBrief(edition: BriefEdition, siteUrl: string, token: strin
 <tr><td align="center" style="padding:24px 12px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;">
   <tr><td style="padding:0 8px 20px 8px;border-bottom:1px solid ${LINE};">
-    <a href="${esc(siteUrl)}" style="text-decoration:none;color:${INK};font-family:${SERIF};font-size:24px;font-weight:bold;">
-      <span style="color:${ACCENT};">&#9679;</span> ReadKernel</a>
-    <div style="font-family:${SANS};font-size:12px;letter-spacing:1px;text-transform:uppercase;color:${ACCENT};margin-top:18px;">Today's brief</div>
+    <a href="${esc(siteUrl)}" style="text-decoration:none;color:${INK};font-family:${GOTHIC};font-size:24px;font-weight:normal;">
+      read<strong>kernel</strong><span style="color:${ACCENT};">.</span></a>
+    <div style="font-family:${SANS};font-size:14px;font-weight:bold;color:${ACCENT};margin-top:18px;">Today's brief</div>
     <div style="font-family:${SERIF};font-size:28px;font-weight:bold;color:${INK};margin-top:4px;">${esc(longDate(edition.date))}</div>
     <div style="font-family:${SANS};font-size:14px;color:${MUTED};margin-top:6px;">${stories.length} stories worth your time.</div>
   </td></tr>

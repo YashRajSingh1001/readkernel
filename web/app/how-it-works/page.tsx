@@ -54,7 +54,7 @@ const FAQ = [
 export default function HowItWorks() {
   return (
     <Container>
-      <p className="font-mono text-xs tracking-wide text-label uppercase">How it works</p>
+      <p className="text-sm font-semibold text-label">How it works</p>
       <h1 className="mt-1 text-4xl font-extrabold tracking-tight text-balance">
         From hundreds of articles to the ten that matter
       </h1>

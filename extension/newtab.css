@@ -35,7 +35,8 @@ a:hover { color: var(--accent); }
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
   max-width: 1180px; margin: 0 auto; padding: 20px 24px;
 }
-.logo { font-family: var(--serif); font-size: 22px; font-weight: 700; }
+.logo { font-family: "Century Gothic", CenturyGothic, var(--sans); font-size: 22px; font-weight: 400; letter-spacing: -0.01em; }
+.logo b { font-weight: 700; }
 .dot { color: var(--accent); }
 .search { flex: 1; display: flex; gap: 8px; min-width: 260px; }
 .search input {

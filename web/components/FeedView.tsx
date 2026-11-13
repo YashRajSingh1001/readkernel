@@ -16,12 +16,12 @@ export function FeedView({ edition, topic, olderDate }: Props) {
   return (
     <>
       <header className="mb-6">
-        <p className="font-mono text-xs tracking-wide text-label uppercase">
+        <p className="text-sm font-semibold text-label">
           The feed · {formatDate(edition.date)}
         </p>
         <h1 className="mt-1 text-4xl font-extrabold tracking-tight">
           {topic ? TOPICS[topic] : "Everything worth knowing"}{" "}
-          <span className="font-mono text-lg font-normal text-muted tabular-nums">{stories.length}</span>
+          <span className="text-lg font-normal text-muted tabular-nums">{stories.length}</span>
         </h1>
         <p className="mt-2 text-muted">
           {topic ? TOPIC_BLURBS[topic] : `The day's ${stories.length} best stories from ${sourceCount} sources.`}{" "}
@@ -39,7 +39,7 @@ export function FeedView({ edition, topic, olderDate }: Props) {
 
       {showReleases && (
         <section aria-labelledby="model-releases" className="mb-8 rounded-2xl border border-line bg-sunk p-4 sm:p-5">
-          <h2 id="model-releases" className="font-mono text-xs tracking-wide text-label uppercase">
+          <h2 id="model-releases" className="text-sm font-semibold text-label">
             ★ Model releases
           </h2>
           <div className="mt-1">

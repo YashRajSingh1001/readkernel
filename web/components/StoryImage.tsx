@@ -45,7 +45,7 @@ export function StoryImage({ src, credit, topic, headline, size = "standard", so
     if (size === "thumb") {
       return (
         <div className={`${ratio} ${radius} flex items-center justify-center border border-line bg-gradient-to-br ${tint}`} aria-hidden>
-          <span className="font-mono text-[10px] font-bold tracking-wide text-ink/60 uppercase">{label}</span>
+          <span className="text-xs font-bold text-ink/60">{label}</span>
         </div>
       );
     }
@@ -56,7 +56,7 @@ export function StoryImage({ src, credit, topic, headline, size = "standard", so
         aria-label={headline}
         role="img"
       >
-        <span className="font-mono text-xs font-bold tracking-widest text-ink/70 uppercase">{label}</span>
+        <span className="text-sm font-bold text-ink/70">{label}</span>
         <span className="absolute -right-2 -bottom-6 font-serif text-[7rem] leading-none font-bold text-ink/[0.06] select-none" aria-hidden>
           {label}
         </span>

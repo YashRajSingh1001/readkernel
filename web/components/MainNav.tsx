@@ -23,7 +23,7 @@ export function MainNav({ variant }: { variant: "desktop" | "phone" }) {
 
   if (variant === "phone") {
     return (
-      <nav aria-label="Main" className="flex gap-5 overflow-x-auto border-t border-line px-4 py-2 text-sm text-muted md:hidden">
+      <nav aria-label="Main" className="flex gap-5 overflow-x-auto [scrollbar-width:none] border-t border-line px-4 py-2 text-sm text-muted md:hidden">
         {NAV.map((item) => {
           const active = isActive(path, item.href);
           return (

@@ -29,9 +29,10 @@ export default async function Image({ params }: { params: Promise<{ key: string 
           fontFamily: "Georgia, serif",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 34, fontWeight: 700 }}>
-          <div style={{ width: 20, height: 20, borderRadius: 10, background: "#c2410c" }} />
-          ReadKernel
+        <div style={{ display: "flex", alignItems: "baseline", fontSize: 38 }}>
+          <span style={{ fontWeight: 400 }}>read</span>
+          <span style={{ fontWeight: 700 }}>kernel</span>
+          <span style={{ color: "#c2410c", fontWeight: 700 }}>.</span>
         </div>
         <div style={{ display: "flex", fontSize: headline.length > 90 ? 52 : 64, lineHeight: 1.15, fontWeight: 700 }}>
           {headline}

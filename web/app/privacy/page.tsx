@@ -13,9 +13,9 @@ const EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "readkernel.brief@gmail.c
 export default function PrivacyPage() {
   return (
     <Container>
-      <p className="font-mono text-xs tracking-wide text-label uppercase">Privacy</p>
+      <p className="text-sm font-semibold text-label">Privacy</p>
       <h1 className="mt-1 text-4xl font-extrabold tracking-tight">Privacy, in plain words</h1>
-      <p className="mt-2 font-mono text-xs text-muted">Last updated 18 October 2026</p>
+      <p className="mt-2 text-xs text-muted">Last updated 18 October 2026</p>
 
       <div className="prose-rk mt-8">
         <p>

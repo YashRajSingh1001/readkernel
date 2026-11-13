@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export default function SearchPage({ searchParams }: PageProps<"/search">) {
   return (
     <Container>
-      <p className="font-mono text-xs tracking-wide text-label uppercase">Search</p>
+      <p className="text-sm font-semibold text-label">Search</p>
       <h1 className="mt-1 text-4xl font-extrabold tracking-tight">Search the archive</h1>
       <Suspense fallback={<SearchBox q="" />}>
         <Results searchParams={searchParams} />
@@ -66,7 +66,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/search">["s
       <ul className="mt-4 divide-y divide-line">
         {results.map((s) => (
           <li key={`${s.edition_date}-${s.story_key}`} className="py-4">
-            <p className="font-mono text-xs text-muted">
+            <p className="text-xs text-muted">
               {formatDate(s.edition_date)} · {TOPICS[s.topic] ?? s.topic}
             </p>
             <Link href={`/story/${s.story_key}`} className="mt-1 block font-serif text-lg leading-snug font-semibold hover:text-accent">
@@ -78,7 +78,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/search">["s
       </ul>
       {companyResults.length > 0 && (
         <section className="mt-10">
-          <h2 className="font-mono text-xs tracking-wide text-label uppercase">From company blogs</h2>
+          <h2 className="text-sm font-semibold text-label">From company blogs</h2>
           {companyResults.map((p) => (
             <CompanyPostCard key={p.url} post={p} variant="compact" />
           ))}

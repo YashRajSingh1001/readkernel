@@ -19,7 +19,7 @@ export function EditionView({ edition, isLatest = false }: { edition: Edition; i
   return (
     <Container>
       <header className="mb-8">
-        <p className="font-mono text-xs tracking-wide text-label uppercase">
+        <p className="text-sm font-semibold text-label">
           {isLatest ? "Today's brief" : "Daily brief"}
         </p>
         <h1 className="mt-1 text-4xl font-extrabold tracking-tight sm:text-5xl">{formatDate(edition.date)}</h1>
@@ -33,7 +33,7 @@ export function EditionView({ edition, isLatest = false }: { edition: Edition; i
 
       {first && (
         <section aria-labelledby="story-of-the-day">
-          <h2 id="story-of-the-day" className="mb-3 font-mono text-xs tracking-wide text-label uppercase">
+          <h2 id="story-of-the-day" className="mb-3 text-sm font-semibold text-label">
             ★ Story of the day
           </h2>
           <StoryCard story={first} now={now} variant="lead" />
@@ -43,7 +43,7 @@ export function EditionView({ edition, isLatest = false }: { edition: Edition; i
       {/* The rest in importance order, 2 to 10. Each card shows its own topic. */}
       {others.length > 0 && (
         <section className="mt-8" aria-labelledby="rest-of-brief">
-          <h2 id="rest-of-brief" className="mb-1 font-mono text-xs tracking-wide text-label uppercase">
+          <h2 id="rest-of-brief" className="mb-1 text-sm font-semibold text-label">
             The rest of the brief
           </h2>
           {others.map((story, i) => (

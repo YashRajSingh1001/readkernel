@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 export default function AskPage() {
   return (
     <Container>
-      <p className="font-mono text-xs tracking-wide text-label uppercase">Ask ReadKernel</p>
+      <p className="text-sm font-semibold text-label">Ask ReadKernel</p>
       <h1 className="mt-1 text-4xl font-extrabold tracking-tight">Ask the news</h1>
       <p className="mt-2 mb-8 text-muted">
         Ask about any company, product or story. ReadKernel searches everything it has covered, follows the story over

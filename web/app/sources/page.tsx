@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default function SourcesPage() {
   return (
     <Container>
-      <p className="font-mono text-xs tracking-wide text-label uppercase">Sources</p>
+      <p className="text-sm font-semibold text-label">Sources</p>
       <h1 className="mt-1 text-4xl font-extrabold tracking-tight">What we read, every morning</h1>
       <p className="mt-3 leading-relaxed text-muted">
         ReadKernel checks these {SOURCES.length} sources each day. We pick sources that report first-hand (the labs
@@ -32,7 +32,7 @@ export default function SourcesPage() {
         return (
           <section key={topic} className="mt-10">
             <h2 className="flex items-baseline gap-2 text-xl font-bold">
-              {TOPICS[topic]} <span className="font-mono text-sm font-normal text-muted">{list.length}</span>
+              {TOPICS[topic]} <span className="text-sm font-normal text-muted">{list.length}</span>
             </h2>
             <p className="text-sm text-muted">{TOPIC_BLURBS[topic]}</p>
             <ul className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -47,7 +47,7 @@ export default function SourcesPage() {
                     <img src={faviconUrl(s.site)} alt="" width={20} height={20} loading="lazy" referrerPolicy="no-referrer" className="h-5 w-5 rounded" />
                     <span className="min-w-0 flex-1">
                       <span className="block font-medium">{s.name}</span>
-                      <span className="block truncate font-mono text-xs text-muted">{domainOf(s.site)}</span>
+                      <span className="block truncate text-xs text-muted">{domainOf(s.site)}</span>
                     </span>
                   </a>
                 </li>

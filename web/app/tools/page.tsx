@@ -22,7 +22,7 @@ function Code({ children }: { children: string }) {
 export default function ToolsPage() {
   return (
     <Container>
-      <p className="font-mono text-xs tracking-wide text-label uppercase">ReadKernel everywhere</p>
+      <p className="text-sm font-semibold text-label">ReadKernel everywhere</p>
       <h1 className="mt-1 text-4xl font-extrabold tracking-tight">Take the brief with you</h1>
       <p className="mt-2 text-muted">
         The same brief, wherever you work: in every new browser tab, or inside your AI assistant. Or{" "}

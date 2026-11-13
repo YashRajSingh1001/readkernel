@@ -146,7 +146,7 @@ async function StoryView({ params }: { params: PageProps<"/story/[key]">["params
                     className={`absolute top-1.5 -left-[27px] h-3 w-3 rounded-full border-2 border-paper ${t.story_key === key ? "bg-accent" : "bg-muted"}`}
                     aria-hidden
                   />
-                  <p className="font-mono text-xs text-muted">{formatDate(t.edition_date)}</p>
+                  <p className="text-xs text-muted">{formatDate(t.edition_date)}</p>
                   {t.story_key === key ? (
                     <p className="font-semibold">{t.headline} (this page)</p>
                   ) : (

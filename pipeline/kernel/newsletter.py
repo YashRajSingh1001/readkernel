@@ -42,6 +42,7 @@ LINE = "#e7e4dc"
 ACCENT = "#c2410c"
 SERIF = "Georgia, 'Times New Roman', serif"
 SANS = "-apple-system, 'Segoe UI', Arial, sans-serif"
+GOTHIC = "'Century Gothic', CenturyGothic, 'Trebuchet MS', Arial, sans-serif"  # the wordmark
 
 
 def long_date(iso: str) -> str:
@@ -129,9 +130,9 @@ def render(
 <tr><td align="center" style="padding:24px 12px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;">
   <tr><td style="padding:0 8px 20px 8px;border-bottom:1px solid {LINE};">
-    <a href="{escape(site_url)}" style="text-decoration:none;color:{INK};font-family:{SERIF};font-size:24px;font-weight:bold;">
-      <span style="color:{ACCENT};">&#9679;</span> ReadKernel</a>
-    <div style="font-family:{SANS};font-size:12px;letter-spacing:1px;text-transform:uppercase;color:{ACCENT};margin-top:18px;">{label}</div>
+    <a href="{escape(site_url)}" style="text-decoration:none;color:{INK};font-family:{GOTHIC};font-size:24px;font-weight:normal;">
+      read<strong>kernel</strong><span style="color:{ACCENT};">.</span></a>
+    <div style="font-family:{SANS};font-size:14px;font-weight:bold;color:{ACCENT};margin-top:18px;">{label}</div>
     <div style="font-family:{SERIF};font-size:28px;font-weight:bold;color:{INK};margin-top:4px;">{escape(long_date(edition['date']))}</div>
     <div style="font-family:{SANS};font-size:14px;color:{MUTED};margin-top:6px;">{len(stories)} stories worth your time.</div>
   </td></tr>

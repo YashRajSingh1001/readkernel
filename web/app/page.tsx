@@ -46,10 +46,7 @@ export default async function Home() {
     <>
       {/* Hero */}
       <Container size="wide" className="pt-6 pb-14 text-center sm:pt-12">
-        <p className="inline-flex items-center gap-2 rounded-full border border-line bg-card px-3 py-1 font-mono text-xs text-muted">
-          <span className="h-1.5 w-1.5 rounded-full bg-label" /> Free · every morning · every source linked
-        </p>
-        <h1 className="mx-auto mt-6 max-w-4xl text-4xl leading-[1.05] font-extrabold tracking-tight text-balance sm:text-6xl">
+        <h1 className="mx-auto max-w-4xl text-4xl leading-[1.05] font-extrabold tracking-tight text-balance sm:text-6xl">
           Today&apos;s tech and AI news, boiled down to ten stories.
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-lg text-pretty text-muted">
@@ -76,7 +73,7 @@ export default async function Home() {
       {/* Sources */}
       <section className="border-y border-line bg-sunk py-6">
         <Container size="wide">
-          <p className="text-center font-mono text-xs tracking-wide text-muted uppercase">
+          <p className="text-center text-sm font-semibold text-muted">
             Reading {SOURCES.length} sources, including
           </p>
           <ul className="mt-4 flex flex-wrap justify-center gap-x-6 gap-y-3">
@@ -100,7 +97,7 @@ export default async function Home() {
         <Container className="py-14">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <p className="font-mono text-xs tracking-wide text-label uppercase">Today&apos;s brief</p>
+              <p className="text-sm font-semibold text-label">Today&apos;s brief</p>
               <h2 className="mt-1 text-3xl font-extrabold tracking-tight">{formatDate(edition.date)}</h2>
             </div>
             <Link href="/today" className="hidden text-sm font-medium text-accent hover:underline sm:inline">
@@ -108,7 +105,7 @@ export default async function Home() {
             </Link>
           </div>
           <div className="mt-6 rounded-2xl border border-line bg-card p-4 sm:p-6">
-            <p className="mb-3 font-mono text-xs tracking-wide text-label uppercase">★ Story of the day</p>
+            <p className="mb-3 text-sm font-semibold text-label">★ Story of the day</p>
             <StoryCard story={first} now={now} variant="lead" />
             <div className="mt-2">
               {rest.slice(0, 3).map((s) => (
@@ -127,7 +124,7 @@ export default async function Home() {
         <Container className="pb-14">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <p className="font-mono text-xs tracking-wide text-label uppercase">From company blogs</p>
+              <p className="text-sm font-semibold text-label">From company blogs</p>
               <h2 className="mt-1 text-3xl font-extrabold tracking-tight">How real companies build</h2>
             </div>
             <Link href="/companies" className="hidden text-sm font-medium text-accent hover:underline sm:inline">
@@ -152,7 +149,7 @@ export default async function Home() {
           className="group grid gap-5 rounded-2xl border border-line bg-card p-6 hover:border-ink sm:grid-cols-[1fr_auto] sm:items-center sm:p-8"
         >
           <div>
-            <p className="font-mono text-xs tracking-wide text-label uppercase">ReadKernel everywhere</p>
+            <p className="text-sm font-semibold text-label">ReadKernel everywhere</p>
             <h2 className="mt-1 text-2xl font-extrabold tracking-tight">Use ReadKernel in Claude, Cursor or Chrome</h2>
             <ul className="mt-3 space-y-1.5 text-sm text-muted">
               <li>
@@ -171,16 +168,16 @@ export default async function Home() {
       {/* How it works */}
       <section className="border-t border-line bg-sunk py-14">
         <Container size="wide">
-          <p className="text-center font-mono text-xs tracking-wide text-label uppercase">How it works</p>
+          <p className="text-center text-sm font-semibold text-label">How it works</p>
           <h2 className="mt-1 text-center text-3xl font-extrabold tracking-tight">From hundreds of articles to ten stories</h2>
           <ol className="mt-10 grid gap-6 md:grid-cols-3">
             {STEPS.map((step) => (
               <li key={step.n} className="rounded-2xl border border-line bg-card p-6">
-                <span className="font-mono text-sm text-accent">0{step.n}</span>
+                <span className="text-sm text-accent">0{step.n}</span>
                 <h3 className="mt-2 text-xl font-bold">{step.title}</h3>
                 <p className="mt-2 leading-relaxed text-muted">{step.body}</p>
                 {step.n === "2" && (
-                  <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-label-soft px-3 py-1 font-mono text-xs text-label">
+                  <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-label-soft px-3 py-1 text-xs text-label">
                     5 articles → 1 story · 5 sources
                   </p>
                 )}
@@ -199,7 +196,7 @@ export default async function Home() {
       <Container size="wide" className="py-14">
         <div className="grid items-center gap-8 rounded-2xl border border-line bg-card p-6 sm:p-10 md:grid-cols-2">
           <div>
-            <p className="font-mono text-xs tracking-wide text-label uppercase">Make it yours</p>
+            <p className="text-sm font-semibold text-label">Make it yours</p>
             <h2 className="mt-1 text-3xl font-extrabold tracking-tight">Your topics, your length, your format</h2>
             <p className="mt-3 leading-relaxed text-muted">
               Only care about AI and startups? Want five stories instead of ten, headlines only, or photos with every

@@ -147,7 +147,7 @@ export function AskChat() {
           ) : (
             <div key={i} className={`rounded-2xl border p-4 sm:p-5 ${t.error ? "border-accent/40 bg-accent-soft" : "border-line bg-card"}`}>
               {t.steps && t.steps.length > 0 && (
-                <p className="mb-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[11px] text-muted">
+                <p className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted">
                   {t.steps.map((s, j) => (
                     <span key={j}>✓ {describe(s)}</span>
                   ))}
@@ -160,7 +160,7 @@ export function AskChat() {
           ),
         )}
         {busy && (
-          <div className="rounded-2xl border border-line bg-card p-4 font-mono text-xs text-muted" role="status">
+          <div className="rounded-2xl border border-line bg-card p-4 text-xs text-muted" role="status">
             Reading the news archive…
           </div>
         )}

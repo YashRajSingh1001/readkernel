@@ -60,9 +60,11 @@
   --color-accent-soft: var(--accent-soft);
   --color-label: var(--label);
   --color-label-soft: var(--label-soft);
-  --font-sans: var(--font-inter);
-  --font-serif: var(--font-newsreader);
-  --font-mono: var(--font-geist-mono);
+  /* One typeface everywhere: Century Gothic if installed, else Jost (see layout.tsx). */
+  --font-sans: "Century Gothic", CenturyGothic, var(--font-jost), "Segoe UI", sans-serif;
+  --font-serif: "Century Gothic", CenturyGothic, var(--font-jost), "Segoe UI", sans-serif;
+  /* Only for real code (setup snippets on /tools). */
+  --font-mono: ui-monospace, Consolas, "SF Mono", Menlo, monospace;
 }
 
 body {
@@ -79,7 +81,6 @@ body {
   line-height: 1.7;
 }
 .prose-rk h2 {
-  font-family: var(--font-newsreader);
   font-size: 1.5rem;
   font-weight: 600;
   margin: 2rem 0 0.75rem;

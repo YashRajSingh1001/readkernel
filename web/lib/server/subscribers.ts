@@ -261,7 +261,7 @@ function shell(body: string) {
   return `<!doctype html><html><body style="margin:0;background:#fbfaf7;font-family:-apple-system,'Segoe UI',Arial,sans-serif;color:#17150f;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;">
-<tr><td style="font-size:20px;font-weight:800;"><span style="color:#c2410c;">&#9679;</span> ReadKernel</td></tr>
+<tr><td style="font-size:22px;font-family:'Century Gothic',CenturyGothic,'Trebuchet MS',Arial,sans-serif;">read<strong>kernel</strong><span style="color:#c2410c;">.</span></td></tr>
 ${body}
 </table></td></tr></table></body></html>`;
 }

@@ -14,7 +14,7 @@ export default async function Archive() {
 
   return (
     <Container>
-      <p className="font-mono text-xs tracking-wide text-label uppercase">Archive</p>
+      <p className="text-sm font-semibold text-label">Archive</p>
       <h1 className="mt-1 text-4xl font-extrabold tracking-tight">Every brief</h1>
       <p className="mt-2 mb-8 text-muted">
         One edition a day. Looking for something specific?{" "}
@@ -33,9 +33,9 @@ export default async function Archive() {
                 <span className="flex items-baseline justify-between gap-4">
                   <span className="font-bold group-hover:text-accent">
                     {formatDate(e.date)}
-                    {i === 0 && <span className="ml-2 rounded-full bg-label-soft px-2 py-0.5 font-mono text-[10px] text-label uppercase">Latest</span>}
+                    {i === 0 && <span className="ml-2 rounded-full bg-label-soft px-2 py-0.5 text-xs font-semibold text-label">Latest</span>}
                   </span>
-                  <span className="shrink-0 font-mono text-xs text-muted">{e.story_count} stories</span>
+                  <span className="shrink-0 text-xs text-muted">{e.story_count} stories</span>
                 </span>
                 {e.lead && <span className="mt-1 block font-serif text-lg leading-snug text-muted">{e.lead}</span>}
               </Link>

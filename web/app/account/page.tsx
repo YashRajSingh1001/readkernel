@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: "Your account", robots: { index: fals
 export default function AccountPage() {
   return (
     <Container>
-      <p className="font-mono text-xs tracking-wide text-label uppercase">Account</p>
+      <p className="text-sm font-semibold text-label">Account</p>
       <Suspense fallback={<p className="mt-6 text-muted">Loading…</p>}>
         <Account />
       </Suspense>
