@@ -2,8 +2,7 @@
 
 /*
  * ReadKernel palette. Light is the default; dark is opt-in via the header
- * toggle (data-theme="dark"), or follows the device when the reader picks
- * "system" (data-theme="system").
+ * toggle (data-theme="dark").
  */
 :root {
   --paper: #fbfaf7;
@@ -33,21 +32,6 @@
   color-scheme: dark;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root[data-theme="system"] {
-    --paper: #121110;
-    --card: #1b1a17;
-    --sunk: #171614;
-    --ink: #efece5;
-    --muted: #a39f95;
-    --line: #2c2a26;
-    --accent: #fb7a3c;
-    --accent-soft: #2e1a10;
-    --label: #3cc2b3;
-    --label-soft: #10302c;
-    color-scheme: dark;
-  }
-}
 
 @theme inline {
   --color-paper: var(--paper);
@@ -323,12 +307,6 @@ body {
 :root[data-theme="dark"] .rk-strip-set img {
   background: #f3f1ec;
   padding: 1px;
-}
-@media (prefers-color-scheme: dark) {
-  :root[data-theme="system"] .rk-strip-set img {
-    background: #f3f1ec;
-    padding: 1px;
-  }
 }
 
 /* Content revealed by a toggle (e.g. "Show N more sources"): opacity only. */

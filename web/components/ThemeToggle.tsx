@@ -2,15 +2,14 @@
 
 import { useSyncExternalStore } from "react";
 
-// Light by default. The choice is stored per browser and applied before the
-// page paints by the small script in the root layout (no flash).
-export type Theme = "light" | "dark" | "system";
+// Light or dark; light by default. The choice is stored per browser and applied
+// before the page paints by the small script in the root layout (no flash).
+export type Theme = "light" | "dark";
 const KEY = "readkernel:theme";
-const ORDER: Theme[] = ["light", "dark", "system"];
 
 function current(): Theme {
   const value = document.documentElement.dataset.theme;
-  return value === "dark" || value === "system" ? value : "light";
+  return value === "dark" ? "dark" : "light";
 }
 
 function subscribe(onChange: () => void) {
@@ -21,10 +20,10 @@ function subscribe(onChange: () => void) {
 
 export function ThemeToggle() {
   const theme = useSyncExternalStore(subscribe, current, () => "light" as Theme);
-  const next = ORDER[(ORDER.indexOf(theme) + 1) % ORDER.length];
-  const label = { light: "Light", dark: "Dark", system: "Auto" }[theme];
+  const next: Theme = theme === "light" ? "dark" : "light";
+  const label = theme === "light" ? "Light" : "Dark";
 
-  function cycle() {
+  function toggle() {
     document.documentElement.dataset.theme = next;
     try {
       localStorage.setItem(KEY, next);
@@ -36,7 +35,7 @@ export function ThemeToggle() {
   return (
     <button
       type="button"
-      onClick={cycle}
+      onClick={toggle}
       title={`Theme: ${label}. Switch to ${next}.`}
       aria-label={`Theme: ${label}. Switch to ${next}.`}
       className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-sunk hover:text-ink"
@@ -52,15 +51,9 @@ export function ThemeToggle() {
           <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
         </svg>
       )}
-      {theme === "system" && (
-        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-          <rect x="3" y="4" width="18" height="12" rx="2" />
-          <path d="M8 20h8M12 16v4" />
-        </svg>
-      )}
     </button>
   );
 }
 
 // Runs in <head> before paint. Kept as a string so it can be inlined.
-export const THEME_SCRIPT = `try{var t=localStorage.getItem('${KEY}');document.documentElement.dataset.theme=(t==='dark'||t==='system')?t:'light'}catch(e){document.documentElement.dataset.theme='light'}`;
+export const THEME_SCRIPT = `try{var t=localStorage.getItem('${KEY}');document.documentElement.dataset.theme=t==='dark'?'dark':'light'}catch(e){document.documentElement.dataset.theme='light'}`;
