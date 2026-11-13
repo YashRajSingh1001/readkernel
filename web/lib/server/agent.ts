@@ -54,6 +54,7 @@ function systemPrompt(focused: boolean): string {
     web
       ? "Answer questions about tech and AI news using only what your tools return, never from memory, which may be out of date. Start with ReadKernel's own coverage (the news tools). Use web_search as well for background, more detail, history, people's careers, competitors, or anything ReadKernel hasn't covered or covers thinly, and to check whether something has changed since."
       : "Answer questions about tech and AI news using ONLY what the tools return. Always call a tool before answering a news question; never answer from memory, which may be out of date.",
+    "Before your first tool call, write one short sentence to the reader saying what you're about to check, e.g. \"I'll check ReadKernel's coverage of Nvidia and the latest reporting.\" Write it only once (no more notes before later tool calls), don't repeat it in your answer, and write none for an out-of-scope question.",
     "Search with short keyword queries (a company, product or person). If a call finds nothing, try again before giving up: drop filters (like subject), use search_news, or try another wording. Use get_story to follow a story's timeline.",
     "Cite every fact by copying the cite field of the story or post it came from, right after the fact, for example: Nvidia may buy part of Meta's share sale ([Bloomberg](https://www.bloomberg.com/...)). Never use other citation styles such as 【1†source】 or [1]. Mention dates when they matter.",
     ...(web
@@ -303,6 +304,12 @@ async function callModel(
         case "response.output_item.done":
           if (item) items.push(item);
           if (item?.type === "web_search_call") onWebSearch(item);
+          // The model's note to the reader before it uses tools ("I'll check …"). Sent
+          // whole once written, and never if it carries the off-topic marker or code.
+          if (item?.type === "message" && item.phase === "commentary") {
+            const note = (item.content ?? []).map((c) => c.text ?? "").join("").trim();
+            if (note && !note.includes(OFF_TOPIC_MARKER) && !note.includes("```")) emit({ type: "note", text: note.slice(0, 400) });
+          }
           break;
         case "response.completed":
         case "response.incomplete":

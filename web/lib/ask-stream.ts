@@ -39,6 +39,8 @@ export type AskEvent =
   | { type: "tool"; id: string; state: "started"; tool: string; args: Record<string, unknown> }
   /** args: set when they're only known once the call is done (web searches). */
   | { type: "tool"; id: string; state: "finished"; ok: boolean; args?: Record<string, unknown>; counts?: ToolCounts; error?: string }
+  /** The model's short note to the reader before it uses tools, e.g. "I'll check ReadKernel's coverage of …". */
+  | { type: "note"; text: string }
   /** Answer text, appended as generated. All deltas joined equal done.answer unless replaced. */
   | { type: "delta"; text: string }
   /** Text streamed so far turned out not to be the answer (the model went on to call tools). */

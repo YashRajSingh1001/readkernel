@@ -22,6 +22,7 @@ type Answer = {
   question: string;
   content: string;
   steps: Activity[];
+  notes: string[]; // the model's notes to the reader before it used tools
   phase: Phase | null;
   state: "working" | "done" | "stopped" | "error";
   startedAt: number; // when the question was sent
@@ -100,6 +101,16 @@ function describe(step: Activity): string {
   if (step.state === "failed") return `${what}: failed${step.error ? ` (${step.error})` : ""}`;
   const result = found(c, step.tool);
   return result ? `${what} · ${result}` : what;
+}
+
+/** What Ask is doing right now, from the latest event: a request in flight, a running tool, or answer text arriving. */
+function currentLabel(a: Answer): string {
+  if (a.phase) return phaseText(a.phase, a.steps);
+  const running = [...a.steps].reverse().find((s) => s.state === "running");
+  if (running) return describe(running);
+  if (a.content) return "Writing the answer…";
+  const last = a.steps.at(-1);
+  return last ? describe(last) : "Sending your question…";
 }
 
 function phaseText(phase: Phase, steps: Activity[]): string {
@@ -323,6 +334,9 @@ export function AskChat({ story }: { story?: FocusStory }) {
           }));
         }
         break;
+      case "note":
+        update(id, (a) => ({ notes: [...a.notes, e.text] }));
+        break;
       case "delta":
         update(id, (a) => ({ phase: null, content: a.content + e.text }));
         break;
@@ -374,7 +388,7 @@ export function AskChat({ story }: { story?: FocusStory }) {
       return [
         ...kept,
         { role: "user", content: q },
-        { role: "assistant", id, question: q, content: "", steps: [], phase: { kind: "sending" }, state: "working", startedAt: Date.now() },
+        { role: "assistant", id, question: q, content: "", steps: [], notes: [], phase: { kind: "sending" }, state: "working", startedAt: Date.now() },
       ];
     });
     setInput("");
@@ -584,8 +598,8 @@ export function AskChat({ story }: { story?: FocusStory }) {
             ↓ Jump to latest
           </button>
         )}
+        <p className="mb-1.5 text-center text-[11px] text-muted">Every answer links its sources. AI can make mistakes, so check them.</p>
         {composer}
-        <p className="mt-1.5 text-center text-[11px] text-muted">Every answer links its sources. AI can make mistakes, so check them.</p>
       </div>
     </div>
   );
@@ -636,50 +650,62 @@ function AnswerView({ answer: a, last, onRetry }: { answer: Answer; last: boolea
   const [allSources, setAllSources] = useState(false);
   const sources = sourcesIn(a.content);
   const shownSources = allSources ? sources : sources.slice(0, 5);
-  // While Ask works, its steps show as they happen; afterwards they fold into one line.
-  const showSteps = working || open;
+  const chevron = (
+    <svg viewBox="0 0 20 20" className={`size-4 shrink-0 ${open ? "rotate-180" : ""}`} aria-hidden>
+      <path d="m5 8 5 5 5-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+  const stepList = (
+    <ul className="mt-2 space-y-1 border-l border-line pl-3 text-[13px]" aria-label={a.cached ? "What Ask looked up on the saved run" : "What Ask looked up"}>
+      {a.steps.map((s) => (
+        <li key={s.id} className={`rk-fade ${s.state === "failed" ? "text-accent" : ""}`}>
+          {s.state === "running" ? "" : s.state === "failed" ? "✗ " : "✓ "}
+          {/* A step still running when the answer stopped or failed never finished. */}
+          {s.state === "running" && !working ? `${describe(s).replace(/…$/, "")} (stopped)` : describe(s)}
+        </li>
+      ))}
+    </ul>
+  );
 
   return (
     <div className="[overflow-wrap:anywhere]">
-      {(a.steps.length > 0 || (!working && summarize(a))) && (
+      {working ? (
+        // While Ask works: one line saying what it's doing right now, which opens to every step so far.
         <div className="mb-3 text-[15px] text-muted">
-          {!working && (
+          <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex items-center gap-1.5 hover:text-ink">
+            <span key={currentLabel(a)} className="rk-fade">
+              {currentLabel(a)}
+            </span>
+            {a.steps.length > 0 && chevron}
+          </button>
+          {open && a.steps.length > 0 && stepList}
+        </div>
+      ) : (
+        summarize(a) && (
+          // Afterwards: how long it took and what it looked up, folded into one line.
+          <div className="mb-3 text-[15px] text-muted">
             <button
               type="button"
               onClick={() => setOpen(!open)}
               aria-expanded={open}
-              disabled={a.steps.length === 0 && !a.cached}
+              disabled={a.steps.length === 0 && a.notes.length === 0 && !a.cached}
               className="flex items-center gap-1.5 hover:text-ink disabled:hover:text-muted"
             >
               <span>{summarize(a)}</span>
-              {(a.steps.length > 0 || a.cached) && (
-                <svg viewBox="0 0 20 20" className={`size-4 ${open ? "rotate-90" : ""}`} aria-hidden>
-                  <path d="m8 5 5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              )}
+              {(a.steps.length > 0 || a.notes.length > 0 || a.cached) && chevron}
             </button>
-          )}
-          {open && a.cached && (
-            <p className="mt-2 text-[13px]">This suggested question was answered earlier for the {shortDate(a.cached)} edition; these are that run&apos;s lookups.</p>
-          )}
-          {showSteps && (
-            <ul
-              className={`space-y-1 text-[13px] ${working ? "" : "mt-2 border-l border-line pl-3"}`}
-              aria-label={a.cached ? "What Ask looked up on the saved run" : "What Ask looked up"}
-            >
-              {a.steps.map((s) => (
-                <li key={s.id} className={`rk-fade ${s.state === "failed" ? "text-accent" : ""}`}>
-                  {s.state === "running" ? "" : s.state === "failed" ? "✗ " : "✓ "}
-                  {describe(s)}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+            {open && a.cached && (
+              <p className="mt-2 text-[13px]">This suggested question was answered earlier for the {shortDate(a.cached)} edition; these are that run&apos;s lookups.</p>
+            )}
+            {open && a.notes.map((n, i) => <p key={i} className="mt-2 text-[13px]">{n}</p>)}
+            {open && a.steps.length > 0 && stepList}
+          </div>
+        )
       )}
-      {a.phase && working && (
-        <p key={JSON.stringify(a.phase)} className="rk-fade text-[13px] text-muted">
-          {phaseText(a.phase, a.steps)}
+      {/* The model's latest "I'll check …" note while it works; all of them fold into the line above once it's done. */}
+      {working && a.notes.length > 0 && (
+        <p key={a.notes.length} className="rk-fade mb-3 text-[17px] leading-7">
+          {a.notes.at(-1)}
         </p>
       )}
       {a.content && (
