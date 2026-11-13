@@ -9,7 +9,7 @@ import Link from "next/link";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { STORY_SUGGESTIONS, SUGGESTIONS } from "@/lib/ask";
-import { NDJSON, readEvents, type AskEvent, type AskStep, type ToolCounts } from "@/lib/ask-stream";
+import { LINK_PATTERN, NDJSON, readEvents, type AskEvent, type AskStep, type ToolCounts } from "@/lib/ask-stream";
 
 export type FocusStory = { key: string; headline: string };
 
@@ -140,7 +140,7 @@ function conversation(turns: Turn[]): { role: "user" | "assistant"; content: str
 /** The links in an answer, once each: by now every one was confirmed by the server. */
 function sourcesIn(text: string): { url: string; label: string; host: string }[] {
   const seen = new Map<string, { url: string; label: string; host: string }>();
-  for (const m of text.matchAll(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g)) {
+  for (const m of text.matchAll(new RegExp(LINK_PATTERN, "g"))) {
     if (seen.has(m[2])) continue;
     let host = m[2];
     try {
@@ -159,7 +159,7 @@ const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("
 // [text](https://links). Everything else stays plain text; no HTML is ever injected.
 function inline(text: string): ReactNode[] {
   const parts: ReactNode[] = [];
-  const re = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\*\*([^*]+)\*\*/g;
+  const re = new RegExp(`${LINK_PATTERN}|\\*\\*([^*]+)\\*\\*`, "g");
   let last = 0;
   let match: RegExpExecArray | null;
   while ((match = re.exec(text))) {
@@ -404,7 +404,11 @@ export function AskChat({ story }: { story?: FocusStory }) {
       clearTimeout(idle);
       idle = setTimeout(() => controller.abort("timeout"), IDLE_MS);
     };
+    let ended = false; // a done or error event arrived: this answer is settled
     const fail = (message: string, retryable = true) => {
+      // Never for an answer that already ended, was replaced, or was stopped by the reader.
+      if (ended || active.current?.id !== id) return;
+      if (controller.signal.aborted && controller.signal.reason !== "timeout") return;
       update(id, () => ({ state: "error", phase: null, error: message, retryable }));
       setAnnounce(message);
     };
@@ -422,16 +426,20 @@ export function AskChat({ story }: { story?: FocusStory }) {
         fail(data.error ?? "Something went wrong.", res.status !== 400);
         return;
       }
-      let ended = false;
       for await (const e of readEvents(res.body)) {
         if (active.current?.id !== id) break; // replaced or stopped
         alive();
         apply(id, e);
-        if (e.type === "done" || e.type === "error") ended = true;
+        if (e.type === "done" || e.type === "error") {
+          // Settled: stop reading (the server may still be saving the answer) and stop the clock.
+          ended = true;
+          clearTimeout(idle);
+          break;
+        }
       }
-      if (!ended && active.current?.id === id) fail("The answer was cut off before it finished.");
+      if (ended) res.body.cancel().catch(() => {});
+      else fail("The answer was cut off before it finished.");
     } catch {
-      if (controller.signal.aborted && controller.signal.reason !== "timeout") return; // stopped by the reader
       fail(
         controller.signal.reason === "timeout"
           ? "ReadKernel stopped responding. Please try again."

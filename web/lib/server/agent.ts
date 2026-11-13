@@ -163,7 +163,8 @@ async function* sseData(body: ReadableStream<Uint8Array>, onBytes: () => void): 
       const { value, done } = await reader.read();
       if (done) return;
       onBytes();
-      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+      // Normalise line ends on the whole buffer, so a \r\n split across two chunks is caught too.
+      buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
       let end: number;
       while ((end = buffer.indexOf("\n\n")) >= 0) {
         const block = buffer.slice(0, end);
@@ -368,15 +369,29 @@ export function withSources(answer: string, cites: string[]): string {
   return `${answer}\n\nSources: ${[...new Set(cites)].slice(0, 5).join(" · ")}`;
 }
 
+/** The promise's result, or the signal's reason as soon as it aborts. */
+function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    if (signal.aborted) return reject(signal.reason);
+    const stop = () => reject(signal.reason);
+    signal.addEventListener("abort", stop, { once: true });
+    promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", stop));
+  });
+}
+
 /** What one tool call found, for the reader and for the model. */
 async function callTool(
   id: string,
   name: string,
   args: Record<string, unknown>,
   emit: (e: AskEvent) => void,
+  signal: AbortSignal,
 ): Promise<{ step: AgentStep; result?: unknown; content: string }> {
+  signal.throwIfAborted();
   emit({ type: "tool", id, state: "started", tool: name, args });
-  const outcome = await runTool(name, args);
+  // Stop waiting when the reader leaves or time runs out. The database read itself
+  // can't be cancelled (tools are shared with MCP), but its result is then ignored.
+  const outcome = await untilAborted(runTool(name, args), signal);
   if (!outcome.ok) {
     emit({ type: "tool", id, state: "finished", ok: false, error: outcome.error });
     return { step: { tool: name, args, ok: false, error: outcome.error }, content: JSON.stringify({ error: outcome.error }) };
@@ -407,7 +422,10 @@ async function answer(history: ChatTurn[], storyKey: string | undefined, signal:
   if (looksLikeCode(history.at(-1)!.content)) return { answer: OFF_TOPIC_REPLY, steps: [], complete: false, truncated: false };
 
   // Links the answer may keep: URLs the model was actually given this run, and
-  // ones in Ask's earlier answers in this chat.
+  // ones in Ask's earlier answers in this chat, so follow-ups can cite them again.
+  // That history comes from the client, so a caller could plant a URL in it; the
+  // link would show only in that caller's own answer, since answers to follow-ups
+  // are never cached or shared (route.ts caches first questions only).
   const known = new Set<string>(history.filter((t) => t.role === "assistant").flatMap((t) => urlsIn(t.content)));
   const cites: string[] = []; // every citation the model was given, for withSources()
   const learn = (content: string, result: unknown) => {
@@ -427,7 +445,7 @@ async function answer(history: ChatTurn[], storyKey: string | undefined, signal:
   let focused = false;
   if (storyKey) {
     const args = { story_key: storyKey };
-    const used = await callTool("preload_story", "get_story", args, emit);
+    const used = await callTool("preload_story", "get_story", args, emit, signal);
     steps.push(used.step);
     if (used.result && (used.result as { story?: unknown }).story) {
       focused = true;
@@ -453,7 +471,12 @@ async function answer(history: ChatTurn[], storyKey: string | undefined, signal:
       flush(guard.finish(), emit);
       if (guard.unconfirmed.length) console.warn(`[ask] unlinked ${guard.unconfirmed.length} URL(s) no tool returned:`, guard.unconfirmed);
       // The model declined (OFF_TOPIC) or wrote code anyway: neither was shown.
-      if (guard.blocked) return { answer: OFF_TOPIC_REPLY, steps, complete: false, truncated: false };
+      if (guard.blocked) {
+        // Anything streamed before the marker or code fence is withdrawn, so the streamed text
+        // still adds up to the final answer (the fixed reply, sent in "done").
+        if (guard.text) emit({ type: "discard" });
+        return { answer: OFF_TOPIC_REPLY, steps, complete: false, truncated: false };
+      }
       if (!guard.text) {
         return { answer: "Sorry, I couldn't put an answer together. Try rephrasing.", steps, complete: false, truncated: false };
       }
@@ -476,7 +499,7 @@ async function answer(history: ChatTurn[], storyKey: string | undefined, signal:
       } catch {
         // leave empty; the tool reports what's missing
       }
-      const used = await callTool(call.id, call.function.name, args, emit);
+      const used = await callTool(call.id, call.function.name, args, emit, signal);
       steps.push(used.step);
       if (used.result !== undefined) learn(used.content, used.result);
       messages.push({ role: "tool", tool_call_id: call.id, content: used.content });

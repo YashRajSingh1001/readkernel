@@ -108,7 +108,13 @@ const norm = (url: string) => url.replace(/[/.,;:]+$/, "");
 // code fences (Ask doesn't hand out code). See lib/server/ask-scope.ts.
 export const OFF_TOPIC_MARKER = "OFF_TOPIC";
 const BLOCKERS = [OFF_TOPIC_MARKER, "```"];
-const LINK = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g;
+/**
+ * A markdown link, as the server checks it and the chat renders it. The length
+ * limits match couldBeLink(): anything longer is released as plain text unchecked,
+ * so the chat must not turn it into a link either.
+ */
+export const LINK_PATTERN = "\\[([^\\]\\n]{1,299})\\]\\((https?:\\/\\/[^\\s)]{1,1990})\\)";
+const LINK = new RegExp(LINK_PATTERN, "g");
 
 /** True while `s` (starting at "[") could still become [label](https://…). */
 function couldBeLink(s: string): boolean {
@@ -131,6 +137,7 @@ function couldBeLink(s: string): boolean {
  */
 export class AnswerGuard {
   private raw = "";
+  private committed = 0; // raw text up to here has been shown and is never looked at again
   private shown = "";
   private cited = new Set<string>();
   private known: Set<string>;
@@ -167,55 +174,69 @@ export class AnswerGuard {
       this.blocked = true;
       return none;
     }
-    const next = this.render(final);
-    // Rendering only ever extends what was shown; anything else is a bug in the hold-back rules.
-    if (!next.startsWith(this.shown)) throw new Error("AnswerGuard: shown text changed");
-    const delta = next.slice(this.shown.length);
+    // Only new text is processed and appended: what was shown never changes.
+    const cut = Math.max(this.committed, final ? this.raw.length : this.safeEnd());
+    let segment = this.raw.slice(this.committed, cut);
+    // Trailing whitespace waits for the text after it (or is trimmed at the end).
+    if (!final) segment = segment.replace(/\s+$/, "");
+    if (!segment && !final) return none;
+    let out = this.clean(segment);
+    if (!this.shown) out = out.trimStart();
+    if (final) out = out.trimEnd();
+    // Check what will actually be shown too: removing a marker or a link must not
+    // have stitched together a blocker (e.g. "OFF【1】_TOPIC").
+    const tail = this.shown.slice(-16) + out;
+    if (BLOCKERS.some((b) => tail.includes(b))) {
+      this.blocked = true;
+      return none;
+    }
+    this.committed += segment.length;
+    this.shown += out;
     const citations: { url: string; label: string }[] = [];
-    for (const m of delta.matchAll(LINK)) {
+    for (const m of out.matchAll(LINK)) {
       if (!this.cited.has(m[2])) {
         this.cited.add(m[2]);
         citations.push({ url: m[2], label: m[1] });
       }
     }
-    // A link can straddle the old and new text only if it was held back, so it can't; but be safe.
-    this.shown = next;
-    return { delta, citations };
+    return { delta: out, citations };
   }
 
-  private render(final: boolean): string {
-    let cut = this.raw.length;
-    if (!final) {
-      const raw = this.raw;
-      // An unclosed 【 …
-      const open = raw.lastIndexOf("【");
-      if (open >= 0 && raw.indexOf("】", open) < 0) cut = Math.min(cut, open);
-      // … a "[" that may still become a link …
-      for (let i = raw.indexOf("[", Math.max(0, raw.length - 2400)); i >= 0 && i < cut; i = raw.indexOf("[", i + 1)) {
-        if (couldBeLink(raw.slice(i))) {
-          cut = Math.min(cut, i);
+  /** How far the raw text can be shown without cutting into something still being written. */
+  private safeEnd(): number {
+    const raw = this.raw;
+    let cut = raw.length;
+    // An unclosed 【 …
+    const open = raw.lastIndexOf("【");
+    if (open >= this.committed && raw.indexOf("】", open) < 0) cut = Math.min(cut, open);
+    // … a "[" that may still become a link …
+    for (let i = raw.indexOf("[", this.committed); i >= 0 && i < cut; i = raw.indexOf("[", i + 1)) {
+      if (couldBeLink(raw.slice(i))) {
+        cut = Math.min(cut, i);
+        break;
+      }
+    }
+    // … or the start of a blocker at the very end.
+    for (const b of BLOCKERS) {
+      for (let k = Math.min(b.length - 1, raw.length); k > 0; k--) {
+        if (b.startsWith(raw.slice(-k))) {
+          cut = Math.min(cut, raw.length - k);
           break;
         }
       }
-      // … or the start of a blocker at the very end.
-      for (const b of BLOCKERS) {
-        for (let k = Math.min(b.length - 1, raw.length); k > 0; k--) {
-          if (b.startsWith(raw.slice(-k))) {
-            cut = Math.min(cut, raw.length - k);
-            break;
-          }
-        }
-      }
     }
-    let s = this.raw.slice(0, cut);
-    s = s.replace(/\s*【[^】]*】/g, "");
+    return cut;
+  }
+
+  /** Drops 【…】 markers, keeps confirmed links, turns the rest into plain words, trims line ends. */
+  private clean(text: string): string {
+    let s = text.replace(/\s*【[^】]*】/g, "");
     s = s.replace(LINK, (whole, label: string, url: string) => {
       if (this.known.has(norm(url))) return whole;
       if (!this.unconfirmed.includes(url)) this.unconfirmed.push(url);
-      return label;
+      // Brackets go too, so the words left behind can't join a link around them.
+      return label.replace(/[[\]]/g, "");
     });
-    s = s.replace(/[ \t]+$/gm, "").trimStart();
-    // Trailing whitespace waits for the text after it (or is trimmed at the end).
-    return s.trimEnd();
+    return s.replace(/[ \t]+$/gm, "");
   }
 }
