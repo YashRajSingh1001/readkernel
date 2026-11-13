@@ -19,11 +19,9 @@ export function EditionView({ edition, isLatest = false }: { edition: Edition; i
   return (
     <Container>
       <header className="mb-8">
-        <p className="font-mono text-xs tracking-wide text-label uppercase">
-          {isLatest ? "Today's brief" : "Daily brief"}
-        </p>
-        <h1 className="mt-1 text-4xl font-extrabold tracking-tight sm:text-5xl">{formatDate(edition.date)}</h1>
+        <h1 className="text-4xl title-serif sm:text-5xl">{formatDate(edition.date)}</h1>
         <p className="mt-2 text-sm text-muted">
+          <span className="font-semibold text-ink">{isLatest ? "Today's brief" : "Daily brief"}</span> ·{" "}
           {edition.stories.length} stories from {sourceCount} sources · about {minutes} min read
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -33,8 +31,8 @@ export function EditionView({ edition, isLatest = false }: { edition: Edition; i
 
       {first && (
         <section aria-labelledby="story-of-the-day">
-          <h2 id="story-of-the-day" className="mb-3 font-mono text-xs tracking-wide text-label uppercase">
-            ★ Story of the day
+          <h2 id="story-of-the-day" className="mb-3 section-rule">
+            Story of the day
           </h2>
           <StoryCard story={first} now={now} variant="lead" />
         </section>
@@ -43,7 +41,7 @@ export function EditionView({ edition, isLatest = false }: { edition: Edition; i
       {/* The rest in importance order, 2 to 10. Each card shows its own topic. */}
       {others.length > 0 && (
         <section className="mt-8" aria-labelledby="rest-of-brief">
-          <h2 id="rest-of-brief" className="mb-1 font-mono text-xs tracking-wide text-label uppercase">
+          <h2 id="rest-of-brief" className="mb-3 section-rule">
             The rest of the brief
           </h2>
           {others.map((story, i) => (
@@ -65,7 +63,7 @@ export function EditionView({ edition, isLatest = false }: { edition: Edition; i
         </Link>
         {more > 0 && (
           <Link href="/feed" className="font-medium text-accent hover:underline">
-            {more} more stories in the feed →
+            {more} more stories in the feed
           </Link>
         )}
       </div>

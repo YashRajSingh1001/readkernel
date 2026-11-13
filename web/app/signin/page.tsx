@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "Sign in", robots: { index: false } }
 export default function SignInPage() {
   return (
     <Container className="max-w-md py-8">
-      <h1 className="text-3xl font-extrabold tracking-tight">Sign in to ReadKernel</h1>
+      <h1 className="text-3xl title-sans">Sign in to ReadKernel</h1>
       <p className="mt-2 text-muted">
         Optional. Signing in keeps your saved stories on every device and lets you set up your brief without
         confirmation emails.

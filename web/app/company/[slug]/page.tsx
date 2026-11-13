@@ -44,8 +44,7 @@ async function CompanyView({ params }: { params: PageProps<"/company/[slug]">["p
 
   return (
     <Container>
-      <p className="font-mono text-xs tracking-wide text-label uppercase">Company</p>
-      <h1 className="mt-1 text-4xl font-extrabold tracking-tight">{news.name}</h1>
+      <h1 className="text-4xl title-serif">{news.name}</h1>
       <p className="mt-2 text-muted">
         {news.stories.length === 1 ? "1 story" : `${news.stories.length} stories`} in ReadKernel
         {oldest ? ` since ${formatDate(oldest)}` : ""}, newest first.
@@ -94,7 +93,7 @@ async function CompanyView({ params }: { params: PageProps<"/company/[slug]">["p
             ))}
           </ul>
           <Link href="/companies" className="mt-2 inline-block text-sm font-medium text-accent hover:underline">
-            All company blogs →
+            All company blogs
           </Link>
         </section>
       )}

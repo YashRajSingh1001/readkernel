@@ -30,11 +30,11 @@ export function StoryCard({ story, now, rank, variant = "standard", showImage = 
       }`}
     >
       {href && internal ? (
-        <Link href={href} className="hover:text-accent">
+        <Link href={href} className="rk-headline">
           {story.headline}
         </Link>
       ) : href ? (
-        <a href={href} target="_blank" rel="noopener noreferrer" className="hover:text-accent">
+        <a href={href} target="_blank" rel="noopener noreferrer" className="rk-headline">
           {story.headline}
         </a>
       ) : (
@@ -44,16 +44,17 @@ export function StoryCard({ story, now, rank, variant = "standard", showImage = 
   );
 
   const meta = (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-      {rank != null && <span className="font-mono text-ink tabular-nums">#{rank}</span>}
-      <span className="rounded-full bg-accent-soft px-2 py-0.5 font-medium text-accent">
-        {TOPICS[story.topic] ?? story.topic}
-      </span>
-      {story.kind === "model_release" && (
-        <span className="rounded-full bg-label-soft px-2 py-0.5 font-medium text-label">Model release</span>
-      )}
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[0.8125rem] text-muted">
+      <span className="font-semibold text-accent">{TOPICS[story.topic] ?? story.topic}</span>
+      {story.kind === "model_release" && <span className="font-semibold text-label">Model release</span>}
+      <span aria-hidden>·</span>
       <span>{timeAgo(story.published, now)}</span>
-      {sourceCount > 1 && <span className="font-medium text-ink">{sourceCount} sources</span>}
+      {sourceCount > 1 && (
+        <>
+          <span aria-hidden>·</span>
+          <span className="text-ink tabular-nums">{sourceCount} sources</span>
+        </>
+      )}
     </div>
   );
 
@@ -71,6 +72,11 @@ export function StoryCard({ story, now, rank, variant = "standard", showImage = 
   if (variant === "compact") {
     return (
       <article className="flex gap-3 border-b border-line py-4 last:border-b-0">
+        {rank != null && (
+          <span className="w-6 shrink-0 font-serif text-xl leading-tight font-semibold text-muted tabular-nums" aria-label={`Number ${rank}`}>
+            {rank}
+          </span>
+        )}
         {showImage && (
           <div className="w-20 shrink-0 sm:w-24">
             <StoryImage src={story.image_url} topic={story.topic} headline={story.headline} size="thumb" />
@@ -103,7 +109,7 @@ export function StoryCard({ story, now, rank, variant = "standard", showImage = 
         )}
         <div className="mt-4">{meta}</div>
         <div className="mt-2">{title}</div>
-        {story.summary && <p className="mt-3 text-lg leading-relaxed text-pretty">{story.summary}</p>}
+        {story.summary && <p className="mt-3 font-serif text-lg leading-relaxed text-pretty">{story.summary}</p>}
         {story.why_it_matters && (
           <p className="mt-3 border-l-2 border-accent pl-3 leading-relaxed text-muted">
             <span className="font-medium text-ink">Why it matters: </span>
@@ -115,12 +121,23 @@ export function StoryCard({ story, now, rank, variant = "standard", showImage = 
     );
   }
 
+  // Ranked stories (the brief, 2 to 10) get their number in a left gutter, like a printed list.
+  const gutter = rank != null;
   return (
-    <article className="grid gap-4 border-b border-line py-6 last:border-b-0 sm:grid-cols-[1fr_200px]">
+    <article
+      className={`grid gap-4 border-b border-line py-6 last:border-b-0 ${
+        gutter ? "grid-cols-[2rem_1fr] sm:grid-cols-[2.5rem_1fr_200px]" : "sm:grid-cols-[1fr_200px]"
+      }`}
+    >
+      {gutter && (
+        <span className="row-span-2 font-serif text-2xl leading-none font-semibold text-muted tabular-nums sm:row-span-1" aria-label={`Number ${rank}`}>
+          {rank}
+        </span>
+      )}
       <div className="min-w-0 sm:order-1">
         {meta}
         <div className="mt-2">{title}</div>
-        {story.summary && <p className="mt-2 leading-relaxed text-pretty">{story.summary}</p>}
+        {story.summary && <p className="mt-2 font-serif leading-relaxed text-pretty">{story.summary}</p>}
         {story.why_it_matters && (
           <p className="mt-3 border-l-2 border-accent pl-3 text-sm leading-relaxed text-muted">
             <span className="font-medium text-ink">Why it matters: </span>
@@ -130,7 +147,7 @@ export function StoryCard({ story, now, rank, variant = "standard", showImage = 
         {footer}
       </div>
       {showImage && (
-        <div className="sm:order-2">
+        <div className={`sm:order-2 ${gutter ? "col-start-2 sm:col-start-auto" : ""}`}>
           <StoryImage
             src={story.image_url}
             credit={story.image_credit}

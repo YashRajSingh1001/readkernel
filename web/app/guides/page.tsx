@@ -11,7 +11,6 @@ export const metadata: Metadata = {
 export default async function Page() {
   return (
     <EntryList
-      label="Guides"
       title="Guides to keeping up"
       intro="Practical walkthroughs for following tech and AI news without the overload."
       base="/guides"

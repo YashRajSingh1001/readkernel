@@ -10,7 +10,7 @@ export function SavedList() {
 
   if (saved.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-line p-8 text-center text-muted">
+      <div className="rounded-md border border-dashed border-line p-8 text-center text-muted">
         Nothing saved yet. Tap <span className="font-medium text-ink">Save</span> on any story and it shows up here.
         <div className="mt-4">
           <Link href="/feed" className="text-accent hover:underline">Browse the feed</Link>

@@ -34,11 +34,22 @@ export async function generateMetadata({ params }: PageProps<"/story/[key]">): P
   const { key } = await params;
   const story = await getStory(key);
   if (!story) return {};
+  const edition = await getEdition(story.edition_date);
   const description = story.summary || story.sources[0]?.title || "";
   return {
     title: story.headline,
     description,
-    openGraph: { title: story.headline, description, type: "article", url: `${siteUrl()}/story/${key}` },
+    // Repeat the RSS link: a page's alternates replace the root layout's, they don't merge.
+    alternates: { canonical: `/story/${key}`, types: { "application/rss+xml": "/rss.xml" } },
+    openGraph: {
+      title: story.headline,
+      description,
+      type: "article",
+      url: `${siteUrl()}/story/${key}`,
+      siteName: "ReadKernel",
+      // When ReadKernel published its summary (the edition), same as the JSON-LD below.
+      publishedTime: edition?.generated_at ?? story.edition_date,
+    },
     twitter: { card: "summary_large_image", title: story.headline, description },
   };
 }
@@ -70,19 +81,47 @@ async function StoryView({ params }: { params: PageProps<"/story/[key]">["params
   const url = `${siteUrl()}/story/${key}`;
   const sourceCount = new Set(story.sources.map((s) => s.name)).size;
 
+  // Structured data for search engines and AI crawlers. The summary is ReadKernel's, so
+  // ReadKernel is the author and publisher; the reporting it is based on is listed in
+  // isBasedOn. The image is our own share card, not a publisher's photo.
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "NewsArticle",
+    headline: story.headline,
+    description: story.summary || undefined,
+    url,
+    mainEntityOfPage: url,
+    image: `${url}/opengraph-image`,
+    datePublished: edition?.generated_at ?? story.edition_date,
+    articleSection: TOPICS[story.topic] ?? story.topic,
+    author: { "@type": "Organization", name: "ReadKernel", url: siteUrl() },
+    publisher: { "@type": "Organization", name: "ReadKernel", url: siteUrl() },
+    isBasedOn: story.sources.map((s) => ({
+      "@type": "NewsArticle",
+      headline: s.title || undefined,
+      url: s.url,
+      publisher: { "@type": "Organization", name: s.name },
+    })),
+  };
+
   return (
     <Container>
+      <script
+        type="application/ld+json"
+        // Headlines come from outside feeds: escape "<" so nothing can close the script tag.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+      />
       <article>
         <Link href={`/brief/${story.edition_date}`} className="mb-6 inline-block text-sm text-muted hover:text-ink">
           ← {formatDate(story.edition_date)}
         </Link>
 
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-          <Link href={`/feed/${story.topic}`} className="rounded-full bg-accent-soft px-2 py-0.5 font-medium text-accent">
+          <Link href={`/feed/${story.topic}`} className="font-semibold text-accent hover:underline">
             {TOPICS[story.topic] ?? story.topic}
           </Link>
           {story.kind === "model_release" && (
-            <span className="rounded-full bg-label-soft px-2 py-0.5 font-medium text-label">Model release</span>
+            <span className="font-semibold text-label">Model release</span>
           )}
           {story.brief_position != null && (
             <span className="font-medium text-ink">#{story.brief_position} in the daily brief</span>
@@ -90,7 +129,7 @@ async function StoryView({ params }: { params: PageProps<"/story/[key]">["params
           <span>{sourceCount > 1 ? `${sourceCount} sources` : lead?.name}</span>
         </div>
 
-        <h1 className="mt-3 text-3xl leading-tight font-extrabold tracking-tight text-balance sm:text-4xl">
+        <h1 className="mt-3 text-3xl title-serif text-balance sm:text-4xl">
           {story.headline}
         </h1>
 
@@ -106,7 +145,7 @@ async function StoryView({ params }: { params: PageProps<"/story/[key]">["params
           />
         </div>
 
-        {story.summary && <p className="mt-6 text-lg leading-relaxed text-pretty">{story.summary}</p>}
+        {story.summary && <p className="mt-6 font-serif text-lg leading-relaxed text-pretty">{story.summary}</p>}
 
         {story.why_it_matters && (
           <p className="mt-5 border-l-2 border-accent pl-4 leading-relaxed text-muted">
@@ -142,13 +181,13 @@ async function StoryView({ params }: { params: PageProps<"/story/[key]">["params
 
         <Link
           href={`/ask?story=${key}`}
-          className="group mt-6 flex items-center justify-between gap-4 rounded-xl border border-line bg-card px-4 py-3 hover:border-ink"
+          className="group mt-6 flex items-center justify-between gap-4 rounded-md border border-line bg-card px-4 py-3 hover:border-ink"
         >
           <span>
             <span className="block font-semibold">Ask about this story</span>
             <span className="text-sm text-muted">Competitors, the wider space, how it developed. Every answer is linked.</span>
           </span>
-          <span className="shrink-0 text-sm font-semibold text-accent group-hover:underline">Ask →</span>
+          <span className="shrink-0 text-sm font-semibold text-accent group-hover:underline">Ask</span>
         </Link>
 
         <section className="mt-8">
@@ -183,7 +222,7 @@ async function StoryView({ params }: { params: PageProps<"/story/[key]">["params
                     className={`absolute top-1.5 -left-[27px] h-3 w-3 rounded-full border-2 border-paper ${t.story_key === key ? "bg-accent" : "bg-muted"}`}
                     aria-hidden
                   />
-                  <p className="font-mono text-xs text-muted">{formatDate(t.edition_date)}</p>
+                  <p className="text-xs text-muted">{formatDate(t.edition_date)}</p>
                   {t.story_key === key ? (
                     <p className="font-semibold">{t.headline} (this page)</p>
                   ) : (

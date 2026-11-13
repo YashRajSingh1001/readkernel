@@ -9,8 +9,7 @@ export const metadata: Metadata = { title: "Saved", robots: { index: false } };
 export default function SavedPage() {
   return (
     <Container>
-      <p className="font-mono text-xs tracking-wide text-label uppercase">Saved</p>
-      <h1 className="mt-1 mb-2 text-4xl font-extrabold tracking-tight">Your reading list</h1>
+      <h1 className="mb-2 text-4xl title-sans">Your reading list</h1>
       <p className="mb-6 text-sm leading-relaxed text-muted">
         Saved in <strong className="font-medium text-ink">this browser</strong> only, with no account needed and
         nothing sent to us. That also means stories saved in one browser (say Firefox) won&apos;t show up in another

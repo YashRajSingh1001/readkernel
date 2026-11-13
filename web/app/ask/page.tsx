@@ -13,8 +13,7 @@ export const metadata: Metadata = {
 export default function AskPage({ searchParams }: PageProps<"/ask">) {
   return (
     <Container>
-      <p className="font-mono text-xs tracking-wide text-label uppercase">Ask ReadKernel</p>
-      <h1 className="mt-1 text-4xl font-extrabold tracking-tight">Ask the news</h1>
+      <h1 className="text-4xl title-sans">Ask the news</h1>
       <p className="mt-2 mb-8 text-muted">
         Ask about any company, product or story. ReadKernel searches everything it has covered, follows the story over
         time, and answers with a link for every fact. It only knows what it has covered, so very new or niche topics may

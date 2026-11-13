@@ -11,7 +11,6 @@ export const metadata: Metadata = {
 export default async function Page() {
   return (
     <EntryList
-      label="Blog"
       title="Notes from ReadKernel"
       intro="How we build ReadKernel, how we pick stories, and how to keep up with tech without losing your morning."
       base="/blog"

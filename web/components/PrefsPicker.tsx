@@ -6,7 +6,7 @@ import { COUNTS, FORMATS, FREQUENCIES, type Prefs } from "@/lib/personal";
 type Props = { value: Prefs; onChange: (next: Prefs) => void };
 
 const chip = (on: boolean) =>
-  `rounded-xl border px-3 py-2 text-left text-sm transition-colors ${
+  `rounded-md border px-3 py-2 text-left text-sm transition-colors ${
     on ? "border-ink bg-ink text-paper" : "border-line bg-card hover:border-ink"
   }`;
 

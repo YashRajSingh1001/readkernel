@@ -19,8 +19,7 @@ const REASONS = [
 export default function ContactPage() {
   return (
     <Container>
-      <p className="font-mono text-xs tracking-wide text-label uppercase">Contact</p>
-      <h1 className="mt-1 text-4xl font-extrabold tracking-tight">Get in touch</h1>
+      <h1 className="text-4xl title-sans">Get in touch</h1>
       <p className="mt-3 leading-relaxed text-muted">
         ReadKernel is a small, independent project. The fastest way to reach us is email:{" "}
         <a href={`mailto:${EMAIL}`} className="font-medium text-accent hover:underline">
@@ -33,11 +32,11 @@ export default function ContactPage() {
           <li key={r.title}>
             <a
               href={`mailto:${EMAIL}?subject=${encodeURIComponent(`ReadKernel: ${r.subject}`)}`}
-              className="block h-full rounded-xl border border-line bg-card p-5 hover:border-ink"
+              className="block h-full rounded-md border border-line bg-card p-5 hover:border-ink"
             >
               <h2 className="font-bold">{r.title}</h2>
               <p className="mt-1 text-sm leading-relaxed text-muted">{r.body}</p>
-              <span className="mt-3 inline-block text-sm font-medium text-accent">Email us →</span>
+              <span className="mt-3 inline-block text-sm font-medium text-accent">Email us</span>
             </a>
           </li>
         ))}

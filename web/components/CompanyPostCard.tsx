@@ -10,17 +10,17 @@ export function CompanyPostCard({ post, variant = "standard" }: Props) {
   const category = COMPANY_CATEGORIES[post.category] ?? post.category;
 
   const meta = (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.8125rem] text-muted">
       <Link href={`/companies?company=${encodeURIComponent(post.company)}`} className="flex items-center gap-1.5 font-medium text-ink hover:text-accent">
         {/* eslint-disable-next-line @next/next/no-img-element -- favicons come from Google's favicon service */}
         <img src={faviconUrl(post.link)} alt="" width={16} height={16} loading="lazy" referrerPolicy="no-referrer" className="h-4 w-4 rounded" />
         {post.company}
       </Link>
-      <Link href={`/companies?category=${post.category}`} className="rounded-full bg-accent-soft px-2 py-0.5 font-medium text-accent hover:opacity-80">
+      <Link href={`/companies?category=${post.category}`} className="font-semibold text-accent hover:underline">
         {category}
       </Link>
       {post.depth != null && post.depth >= 4 && (
-        <span className="rounded-full bg-label-soft px-2 py-0.5 font-medium text-label">Deep dive</span>
+        <span className="font-semibold text-label">Deep dive</span>
       )}
       <span>{formatDate(post.published.slice(0, 10), "short")}</span>
       {post.hn_points != null && post.hn_points >= 20 && <span className="text-accent">▲ {post.hn_points} on HN</span>}
@@ -29,7 +29,7 @@ export function CompanyPostCard({ post, variant = "standard" }: Props) {
 
   const title = (
     <h3 className={`font-serif leading-snug font-semibold text-balance ${variant === "compact" ? "text-base" : "text-xl"}`}>
-      <a href={post.link} target="_blank" rel="noopener noreferrer" className="hover:text-accent">
+      <a href={post.link} target="_blank" rel="noopener noreferrer" className="rk-headline">
         {post.title}
       </a>
     </h3>

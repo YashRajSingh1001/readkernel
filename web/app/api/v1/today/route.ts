@@ -23,6 +23,8 @@ export async function GET() {
       url: `${site}/brief/${edition.date}`,
       stories: edition.stories.map((s, i) => ({
         rank: i + 1,
+        story_key: s.story_key ?? null,
+        published: s.published,
         headline: s.headline,
         summary: s.summary,
         why_it_matters: s.why_it_matters,
@@ -31,7 +33,7 @@ export async function GET() {
         image_url: s.image_url ?? null,
         url: s.story_key ? `${site}/story/${s.story_key}` : s.sources[0]?.url,
         source_count: new Set(s.sources.map((x) => x.name)).size,
-        sources: s.sources.slice(0, 3).map((x) => ({ name: x.name, url: x.url })),
+        sources: s.sources.map((x) => ({ name: x.name, url: x.url })),
       })),
       top_articles: edition.discussions.slice(0, 8).map((d) => ({
         title: d.title,

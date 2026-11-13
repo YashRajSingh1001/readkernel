@@ -1,14 +1,10 @@
 import Link from "next/link";
 
-// Placeholder mark until the real logo is designed: a kernel (dot) inside a ring.
+// Wordmark: the name set in the headline serif, with the ember full stop as the mark.
 export function Logo() {
   return (
-    <Link href="/" className="flex items-center gap-2" aria-label="ReadKernel home">
-      <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden>
-        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" className="text-ink" />
-        <circle cx="12" cy="12" r="4.5" className="fill-accent" />
-      </svg>
-      <span className="text-lg font-extrabold tracking-tight">ReadKernel</span>
+    <Link href="/" className="font-serif text-xl leading-none font-semibold tracking-[-0.01em]" aria-label="ReadKernel home">
+      ReadKernel<span className="text-accent">.</span>
     </Link>
   );
 }

@@ -11,7 +11,6 @@ export const metadata: Metadata = {
 export default async function Page() {
   return (
     <EntryList
-      label="Newsletter reviews"
       title="Tech newsletters, honestly reviewed"
       intro="What each one covers, how often it arrives, what it costs, and who it suits. Our own opinions, checked against each newsletter's website."
       base="/newsletters"

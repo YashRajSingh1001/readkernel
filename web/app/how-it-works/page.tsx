@@ -32,6 +32,16 @@ const STEPS = [
   },
 ];
 
+// What readers get beyond the daily email (moved here from the homepage).
+const PERKS = [
+  { title: "Every story has its own page", body: "Summary, all the coverage and share buttons, without bouncing between ten tabs." },
+  { title: "Built with India in mind", body: "Indian startup and market sources, and the brief lands at 6 AM IST." },
+  { title: "Developers and security get their own lanes", body: "Not buried under gadget news." },
+  { title: "Save without an account", body: "Bookmarks live in your browser. Sign in only if you want them everywhere." },
+  { title: "Listen instead of reading", body: "One tap and your browser reads the brief aloud." },
+  { title: "Search every past brief", body: "Find that story from last week in seconds." },
+];
+
 const FAQ = [
   {
     q: "Is it free?",
@@ -54,8 +64,7 @@ const FAQ = [
 export default function HowItWorks() {
   return (
     <Container>
-      <p className="font-mono text-xs tracking-wide text-label uppercase">How it works</p>
-      <h1 className="mt-1 text-4xl font-extrabold tracking-tight text-balance">
+      <h1 className="text-4xl title-serif text-balance">
         From hundreds of articles to the ten that matter
       </h1>
       <p className="mt-3 max-w-2xl leading-relaxed text-muted">
@@ -73,6 +82,23 @@ export default function HowItWorks() {
           </li>
         ))}
       </ol>
+
+      <section className="mt-12">
+        <h2 className="font-serif text-2xl font-semibold">What you get</h2>
+        <dl className="mt-4 grid gap-x-8 gap-y-4 sm:grid-cols-2">
+          {PERKS.map((p) => (
+            <div key={p.title}>
+              <dt className="font-semibold">{p.title}</dt>
+              <dd className="mt-0.5 leading-relaxed text-muted">{p.body}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="mt-6">
+          <Link href="/brief/customize" className="font-medium text-accent hover:underline">
+            Pick your topics, length and format
+          </Link>
+        </p>
+      </section>
 
       <section className="mt-12">
         <h2 className="font-serif text-2xl font-semibold">Questions</h2>

@@ -17,7 +17,7 @@ export function Builder({ edition }: { edition: Edition }) {
     <div className="grid gap-10 lg:grid-cols-[1fr_420px]">
       <div>
         <PrefsPicker value={prefs} onChange={setPrefs} />
-        <div className="mt-8 rounded-2xl border border-line bg-sunk p-5">
+        <div className="mt-8 rounded-lg border border-line bg-sunk p-5">
           <h2 className="font-bold">Send it to me</h2>
           <p className="mt-1 mb-3 text-sm text-muted">
             We&apos;ll email you once to confirm. Already subscribed? We&apos;ll send you a link to update your settings

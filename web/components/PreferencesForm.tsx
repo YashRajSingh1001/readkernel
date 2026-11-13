@@ -29,7 +29,7 @@ export function PreferencesForm({ initial, action, token }: Props) {
         <button
           type="submit"
           disabled={pending}
-          className="rounded-full bg-accent px-6 py-2.5 font-semibold text-white hover:opacity-90 disabled:opacity-60"
+          className="rounded-md bg-accent px-6 py-2.5 font-semibold text-paper hover:opacity-90 disabled:opacity-60"
         >
           {pending ? "Saving…" : "Save my brief"}
         </button>

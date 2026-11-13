@@ -11,7 +11,7 @@ export function SignInButtons() {
 
   if (!AUTH_ENABLED) {
     return (
-      <p className="rounded-xl border border-dashed border-line p-6 text-center text-muted">
+      <p className="rounded-md border border-dashed border-line p-6 text-center text-muted">
         Sign-in is coming soon. You can already{" "}
         <Link href="/#subscribe" className="text-accent underline">
           subscribe by email
@@ -42,7 +42,7 @@ export function SignInButtons() {
         type="button"
         onClick={google}
         disabled={busy}
-        className="flex w-full items-center justify-center gap-3 rounded-xl border border-line bg-card px-4 py-3 font-semibold hover:border-ink disabled:opacity-60"
+        className="flex w-full items-center justify-center gap-3 rounded-md border border-line bg-card px-4 py-3 font-semibold hover:border-ink disabled:opacity-60"
       >
         <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
           <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.3-2.1 3.5-5.2 3.5-8.7z" />

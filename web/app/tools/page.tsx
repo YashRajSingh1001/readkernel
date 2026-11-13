@@ -11,6 +11,15 @@ export const metadata: Metadata = {
 
 const MCP_URL = "https://readkernel.in/mcp";
 
+// The parts of a tool argument's JSON Schema shown here.
+type SchemaProp = { description?: string; enum?: string[] };
+
+const DATA_URLS = [
+  { path: "/api/v1/today", what: "Today's brief as JSON: ranked stories with summaries, topics and every source link. Any site may call it (CORS open)." },
+  { path: "/rss.xml", what: "RSS: today's brief, one item per story, with its sources linked." },
+  { path: "/llms.txt", what: "A Markdown map of the site for AI agents, with today's headlines." },
+];
+
 function Code({ children }: { children: string }) {
   return (
     <pre className="mt-2 overflow-x-auto rounded-lg border border-line bg-sunk p-3 font-mono text-[13px] leading-relaxed">
@@ -22,8 +31,7 @@ function Code({ children }: { children: string }) {
 export default function ToolsPage() {
   return (
     <Container>
-      <p className="font-mono text-xs tracking-wide text-label uppercase">ReadKernel everywhere</p>
-      <h1 className="mt-1 text-4xl font-extrabold tracking-tight">Take the brief with you</h1>
+      <h1 className="text-4xl title-sans">Take the brief with you</h1>
       <p className="mt-2 text-muted">
         The same brief, wherever you work: in every new browser tab, or inside your AI assistant. Or{" "}
         <Link href="/ask" className="text-accent hover:underline">
@@ -83,9 +91,46 @@ export default function ToolsPage() {
             <li key={t.name} className="py-3">
               <code className="font-mono text-sm text-accent">{t.name}</code>
               <p className="mt-0.5 text-sm text-muted">{t.description}</p>
+              {Object.keys(t.inputSchema.properties).length > 0 && (
+                <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+                  {Object.entries(t.inputSchema.properties as Record<string, SchemaProp>).map(([name, p]) => (
+                    <div key={name} className="contents">
+                      <dt>
+                        <code className="font-mono text-[13px]">{name}</code>
+                        {t.inputSchema.required?.includes(name) && <span className="text-accent"> *</span>}
+                      </dt>
+                      <dd className="text-muted">
+                        {p.description}
+                        {p.enum && <span className="block font-mono text-[12px]">{p.enum.join(" | ")}</span>}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="mt-12" aria-labelledby="data">
+        <h2 id="data" className="text-2xl font-bold">
+          Plain data, for your own scripts and agents
+        </h2>
+        <p className="mt-2 leading-relaxed">
+          No key needed. Please cache: the brief changes once a day.
+        </p>
+        <dl className="mt-4 divide-y divide-line border-y border-line">
+          {DATA_URLS.map((d) => (
+            <div key={d.path} className="py-3">
+              <dt>
+                <a href={d.path} className="font-mono text-sm text-accent hover:underline">
+                  {d.path}
+                </a>
+              </dt>
+              <dd className="mt-0.5 text-sm text-muted">{d.what}</dd>
+            </div>
+          ))}
+        </dl>
       </section>
     </Container>
   );

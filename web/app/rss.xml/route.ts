@@ -17,7 +17,15 @@ export async function GET() {
   const items = (edition?.stories ?? [])
     .map((s) => {
       const link = s.story_key ? `${site}/story/${s.story_key}` : (s.sources[0]?.url ?? site);
-      const body = [s.summary, s.why_it_matters && `Why it matters: ${s.why_it_matters}`].filter(Boolean).join(" ");
+      // HTML (escaped, as RSS expects): the summary, why it matters, and every source linked.
+      const sources = s.sources.map((x) => `<a href="${xml(x.url)}">${xml(x.name)}</a>`).join(", ");
+      const body = [
+        `<p>${xml(s.summary)}</p>`,
+        s.why_it_matters && `<p><strong>Why it matters:</strong> ${xml(s.why_it_matters)}</p>`,
+        sources && `<p>Sources: ${sources}</p>`,
+      ]
+        .filter(Boolean)
+        .join("");
       return `    <item>
       <title>${xml(s.headline)}</title>
       <link>${xml(link)}</link>

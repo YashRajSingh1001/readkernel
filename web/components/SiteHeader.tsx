@@ -27,7 +27,7 @@ export function SiteHeader() {
           <AccountButton />
           <Link
             href="/#subscribe"
-            className="ml-1 hidden rounded-full bg-ink px-3.5 py-1.5 text-sm font-medium text-paper hover:opacity-90 sm:inline-block"
+            className="ml-1 hidden rounded-md bg-ink px-3.5 py-1.5 text-sm font-semibold text-paper hover:opacity-90 sm:inline-block"
           >
             Subscribe
           </Link>

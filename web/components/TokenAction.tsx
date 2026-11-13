@@ -20,7 +20,7 @@ export function TokenAction({ token, action, title, description, button }: Props
 
   return (
     <div className="mx-auto max-w-md px-4 py-12 text-center">
-      <h1 className="text-3xl font-extrabold">{title}</h1>
+      <h1 className="text-3xl title-sans">{title}</h1>
       {state ? (
         <>
           <p role="status" className={`mt-4 ${state.ok ? "text-ink" : "text-accent"}`}>{state.message}</p>

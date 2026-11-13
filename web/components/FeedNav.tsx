@@ -39,7 +39,7 @@ export function FeedNav({ counts, total, discussions }: Props) {
       >
         {d && <Icon d={d} />}
         <span className="flex-1">{label}</span>
-        {count != null && <span className="font-mono text-xs opacity-70 tabular-nums">{count}</span>}
+        {count != null && <span className="text-xs opacity-70 tabular-nums">{count}</span>}
       </Link>
     );
   };
@@ -48,11 +48,11 @@ export function FeedNav({ counts, total, discussions }: Props) {
     <>
       <nav aria-label="Feed" className="sticky top-20 hidden w-52 shrink-0 self-start lg:block">
         {item("/feed", "All stories", total, icon.home)}
-        <p className="mt-4 mb-1 px-3 font-mono text-[11px] tracking-wide text-muted uppercase">Topics</p>
+        <p className="mt-4 mb-1 px-3 text-xs font-semibold text-muted">Topics</p>
         {Object.keys(TOPICS)
           .filter((t) => counts[t])
           .map((t) => item(`/feed/${t}`, TOPICS[t], counts[t]))}
-        <p className="mt-4 mb-1 px-3 font-mono text-[11px] tracking-wide text-muted uppercase">More</p>
+        <p className="mt-4 mb-1 px-3 text-xs font-semibold text-muted">More</p>
         {item("/feed/top", "Top articles", discussions, icon.top)}
         {item("/companies", "Company blogs", undefined, icon.companies)}
         {item("/saved", "Saved", undefined, icon.saved)}

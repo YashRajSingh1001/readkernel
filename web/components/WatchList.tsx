@@ -18,7 +18,7 @@ export function WatchList({ token, watches, max }: Props) {
   }, null);
 
   return (
-    <section className="mt-12 rounded-2xl border border-line bg-card p-5 sm:p-6" aria-labelledby="watch-title">
+    <section className="mt-12 rounded-lg border border-line bg-card p-5 sm:p-6" aria-labelledby="watch-title">
       <h2 id="watch-title" className="text-xl font-bold">
         Watch alerts
       </h2>

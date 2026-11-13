@@ -125,9 +125,9 @@ export function AskChat({ story }: { story?: FocusStory }) {
   return (
     <div>
       {focus && (
-        <div className="mb-4 flex items-start gap-3 rounded-xl border border-accent/40 bg-accent-soft px-4 py-3 text-sm">
+        <div className="mb-4 flex items-start gap-3 rounded-md border border-accent/40 bg-accent-soft px-4 py-3 text-sm">
           <p className="min-w-0 flex-1">
-            <span className="font-mono text-[11px] tracking-wide text-label uppercase">Asking about</span>
+            <span className="text-xs font-semibold text-muted">Asking about</span>
             <Link href={`/story/${focus.key}`} className="mt-0.5 block font-semibold hover:text-accent">
               {focus.headline}
             </Link>
@@ -151,7 +151,7 @@ export function AskChat({ story }: { story?: FocusStory }) {
               key={s}
               type="button"
               onClick={() => ask(s)}
-              className="rounded-xl border border-line bg-card px-4 py-3 text-left text-sm hover:border-ink"
+              className="rounded-md border border-line bg-card px-4 py-3 text-left text-sm hover:border-ink"
             >
               {s}
             </button>
@@ -163,12 +163,12 @@ export function AskChat({ story }: { story?: FocusStory }) {
         {turns.map((t, i) =>
           t.role === "user" ? (
             <div key={i} className="flex justify-end">
-              <p className="max-w-[85%] rounded-2xl rounded-br-sm bg-ink px-4 py-2.5 text-paper">{t.content}</p>
+              <p className="max-w-[85%] rounded-lg rounded-br-sm bg-ink px-4 py-2.5 text-paper">{t.content}</p>
             </div>
           ) : (
-            <div key={i} className={`rounded-2xl border p-4 sm:p-5 ${t.error ? "border-accent/40 bg-accent-soft" : "border-line bg-card"}`}>
+            <div key={i} className={`rounded-lg border p-4 sm:p-5 ${t.error ? "border-accent/40 bg-accent-soft" : "border-line bg-card"}`}>
               {t.steps && t.steps.length > 0 && (
-                <p className="mb-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[11px] text-muted">
+                <p className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted">
                   {t.steps.map((s, j) => (
                     <span key={j}>✓ {describe(s)}</span>
                   ))}
@@ -181,7 +181,7 @@ export function AskChat({ story }: { story?: FocusStory }) {
           ),
         )}
         {busy && (
-          <div className="rounded-2xl border border-line bg-card p-4 font-mono text-xs text-muted" role="status">
+          <div className="rounded-lg border border-line bg-card p-4 text-xs text-muted" role="status">
             Reading the news archive…
           </div>
         )}
@@ -193,7 +193,7 @@ export function AskChat({ story }: { story?: FocusStory }) {
           e.preventDefault();
           ask(input);
         }}
-        className="sticky bottom-4 mt-6 flex gap-2 rounded-2xl border border-line bg-paper/95 p-2 backdrop-blur"
+        className="sticky bottom-4 mt-6 flex gap-2 rounded-lg border border-line bg-paper/95 p-2 backdrop-blur"
       >
         <label htmlFor="ask-input" className="sr-only">
           Your question
@@ -210,7 +210,7 @@ export function AskChat({ story }: { story?: FocusStory }) {
         <button
           type="submit"
           disabled={busy || !input.trim()}
-          className="rounded-xl bg-ink px-4 py-2 font-semibold text-paper hover:opacity-90 disabled:opacity-40"
+          className="rounded-md bg-ink px-4 py-2 font-semibold text-paper hover:opacity-90 disabled:opacity-40"
         >
           Ask
         </button>

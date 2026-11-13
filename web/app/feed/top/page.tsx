@@ -14,29 +14,28 @@ export default async function TopArticlesPage() {
   return (
     <>
       <header className="mb-6">
-        <p className="font-mono text-xs tracking-wide text-label uppercase">
-          Top articles{edition ? ` · ${formatDate(edition.date)}` : ""}
-        </p>
-        <h1 className="mt-1 text-4xl font-extrabold tracking-tight">
+        <h1 className="text-4xl title-serif">
           What developers are discussing{" "}
-          <span className="font-mono text-lg font-normal text-muted tabular-nums">{items.length}</span>
+          <span className="font-sans text-lg font-normal text-muted tabular-nums">{items.length}</span>
         </h1>
-        <p className="mt-2 text-muted">The most-upvoted posts on Hacker News in the last day and a half.</p>
+        <p className="mt-2 text-muted">
+          {edition && <span className="font-semibold text-ink">{formatDate(edition.date)}.</span>}{" "}
+          The most-upvoted posts on Hacker News in the last day and a half.</p>
       </header>
 
       {items.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-line p-8 text-center text-muted">Nothing yet today.</p>
+        <p className="rounded-md border border-dashed border-line p-8 text-center text-muted">Nothing yet today.</p>
       ) : (
         <ol className="divide-y divide-line border-y border-line">
           {items.map((d, i) => (
             <li key={d.url} className="grid grid-cols-[2.25rem_1fr] gap-3 py-4">
-              <span className="pt-0.5 font-mono text-sm text-muted tabular-nums">{i + 1}</span>
+              <span className="pt-0.5 text-sm text-muted tabular-nums">{i + 1}</span>
               <div className="min-w-0">
                 <a href={d.url} target="_blank" rel="noopener noreferrer" className="font-serif text-lg leading-snug font-semibold hover:text-accent">
                   {d.title}
                 </a>
                 {d.summary && <p className="mt-1 text-sm leading-relaxed text-muted">{d.summary}</p>}
-                <p className="mt-1.5 flex flex-wrap gap-x-3 font-mono text-xs text-muted">
+                <p className="mt-1.5 flex flex-wrap gap-x-3 text-xs text-muted">
                   <span>{d.source}</span>
                   {d.points != null && <span className="text-accent">▲ {d.points} points</span>}
                   {d.comments_url && (

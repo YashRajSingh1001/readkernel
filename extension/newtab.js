@@ -86,7 +86,7 @@ function render(data, note) {
         el(
           "div",
           {},
-          el("p", { class: "label" }, "★ Story of the day"),
+          el("p", { class: "label" }, "Story of the day"),
           meta(first),
           el("h2", {}, el("a", { href: first.url }, first.headline)),
           el("p", { class: "summary" }, first.summary),
@@ -102,7 +102,7 @@ function render(data, note) {
       el(
         "li",
         {},
-        el("span", { class: "rank" }, `#${s.rank}`),
+        el("span", { class: "rank" }, `${s.rank}`),
         el(
           "div",
           {},

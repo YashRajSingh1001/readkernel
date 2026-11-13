@@ -60,14 +60,41 @@
   --color-accent-soft: var(--accent-soft);
   --color-label: var(--label);
   --color-label-soft: var(--label-soft);
-  --font-sans: var(--font-inter);
-  --font-serif: var(--font-newsreader);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-source-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-source-serif), ui-serif, Georgia, serif;
+  --font-mono: var(--font-source-code), ui-monospace, monospace;
 }
 
 body {
   background: var(--paper);
   color: var(--ink);
+  font-size: 1.0625rem; /* Source Sans runs small; 17px reads like 16px Inter */
+}
+
+/*
+ * Two title voices. Editorial pages (the brief, stories, feeds, writing) get
+ * the serif; utility pages (account, sign-in, settings, legal) get plain sans.
+ */
+@utility title-serif {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  line-height: 1.1;
+  font-optical-sizing: auto;
+}
+@utility title-sans {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+/* A section heading set as a newspaper rule: a line above, a small bold label. */
+@utility section-rule {
+  border-top: 2px solid var(--ink);
+  padding-top: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
 ::selection {
@@ -79,7 +106,7 @@ body {
   line-height: 1.7;
 }
 .prose-rk h2 {
-  font-family: var(--font-newsreader);
+  font-family: var(--font-serif);
   font-size: 1.5rem;
   font-weight: 600;
   margin: 2rem 0 0.75rem;
@@ -126,4 +153,105 @@ body {
   border-left: 2px solid var(--accent);
   padding-left: 1rem;
   color: var(--muted);
+}
+
+/*
+ * Motion. Spent on feedback (save, copy, sign-up) and orientation (reading
+ * progress), never on headlines or paragraphs. Everything is instant when the
+ * reader asks the system for reduced motion.
+ */
+:root {
+  --motion-press: 90ms;
+  --motion-fast: 120ms;
+  --motion-ui: 180ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-press: 0ms;
+    --motion-fast: 0ms;
+    --motion-ui: 0ms;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Headline links warm to the accent on mouse hover only; keyboard focus is instant. */
+.rk-headline:focus-visible {
+  color: var(--accent);
+}
+@media (hover: hover) and (pointer: fine) {
+  .rk-headline {
+    transition: color var(--motion-fast) var(--ease-out);
+  }
+  .rk-headline:hover {
+    color: var(--accent);
+  }
+}
+
+/* Save: a small press, then the bookmark fills. */
+.rk-save {
+  transition:
+    transform var(--motion-fast) var(--ease-out),
+    color var(--motion-fast) var(--ease-out),
+    border-color var(--motion-fast) var(--ease-out),
+    background-color var(--motion-fast) var(--ease-out);
+}
+.rk-save:active {
+  transform: scale(0.97);
+  transition-duration: var(--motion-press);
+}
+.rk-save path {
+  fill: transparent;
+  transition: fill var(--motion-fast) var(--ease-out);
+}
+.rk-save[aria-pressed="true"] path {
+  fill: currentColor;
+}
+
+/* Two labels in one cell (e.g. "Copy link" / "Copied"), cross-faded without changing width. */
+.rk-swap {
+  display: inline-grid;
+}
+.rk-swap > * {
+  grid-area: 1 / 1;
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+
+/* Something that has just appeared in place of something else (sign-up confirmation). */
+.rk-arrive {
+  transition: opacity var(--motion-ui) var(--ease-out);
+}
+@starting-style {
+  .rk-arrive {
+    opacity: 0;
+  }
+}
+
+/* Reading progress on long articles: a 2px rule tied to scroll. Browsers without
+   scroll-driven animations, and readers who reduce motion, simply don't get it. */
+.rk-progress {
+  display: none;
+}
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .rk-progress {
+      display: block;
+      position: fixed;
+      inset: 0 0 auto 0;
+      height: 2px;
+      z-index: 40;
+      background: var(--accent);
+      transform-origin: 0 50%;
+      transform: scaleX(0);
+      animation: rk-progress linear both;
+      animation-timeline: scroll(root block);
+    }
+  }
+}
+@keyframes rk-progress {
+  to {
+    transform: scaleX(1);
+  }
 }

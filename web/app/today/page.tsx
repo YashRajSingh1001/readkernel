@@ -14,7 +14,7 @@ export default async function TodayPage() {
   if (!edition) {
     return (
       <Container className="py-16 text-center">
-        <h1 className="text-3xl font-extrabold">No brief yet</h1>
+        <h1 className="text-3xl title-sans">No brief yet</h1>
         <p className="mt-3 text-muted">The first edition appears after the morning run.</p>
       </Container>
     );

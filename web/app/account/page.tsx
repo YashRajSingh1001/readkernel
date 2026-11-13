@@ -17,8 +17,7 @@ export const metadata: Metadata = { title: "Your account", robots: { index: fals
 export default function AccountPage() {
   return (
     <Container>
-      <p className="font-mono text-xs tracking-wide text-label uppercase">Account</p>
-      <Suspense fallback={<p className="mt-6 text-muted">Loading…</p>}>
+      <Suspense fallback={<p className="text-muted">Loading…</p>}>
         <Account />
       </Suspense>
     </Container>
@@ -34,7 +33,7 @@ async function Account() {
 
   return (
     <>
-      <h1 className="mt-1 text-4xl font-extrabold tracking-tight">Hi, {user.user_metadata?.name ?? user.email}</h1>
+      <h1 className="text-4xl title-sans">Hi, {user.user_metadata?.name ?? user.email}</h1>
       <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted">
         <span>Signed in as {user.email}</span>
         <SignOutButton />
@@ -62,7 +61,7 @@ async function Account() {
         <p className="mt-1 text-muted">
           Synced with your account on every device.{" "}
           <Link href="/saved" className="text-accent hover:underline">
-            Open your saved stories →
+            Open your saved stories
           </Link>
         </p>
       </section>

@@ -11,17 +11,21 @@ type Props = {
   /** "Make it yours" choices sent with the sign-up (builder page). */
   prefs?: Prefs;
   buttonLabel?: string;
+  /** Field above button at every width (narrow side columns). */
+  stacked?: boolean;
 };
 
-export function SignupForm({ compact = false, prefs, buttonLabel = "Get the daily brief" }: Props) {
+export function SignupForm({ compact = false, prefs, buttonLabel = "Get the daily brief", stacked = false }: Props) {
   const [state, action, pending] = useActionState<FormState, FormData>(subscribeAction, null);
 
   const form = state?.ok ? (
-    <p role="status" className="text-sm font-medium text-label">
-      {state.message}
-    </p>
+    // Fades in where the form was, holding roughly the form's height so the page doesn't jump.
+    <div role="status" className={`rk-arrive ${compact ? "" : stacked ? "min-h-[6.25rem]" : "min-h-[2.75rem]"}`}>
+      <p className="font-serif text-lg font-semibold text-ink">Check your inbox.</p>
+      <p className="mt-0.5 text-sm text-muted">{state.message}</p>
+    </div>
   ) : (
-    <form action={action} className={`flex flex-col gap-2 ${compact ? "sm:flex-row" : "sm:flex-row sm:rounded-full sm:border sm:border-line sm:bg-card sm:p-1.5 sm:shadow-sm"}`}>
+    <form action={action} className={`flex flex-col gap-2 ${stacked ? "" : "sm:flex-row"}`}>
       <label htmlFor={compact ? "signup-email-c" : "signup-email"} className="sr-only">
         Email address
       </label>
@@ -33,7 +37,7 @@ export function SignupForm({ compact = false, prefs, buttonLabel = "Get the dail
         autoComplete="email"
         placeholder="you@example.com"
         className={`min-w-0 flex-1 bg-card px-4 py-2.5 text-base outline-none ${
-          compact ? "rounded-lg border border-line focus:border-ink" : "rounded-full border border-line focus:border-ink sm:border-0"
+          "rounded-md border border-line focus:border-ink"
         }`}
       />
       {/* Honeypot: hidden from people, filled in by bots */}
@@ -50,15 +54,15 @@ export function SignupForm({ compact = false, prefs, buttonLabel = "Get the dail
       <button
         type="submit"
         disabled={pending}
-        className={`bg-accent px-5 py-2.5 font-semibold text-white hover:opacity-90 disabled:opacity-60 ${compact ? "rounded-lg" : "rounded-full"}`}
+        className={`bg-accent px-5 py-2.5 font-semibold text-paper hover:opacity-90 disabled:opacity-60 rounded-md`}
       >
-        {pending ? "Signing up…" : `${buttonLabel} →`}
+        {pending ? "Signing up…" : buttonLabel}
       </button>
     </form>
   );
 
   return (
-    <div className={compact ? "rounded-xl border border-line bg-card p-4 sm:p-5" : ""}>
+    <div className={compact ? "border-y border-line py-5" : ""}>
       {compact && (
         <>
           <h2 className="font-serif text-lg font-semibold">Get this in your inbox</h2>

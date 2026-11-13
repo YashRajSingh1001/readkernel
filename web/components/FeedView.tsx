@@ -16,14 +16,12 @@ export function FeedView({ edition, topic, olderDate }: Props) {
   return (
     <>
       <header className="mb-6">
-        <p className="font-mono text-xs tracking-wide text-label uppercase">
-          The feed · {formatDate(edition.date)}
-        </p>
-        <h1 className="mt-1 text-4xl font-extrabold tracking-tight">
+        <h1 className="text-4xl title-serif">
           {topic ? TOPICS[topic] : "Everything worth knowing"}{" "}
-          <span className="font-mono text-lg font-normal text-muted tabular-nums">{stories.length}</span>
+          <span className="font-sans text-lg font-normal text-muted tabular-nums">{stories.length}</span>
         </h1>
         <p className="mt-2 text-muted">
+          <span className="font-semibold text-ink">{formatDate(edition.date)}.</span>{" "}
           {topic ? TOPIC_BLURBS[topic] : `The day's ${stories.length} best stories from ${sourceCount} sources.`}{" "}
           {!topic && (
             <>
@@ -38,9 +36,9 @@ export function FeedView({ edition, topic, olderDate }: Props) {
       </header>
 
       {showReleases && (
-        <section aria-labelledby="model-releases" className="mb-8 rounded-2xl border border-line bg-sunk p-4 sm:p-5">
-          <h2 id="model-releases" className="font-mono text-xs tracking-wide text-label uppercase">
-            ★ Model releases
+        <section aria-labelledby="model-releases" className="mb-10">
+          <h2 id="model-releases" className="section-rule">
+            Model releases
           </h2>
           <div className="mt-1">
             {releases.slice(0, 4).map((s) => (
@@ -51,7 +49,7 @@ export function FeedView({ edition, topic, olderDate }: Props) {
       )}
 
       {stories.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-line p-8 text-center text-muted">
+        <p className="rounded-md border border-dashed border-line p-8 text-center text-muted">
           No {topic ? TOPICS[topic] : ""} stories today. Check another topic or come back tomorrow.
         </p>
       ) : (
@@ -61,7 +59,7 @@ export function FeedView({ edition, topic, olderDate }: Props) {
       {olderDate && (
         <div className="mt-8 border-t border-line pt-6 text-center">
           <Link href={`/brief/${olderDate}`} className="font-medium text-accent hover:underline">
-            See older stories: {formatDate(olderDate)} →
+            See older stories: {formatDate(olderDate)}
           </Link>
         </div>
       )}
