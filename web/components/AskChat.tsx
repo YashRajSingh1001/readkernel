@@ -223,6 +223,7 @@ export function AskChat({ story }: { story?: FocusStory }) {
   const follow = useRef(true);
   const autoY = useRef<number | null>(null); // where our last automatic scroll left the page
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const busy = turns.some((t) => t.role === "assistant" && t.state === "working");
 
@@ -334,7 +335,13 @@ export function AskChat({ story }: { story?: FocusStory }) {
     const id = nextId.current++;
     const controller = new AbortController();
     active.current = { id, controller };
-    const history = [...conversation(turnsRef.current), { role: "user" as const, content: q }];
+    // Asking again leaves out the answer being replaced, so the model doesn't see its own first try.
+    const earlier = turnsRef.current.filter(
+      (t, i, all) =>
+        replacing === undefined ||
+        !((t.role === "assistant" && t.id === replacing) || (all[i + 1]?.role === "assistant" && (all[i + 1] as Answer).id === replacing)),
+    );
+    const history = [...conversation(earlier), { role: "user" as const, content: q }];
     setTurns((all) => {
       // Asking again after a failure: the failed attempt makes way for the new one.
       const at = replacing === undefined ? -1 : all.findIndex((t) => t.role === "assistant" && t.id === replacing);
@@ -346,6 +353,7 @@ export function AskChat({ story }: { story?: FocusStory }) {
       ];
     });
     setInput("");
+    if (inputRef.current) inputRef.current.style.height = "auto";
     setAnnounce("Looking into it.");
     follow.current = true;
     autoY.current = null;
@@ -445,7 +453,13 @@ export function AskChat({ story }: { story?: FocusStory }) {
               <p className="max-w-[85%] rounded-lg bg-sunk px-4 py-2.5 whitespace-pre-wrap [overflow-wrap:anywhere]">{t.content}</p>
             </div>
           ) : (
-            <AnswerView key={`a${t.id}`} answer={t} onRetry={() => ask(t.question, t.id)} />
+            <AnswerView
+              key={`a${t.id}`}
+              answer={t}
+              // Re-asking a finished answer only makes sense for the latest one; later turns built on it.
+              last={i === turns.length - 1}
+              onRetry={() => ask(t.question, t.id)}
+            />
           ),
         )}
         {/* scroll-mb keeps the newest line clear of the sticky question box */}
@@ -474,6 +488,7 @@ export function AskChat({ story }: { story?: FocusStory }) {
             Your question
           </label>
           <textarea
+            ref={inputRef}
             id="ask-input"
             rows={1}
             value={input}
@@ -487,7 +502,6 @@ export function AskChat({ story }: { story?: FocusStory }) {
               // Enter asks, Shift+Enter starts a new line.
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
-                e.currentTarget.style.height = "auto";
                 ask(input);
               }
             }}
@@ -532,7 +546,7 @@ function summarize(steps: Activity[]): string {
   return [own ? plural(own, "ReadKernel lookup") : "", web ? plural(web, "web search", "web searches") : ""].filter(Boolean).join(" · ");
 }
 
-function AnswerView({ answer: a, onRetry }: { answer: Answer; onRetry: () => void }) {
+function AnswerView({ answer: a, last, onRetry }: { answer: Answer; last: boolean; onRetry: () => void }) {
   const working = a.state === "working";
   const failed = a.state === "error";
   const [open, setOpen] = useState(false);
@@ -659,9 +673,11 @@ function AnswerView({ answer: a, onRetry }: { answer: Answer; onRetry: () => voi
           >
             {copied ? "Copied" : "Copy"}
           </button>
-          <button type="button" onClick={onRetry} className="hover:text-ink">
-            Ask again
-          </button>
+          {last && (
+            <button type="button" onClick={onRetry} className="hover:text-ink">
+              Ask again
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -17,10 +17,11 @@ import { askCacheKey, readCachedAnswer, saveCachedAnswer } from "@/lib/server/as
 
 const MAX_TURNS = 6; // the last few messages give follow-up questions their context
 const MAX_CHARS = 600; // a reader's message (the chat box stops at 600 too)
-// Ask's own earlier answers come back as history for follow-ups. They run to
-// about 1,100-2,200 characters (180 words plus full link URLs), so cutting them
-// at 600 would hide the later bullets and their links from the model.
-const MAX_ANSWER_CHARS = 2500;
+// Ask's own earlier answers come back as history for follow-ups. A detailed one
+// runs to about 400 words plus full link URLs (web links are often long), so up
+// to about 5,000 characters; cutting it would hide the later bullets and their
+// links from the model, and links it can't see can't be kept in a follow-up.
+const MAX_ANSWER_CHARS = 6000;
 
 // Best-effort limit per visitor, to keep AI costs and quotas in check. It lives in
 // one server instance's memory, which is enough to stop casual abuse.
