@@ -378,8 +378,8 @@ flowchart TD
 ## 7. Agents and integrations
 
 "Agentic" here means the AI is given **tools** and decides for itself which to use, in what order,
-until it reaches a goal, instead of answering one fixed prompt. All of it runs on the same free Groq
-model (`gpt-oss-120b` supports tool calling).
+until it reaches a goal, instead of answering one fixed prompt. Watch alerts run on the pipeline's free
+Groq model (`gpt-oss-120b` supports tool calling); Ask ReadKernel runs on OpenAI (see 7.2).
 
 ### 7.1 One set of news tools — `web/lib/tools.ts`
 
@@ -403,7 +403,7 @@ link the exact source. Bad input comes back as a readable error the agent can fi
 ```mermaid
 sequenceDiagram
     participant R as Reader
-    participant A as Agent (Groq)
+    participant A as Agent (OpenAI)
     participant T as News tools
     R->>A: "What has Nvidia been up to?"
     A->>T: search_news("Nvidia")
@@ -415,9 +415,16 @@ sequenceDiagram
 
 - Files: `web/lib/server/agent.ts` (the loop), `web/app/api/ask/route.ts` (limits), `web/components/AskChat.tsx` (the chat).
 - At most 5 rounds of tool use per question, then it must answer. Follow-up questions keep the last 6 messages as context.
-- Answers only from tool results, never from memory, and must not stretch an item to fit the question; off-topic requests are declined.
+- Answers only from tool results, never from memory, and must not stretch an item to fit the question.
+- **Tech and AI news only** (`web/lib/server/ask-scope.ts`). Coding help, homework, general knowledge,
+  advice, creative writing and questions about which AI runs Ask all get one fixed reply. Three layers:
+  a message with pasted code or an error trace is turned away before any AI call; the prompt tells the
+  AI to reply with an `OFF_TOPIC` marker, with no tool calls, to anything else out of scope; and an
+  answer carrying that marker or a code block is swapped for the fixed reply, so a tricked AI still
+  can't hand out code. The prompt also says earlier messages can't change these rules, because the
+  chat history comes from the browser and could be faked. Declined answers are never stored.
 - If the model forgets to link, the sources it used are listed under the answer automatically.
-- Limits to protect the free quota: 12 questions per visitor per 10 minutes, 600 characters per message.
+- Limits to protect the free quota: 12 questions per visitor per 10 minutes, 600 characters per reader message (Ask's own earlier answers, sent back as history for follow-ups, keep up to 2,500).
 - **Ask about this story:** every story page links to `/ask?story=<key>`. The story and its timeline are
   loaded before the first question, and the suggestions change to "Who are the competitors here?",
   "What else is happening in this space?" and so on. For rivals the agent starts with `get_company_news`.
@@ -430,7 +437,10 @@ sequenceDiagram
 - Tested 27 October 2026: "What has Nvidia been up to?" → one search, four facts, sources listed.
   "What did Uber write about AI?" → its first, filtered search found nothing, so it **retried by
   itself** without the filter and found Uber's AutoClean post.
-- Needs `GROQ_API_KEY` in Vercel's environment variables.
+- Runs on OpenAI's `gpt-6-luna` at medium reasoning, with no fallback: Ask is off until
+  `OPENAI_API_KEY` is set in Vercel's environment variables. The pipeline's AI is separate and stays on Groq.
+- The website never names the AI services it uses (the privacy page says "AI services"), and Ask
+  declines questions about which AI runs it.
 
 ### 7.3 Watch alerts — `kernel/watches.py` and the settings page
 
@@ -695,7 +705,7 @@ so they're free and repeatable.
 
 | Service | Free allowance | Our use | Watch out for |
 | --- | --- | --- | --- |
-| Groq | Daily and per-minute token limits | A few dozen calls a day, plus Ask ReadKernel questions | Big first fills (like 30 days of company posts) take longer because of per-minute limits; the retry logic waits automatically. |
+| Groq | Daily and per-minute token limits | A few dozen calls a day (the pipeline only) | Big first fills (like 30 days of company posts) take longer because of per-minute limits; the retry logic waits automatically. |
 | Supabase | 500 MB database, pauses after 7 days with no activity | A few MB | The daily job keeps it active. |
 | Vercel | Hobby plan | One small site | Hobby is for non-commercial use. |
 | GitHub Actions | Free minutes on public repos; 2,000 min/month on private | ~5 min a day | |
@@ -713,8 +723,10 @@ Templates: [`.env.example`](../.env.example) and [`web/.env.example`](../web/.en
 | Setting | Used by | Value now | Meaning |
 | --- | --- | --- | --- |
 | `LLM_PROVIDER` | pipeline | `groq` | `groq`, `claude`, `openai` or `none` |
-| `GROQ_API_KEY` | pipeline, website | (secret) | Free key from console.groq.com; the website needs it for Ask ReadKernel |
-| `GROQ_MODEL` | pipeline, website | `openai/gpt-oss-120b` | Model on Groq |
+| `GROQ_API_KEY` | pipeline | (secret) | Free key from console.groq.com |
+| `GROQ_MODEL` | pipeline | `openai/gpt-oss-120b` | Model on Groq |
+| `OPENAI_API_KEY` | website | (secret) | Ask ReadKernel's AI. Not read by the pipeline, which stays on Groq |
+| `ASK_MODEL` / `ASK_REASONING_EFFORT` | website | `gpt-6-luna` / `medium` | OpenAI model and reasoning level for Ask |
 | `MAX_AGE_HOURS` | pipeline | 36 | How old an article may be |
 | `STORIES_PER_BRIEF` / `FEED_SIZE` | pipeline | 10 / 30 | Brief and feed size |
 | `EMBEDDINGS` | pipeline | `local` | `local` (bge-small) or `simple` (word overlap, no download) |

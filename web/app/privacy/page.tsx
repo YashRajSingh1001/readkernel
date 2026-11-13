@@ -73,8 +73,9 @@ export default function PrivacyPage() {
             <strong>Our email provider</strong> (currently Gmail) delivers the brief.
           </li>
           <li>
-            <strong>Groq</strong> runs the AI that writes summaries. It only ever sees public news articles, never
-            anything about you.
+            <strong>AI services</strong> write the story summaries and answer questions typed into Ask. For summaries
+            they only ever see public news articles. For Ask they see the question and the news ReadKernel looks up to
+            answer it, never your email or account.
           </li>
         </ul>
         <p>
