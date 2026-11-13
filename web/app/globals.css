@@ -302,15 +302,31 @@ body {
     -webkit-mask-image: none;
     mask-image: none;
   }
+  /* Still list: the lane becomes a plain block so the list wraps to the page width. */
   .rk-strip-lane {
-    width: auto;
+    display: block;
+    width: 100%;
     transform: none !important;
   }
   .rk-strip-set {
+    width: 100%;
+    flex-shrink: 1;
     flex-wrap: wrap;
     row-gap: 0.75rem;
   }
   .rk-strip-set[aria-hidden] {
     display: none;
+  }
+}
+
+/* Dark logos (VentureBeat, GitHub, ...) vanish on the dark background: give icons a small light tile there. */
+:root[data-theme="dark"] .rk-strip-set img {
+  background: #f3f1ec;
+  padding: 1px;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] .rk-strip-set img {
+    background: #f3f1ec;
+    padding: 1px;
   }
 }

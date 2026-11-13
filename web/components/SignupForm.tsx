@@ -18,13 +18,23 @@ type Props = {
 export function SignupForm({ compact = false, prefs, buttonLabel = "Get the daily brief", stacked = false }: Props) {
   const [state, action, pending] = useActionState<FormState, FormData>(subscribeAction, null);
 
-  const form = state?.ok ? (
-    // Fades in where the form was, holding roughly the form's height so the page doesn't jump.
-    <div role="status" className={`rk-arrive ${compact ? "" : stacked ? "min-h-[6.25rem]" : "min-h-[2.75rem]"}`}>
-      <p className="font-serif text-lg font-semibold text-ink">Check your inbox.</p>
-      <p className="mt-0.5 text-sm text-muted">{state.message}</p>
+  // The status region is always mounted (empty until success) so screen readers reliably
+  // announce the confirmation; the confirmation fades in where the form was.
+  const status = (
+    <div role="status">
+      {state?.ok && (
+        <div className="rk-arrive">
+          <p className="font-serif text-lg font-semibold text-ink">Check your inbox.</p>
+          <p className="mt-0.5 text-sm text-muted">{state.message}</p>
+        </div>
+      )}
     </div>
-  ) : (
+  );
+  // Hold the form's height (two rows when stacked or on phones, one row otherwise) so the
+  // page doesn't jump when the confirmation replaces it.
+  const reserve = stacked ? "min-h-[6.25rem]" : "min-h-[6.25rem] sm:min-h-[2.75rem]";
+
+  const form = state?.ok ? null : (
     <form action={action} className={`flex flex-col gap-2 ${stacked ? "" : "sm:flex-row"}`}>
       <label htmlFor={compact ? "signup-email-c" : "signup-email"} className="sr-only">
         Email address
@@ -69,7 +79,10 @@ export function SignupForm({ compact = false, prefs, buttonLabel = "Get the dail
           <p className="mt-1 mb-3 text-sm text-muted">One email each morning at 6 AM IST. Free. Unsubscribe with one click.</p>
         </>
       )}
-      {form}
+      <div className={reserve}>
+        {status}
+        {form}
+      </div>
       {state && !state.ok && (
         <p role="alert" className="mt-2 text-sm text-accent">
           {state.message}

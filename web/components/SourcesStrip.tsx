@@ -31,6 +31,7 @@ export function SourcesStrip({ sources }: { sources: SourceInfo[] }) {
     const vp = viewport.current!;
     const ln = lane.current!;
     const root = band.current!;
+    const first = ln.firstElementChild as HTMLElement;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
 
     let x = 0;
@@ -40,44 +41,69 @@ export function SourcesStrip({ sources }: { sources: SourceInfo[] }) {
     let visible = true;
     let velocity = 0;
     let drag: { startX: number; x0: number; lastX: number; lastT: number } | null = null;
-    let last = performance.now();
+    let last = 0;
     let frame = 0;
 
-    const measure = () => {
-      // One copy plus the gap before the next copy (the gap is in rem, so read it from CSS).
-      const gap = parseFloat(getComputedStyle(ln).columnGap) || 0;
-      setWidth = (ln.firstElementChild as HTMLElement).getBoundingClientRect().width + gap;
-    };
     const wrap = () => {
       if (setWidth) x = -(((-x % setWidth) + setWidth) % setWidth);
     };
+    const paint = () => {
+      wrap();
+      ln.style.transform = `translate3d(${x}px,0,0)`;
+    };
+    // The frame loop only runs while something is moving: drifting, gliding or being dragged.
+    const drifting = () => !hover && !focus && visible && !document.hidden;
+    const active = () => !reduced.matches && (drag !== null || velocity !== 0 || drifting());
     const tick = (t: number) => {
-      const dt = Math.min(0.05, (t - last) / 1000);
+      frame = 0;
+      if (!active()) return;
+      const dt = last ? Math.min(0.05, (t - last) / 1000) : 0;
       last = t;
-      if (reduced.matches) {
-        ln.style.transform = "";
+      if (drag) {
+        // position follows the pointer
+      } else if (velocity) {
+        x += velocity * dt;
+        velocity *= Math.pow(0.005, dt);
+        if (Math.abs(velocity) < 8) velocity = 0;
       } else {
-        if (drag) {
-          // position follows the pointer
-        } else if (velocity) {
-          x += velocity * dt;
-          velocity *= Math.pow(0.005, dt);
-          if (Math.abs(velocity) < 8) velocity = 0;
-        } else if (!hover && !focus && visible && !document.hidden) {
-          x -= SPEED * dt;
-        }
-        wrap();
-        ln.style.transform = `translate3d(${x}px,0,0)`;
+        x -= SPEED * dt;
       }
+      paint();
       frame = requestAnimationFrame(tick);
     };
+    const wake = () => {
+      if (reduced.matches) {
+        ln.style.transform = "";
+        return;
+      }
+      if (!frame && active()) {
+        last = 0;
+        frame = requestAnimationFrame(tick);
+      }
+    };
+
+    // One copy plus the gap before the next copy. Re-measured whenever the copy's size
+    // changes (web fonts arriving, window resizing), so the loop never jumps at the seam.
+    const measure = () => {
+      const gap = parseFloat(getComputedStyle(ln).columnGap) || 0;
+      setWidth = first.getBoundingClientRect().width + gap;
+      if (!reduced.matches) paint();
+    };
+    const ro = new ResizeObserver(measure);
 
     const onWheel = (e: WheelEvent) => {
-      // Only sideways swipes move the strip; vertical scrolling still scrolls the page.
-      if (reduced.matches || Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+      if (reduced.matches) return;
+      // Sideways swipes move the strip; Shift + mouse wheel too, if the browser hasn't already
+      // turned it sideways. Plain vertical scrolling is left to the page.
+      let dx = e.deltaX;
+      if (!dx && e.shiftKey) dx = e.deltaY;
+      else if (Math.abs(dx) <= Math.abs(e.deltaY)) return;
+      if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) dx *= 16;
+      else if (e.deltaMode === WheelEvent.DOM_DELTA_PAGE) dx *= vp.clientWidth;
       e.preventDefault();
       velocity = 0;
-      x -= e.deltaX;
+      x -= dx;
+      paint();
     };
     const onDown = (e: PointerEvent) => {
       if (reduced.matches || e.button !== 0) return;
@@ -85,6 +111,7 @@ export function SourcesStrip({ sources }: { sources: SourceInfo[] }) {
       velocity = 0;
       vp.setPointerCapture(e.pointerId);
       vp.dataset.dragging = "true";
+      wake();
     };
     const onMove = (e: PointerEvent) => {
       if (!drag) return;
@@ -99,17 +126,33 @@ export function SourcesStrip({ sources }: { sources: SourceInfo[] }) {
       drag = null;
       delete vp.dataset.dragging;
       velocity = Math.max(-1000, Math.min(1000, velocity)); // a short glide, then settle
+      wake();
     };
-    const enter = () => (hover = true);
-    const leave = () => (hover = false);
+    // Hover stops the drift for mouse and trackpad only. Taps on a phone also fire
+    // mouse events, which would otherwise leave the strip stopped for good.
+    const enter = (e: PointerEvent) => {
+      if (e.pointerType === "mouse") hover = true;
+    };
+    const leave = (e: PointerEvent) => {
+      if (e.pointerType === "mouse") {
+        hover = false;
+        wake();
+      }
+    };
     const focusIn = () => (focus = true);
-    const focusOut = () => (focus = false);
-    const io = new IntersectionObserver(([entry]) => (visible = entry.isIntersecting));
+    const focusOut = () => {
+      focus = false;
+      wake();
+    };
+    const io = new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      wake();
+    });
 
     measure();
-    window.addEventListener("resize", measure);
-    root.addEventListener("mouseenter", enter);
-    root.addEventListener("mouseleave", leave);
+    ro.observe(first);
+    root.addEventListener("pointerenter", enter);
+    root.addEventListener("pointerleave", leave);
     root.addEventListener("focusin", focusIn);
     root.addEventListener("focusout", focusOut);
     vp.addEventListener("wheel", onWheel, { passive: false });
@@ -117,15 +160,17 @@ export function SourcesStrip({ sources }: { sources: SourceInfo[] }) {
     vp.addEventListener("pointermove", onMove);
     vp.addEventListener("pointerup", onUp);
     vp.addEventListener("pointercancel", onUp);
+    document.addEventListener("visibilitychange", wake);
+    reduced.addEventListener("change", wake);
     io.observe(root);
-    frame = requestAnimationFrame(tick);
+    wake();
 
     return () => {
       cancelAnimationFrame(frame);
       io.disconnect();
-      window.removeEventListener("resize", measure);
-      root.removeEventListener("mouseenter", enter);
-      root.removeEventListener("mouseleave", leave);
+      ro.disconnect();
+      root.removeEventListener("pointerenter", enter);
+      root.removeEventListener("pointerleave", leave);
       root.removeEventListener("focusin", focusIn);
       root.removeEventListener("focusout", focusOut);
       vp.removeEventListener("wheel", onWheel);
@@ -133,6 +178,8 @@ export function SourcesStrip({ sources }: { sources: SourceInfo[] }) {
       vp.removeEventListener("pointermove", onMove);
       vp.removeEventListener("pointerup", onUp);
       vp.removeEventListener("pointercancel", onUp);
+      document.removeEventListener("visibilitychange", wake);
+      reduced.removeEventListener("change", wake);
     };
   }, []);
 
@@ -165,7 +212,7 @@ export function SourcesStrip({ sources }: { sources: SourceInfo[] }) {
       </div>
       <div ref={viewport} className="rk-strip-viewport">
         <div ref={lane} className="rk-strip-lane">
-          <ul className="rk-strip-set" aria-label="Sources">
+          <ul className="rk-strip-set" role="list" aria-label="Sources">
             {items}
           </ul>
           {/* The second copy makes the loop seamless; screen readers skip it. */}

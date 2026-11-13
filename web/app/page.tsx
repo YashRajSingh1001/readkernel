@@ -71,7 +71,6 @@ export default async function Home() {
             </p>
           </div>
         </div>
-        <SourcesStrip sources={SOURCES} />
       </Container>
 
       {/* Today's brief: the lead story large, the next five as a numbered list */}
@@ -163,6 +162,11 @@ export default async function Home() {
             </Link>
           </section>
         </div>
+      </Container>
+
+      {/* The outlets we read, last thing before the footer */}
+      <Container size="wide" className="pt-14">
+        <SourcesStrip sources={SOURCES} />
       </Container>
     </>
   );
