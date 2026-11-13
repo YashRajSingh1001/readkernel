@@ -6,9 +6,13 @@ import { AgentUnavailable, askAgent, type ChatTurn } from "@/lib/server/agent";
 import { askCacheKey, readCachedAnswer, saveCachedAnswer } from "@/lib/server/ask-cache";
 
 const MAX_TURNS = 6; // the last few messages give follow-up questions their context
-const MAX_CHARS = 600;
+const MAX_CHARS = 600; // a reader's message (the chat box stops at 600 too)
+// Ask's own earlier answers come back as history for follow-ups. They run to
+// about 1,100-2,200 characters (180 words plus full link URLs), so cutting them
+// at 600 would hide the later bullets and their links from the model.
+const MAX_ANSWER_CHARS = 2500;
 
-// Best-effort limit per visitor, to keep within Groq's free quota. It lives in
+// Best-effort limit per visitor, to keep AI costs and quotas in check. It lives in
 // one server instance's memory, which is enough to stop casual abuse.
 const WINDOW_MS = 10 * 60 * 1000;
 const PER_WINDOW = 12;
@@ -27,10 +31,11 @@ function allowed(ip: string): boolean {
 function parse(body: unknown): ChatTurn[] | null {
   const list = (body as { messages?: unknown })?.messages;
   if (!Array.isArray(list) || list.length === 0) return null;
-  const turns = list.slice(-MAX_TURNS).map((m) => ({
-    role: (m as ChatTurn)?.role,
-    content: String((m as ChatTurn)?.content ?? "").trim().slice(0, MAX_CHARS),
-  }));
+  const turns = list.slice(-MAX_TURNS).map((m) => {
+    const role = (m as ChatTurn)?.role;
+    const limit = role === "assistant" ? MAX_ANSWER_CHARS : MAX_CHARS;
+    return { role, content: String((m as ChatTurn)?.content ?? "").trim().slice(0, limit) };
+  });
   if (turns.some((t) => (t.role !== "user" && t.role !== "assistant") || !t.content)) return null;
   if (turns.at(-1)!.role !== "user") return null;
   return turns as ChatTurn[];

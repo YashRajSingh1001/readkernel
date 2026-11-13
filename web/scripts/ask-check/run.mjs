@@ -1,7 +1,7 @@
 // Runs the fixed Ask questions in cases.json against /api/ask and writes a
 // markdown report to web/.ask-runs/. See README.md.
 //
-//   node scripts/ask-check/run.mjs [--base http://localhost:3000] [--only page|typed|general] [--case <id>]
+//   node scripts/ask-check/run.mjs [--base http://localhost:3000] [--only page|typed|general|scope] [--case <id>]
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -18,18 +18,18 @@ const only = flag("only", "");
 const caseId = flag("case", "");
 
 const LIMIT_WAIT_MS = 60_000; // /api/ask allows 12 questions per 10 minutes
-const BUSY_WAIT_MS = 30_000; // Groq's free per-minute token quota ran out ("resting"); not an answer to grade
+const BUSY_WAIT_MS = 30_000; // the AI was busy or out of quota ("resting"); not an answer to grade
 const PAUSE_MS = 15_000; // between questions, so one answer's tokens don't starve the next
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function ask(question, story) {
+async function ask(question, story, history = []) {
   for (let attempt = 0; attempt < 12; attempt++) {
     const started = Date.now();
     const res = await fetch(`${base}/api/ask`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: [{ role: "user", content: question }], ...(story ? { story } : {}) }),
+      body: JSON.stringify({ messages: [...history, { role: "user", content: question }], ...(story ? { story } : {}) }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.status === 429) {
@@ -47,6 +47,9 @@ async function ask(question, story) {
   return { status: 429, ms: 0, answer: "Still rate limited after retries.", steps: [] };
 }
 
+// The fixed reply for questions outside tech and AI news (lib/server/ask-scope.ts).
+const DECLINED = /^I can only help with tech and AI news/;
+
 const NOT_COVERED = /hasn['’]t covered|haven['’]t covered|no (?:coverage|stories)|doesn['’]t (?:name|mention)|not covered|couldn['’]t find/i;
 
 function checks(result) {
@@ -61,6 +64,7 @@ function checks(result) {
     under_limit: words <= 220, // the prompt asks for 180; allow a little for links and the Sources line
     says_not_covered: NOT_COVERED.test(result.answer),
     tool_calls: result.steps.length,
+    declined: DECLINED.test(result.answer),
   };
 }
 
@@ -75,6 +79,9 @@ function plan(cases) {
   if (!only || only === "general") {
     for (const c of cases.general_cases) runs.push({ id: c.id, variant: "general", question: c.question });
   }
+  if (!only || only === "scope") {
+    for (const c of cases.scope_cases) runs.push({ ...c, variant: "scope" });
+  }
   return caseId ? runs.filter((r) => r.id === caseId) : runs;
 }
 
@@ -85,22 +92,24 @@ console.log(`Asking ${runs.length} questions at ${base}`);
 const results = [];
 for (const [i, run] of runs.entries()) {
   console.log(`${i + 1}/${runs.length} ${run.id} (${run.variant})`);
-  const result = await ask(run.question, run.story);
+  const result = await ask(run.question, run.story, run.history);
   results.push({ ...run, ...result, checks: checks(result) });
   if (i < runs.length - 1) await sleep(PAUSE_MS);
 }
 
 const tick = (b) => (b ? "yes" : "**no**");
+// Scope cases: did Ask decline exactly the questions it should?
+const scope = (r) => (r.expect ? (r.checks.declined === (r.expect === "decline") ? `ok (${r.expect})` : `**wrong** (wanted ${r.expect})`) : r.checks.declined ? "declined" : "");
 const lines = [
   `# Ask check: ${new Date().toISOString()}`,
   "",
   `Base: ${base}. Read each answer against the checklist in scripts/ask-check/README.md.`,
   "",
-  "| case | variant | answered | linked | links | words | says not covered | tool calls | seconds |",
-  "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+  "| case | variant | answered | linked | links | words | says not covered | scope | tool calls | seconds |",
+  "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
   ...results.map(
     (r) =>
-      `| ${r.id} | ${r.variant} | ${tick(r.checks.answered)} | ${tick(r.checks.linked)} | ${r.checks.links} | ${r.checks.words}${r.checks.under_limit ? "" : " (long)"} | ${r.checks.says_not_covered ? "yes" : "no"} | ${r.checks.tool_calls} | ${(r.ms / 1000).toFixed(1)} |`,
+      `| ${r.id} | ${r.variant} | ${tick(r.checks.answered)} | ${tick(r.checks.linked)} | ${r.checks.links} | ${r.checks.words}${r.checks.under_limit ? "" : " (long)"} | ${r.checks.says_not_covered ? "yes" : "no"} | ${scope(r)} | ${r.checks.tool_calls} | ${(r.ms / 1000).toFixed(1)} |`,
   ),
   "",
 ];
@@ -109,6 +118,7 @@ for (const r of results) {
     `## ${r.id} (${r.variant})`,
     "",
     ...(r.headline ? [`Story: ${r.headline}${r.story ? ` (\`${r.story}\`)` : ""}`, ""] : []),
+    ...(r.history ? r.history.map((t) => `**${t.role === "user" ? "Q" : "A"} (earlier):** ${t.content}`).concat("") : []),
     `**Q:** ${r.question}`,
     "",
     `**Tools:** ${r.steps.map((s) => `${s.tool}(${JSON.stringify(s.args)})`).join(" → ") || "none"}`,

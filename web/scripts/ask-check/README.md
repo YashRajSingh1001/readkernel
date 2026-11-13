@@ -5,13 +5,14 @@ to the agent or its prompt can be judged by before-and-after answers, not by
 trying a couple of chats.
 
 ```bash
-# start the site with a Groq key (the web app doesn't read the root .env)
-cd web && GROQ_API_KEY=... npm run dev
+# start the site; Ask needs OPENAI_API_KEY in web/.env (the web app doesn't read the root .env)
+cd web && npm run dev
 
 # in another terminal
 node scripts/ask-check/run.mjs                      # against http://localhost:3000
 node scripts/ask-check/run.mjs --base https://readkernel.in --only typed
 node scripts/ask-check/run.mjs --case fireworks-startup-competitors   # one case
+node scripts/ask-check/run.mjs --only scope        # only the stay-on-topic cases
 ```
 
 Each run writes a report to `web/.ask-runs/<time>.md` (not committed): every
@@ -25,8 +26,15 @@ Story cases run two ways:
 
 `/api/ask` allows 12 questions per 10 minutes per visitor. A full run is 12, so
 the script waits and retries if it hits the limit. It also waits and retries
-when Groq's free quota runs out ("Ask ReadKernel is resting"), since that is
-not an answer to grade; a run takes about 5 minutes.
+when the AI is busy or out of quota ("Ask ReadKernel is resting"), since that
+is not an answer to grade.
+
+Scope cases check that Ask stays on tech and AI news: coding help, homework,
+general knowledge, advice, "which AI are you" and attempts to talk it out of
+its rules (including a faked earlier reply) must get the fixed decline, while
+news questions that merely name Python or Copilot, short follow-ups and story
+page questions must still be answered. The report's scope column marks each
+one ok or **wrong**.
 
 ## Reading the report
 
