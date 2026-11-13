@@ -7,7 +7,7 @@ import { getStory } from "@/lib/brief";
 
 export const metadata: Metadata = {
   title: "Ask ReadKernel",
-  description: "Ask anything about tech and AI news. ReadKernel searches its archive and answers with a link for every fact.",
+  description: "Ask anything about tech and AI news. ReadKernel searches its archive and answers with links to the sources it used.",
 };
 
 export default function AskPage({ searchParams }: PageProps<"/ask">) {
@@ -17,7 +17,7 @@ export default function AskPage({ searchParams }: PageProps<"/ask">) {
       <h1 className="mt-1 text-4xl font-extrabold tracking-tight">Ask the news</h1>
       <p className="mt-2 mb-8 text-muted">
         Ask about any company, product or story. ReadKernel searches everything it has covered, follows the story over
-        time, and answers with a link for every fact. It only knows what it has covered, so very new or niche topics may
+        time, and answers with links to the sources it used. It only knows what it has covered, so very new or niche topics may
         be missing.
       </p>
       <Suspense fallback={<AskChat />}>

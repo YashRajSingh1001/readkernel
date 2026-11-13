@@ -146,7 +146,7 @@ async function StoryView({ params }: { params: PageProps<"/story/[key]">["params
         >
           <span>
             <span className="block font-semibold">Ask about this story</span>
-            <span className="text-sm text-muted">Competitors, the wider space, how it developed. Every answer is linked.</span>
+            <span className="text-sm text-muted">Competitors, the wider space, how it developed, with links to the sources.</span>
           </span>
           <span className="shrink-0 text-sm font-semibold text-accent group-hover:underline">Ask →</span>
         </Link>

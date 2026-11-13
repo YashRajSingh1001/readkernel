@@ -175,7 +175,9 @@ export const NEWS_TOOLS: NewsTool[] = [
         if (stories.length === 0 && posts.length === 0) continue;
         return {
           query,
-          ...(attempt !== query ? { note: `Nothing matched every word of "${query}"; these match "${attempt}".` } : {}),
+          ...(attempt !== query
+            ? { matched_query: attempt, note: `Nothing matched every word of "${query}"; these match "${attempt}".` }
+            : {}),
           stories: stories.slice(0, limit).map((s) => story(s)),
           company_blog_posts: posts.map(companyPost),
         };

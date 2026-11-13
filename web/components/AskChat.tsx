@@ -1,37 +1,124 @@
 "use client";
 
+// The Ask ReadKernel chat. Everything it shows while an answer is on its way
+// comes from /api/ask's event stream (lib/ask-stream.ts): which tool is running
+// and what it found, OpenAI retries, and the answer text as it's written. No
+// status here is driven by a timer.
+
 import Link from "next/link";
-import { Fragment, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { STORY_SUGGESTIONS, SUGGESTIONS } from "@/lib/ask";
-
-type Step = { tool: string; args: Record<string, unknown> };
-type Turn = { role: "user" | "assistant"; content: string; steps?: Step[]; error?: boolean };
+import { NDJSON, readEvents, type AskEvent, type AskStep, type ToolCounts } from "@/lib/ask-stream";
 
 export type FocusStory = { key: string; headline: string };
 
-// What each tool call looked like, in words.
-function describe(step: Step): string {
+type Activity = AskStep & { id: string; state: "running" | "done" | "failed" };
+// What the server is doing right now, when no tool is running and no text has arrived.
+type Phase = { kind: "sending" } | { kind: "thinking"; round: number } | { kind: "retry"; waitSeconds: number; reason: string };
+type Answer = {
+  role: "assistant";
+  id: number;
+  question: string;
+  content: string;
+  steps: Activity[];
+  phase: Phase | null;
+  state: "working" | "done" | "stopped" | "error";
+  cached?: string; // the edition date of a saved answer
+  truncated?: boolean;
+  error?: string;
+  retryable?: boolean;
+};
+type Turn = { role: "user"; content: string } | Answer;
+
+const IDLE_MS = 60_000; // no event from the server for this long: give up (the server gives up on OpenAI at 45s)
+const NEAR_BOTTOM_PX = 120;
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+function shortDate(date: string): string {
+  const d = new Date(`${date}T12:00:00Z`);
+  return Number.isNaN(d.getTime()) ? date : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+}
+
+/** "10 stories, 2 blog posts" from what a tool really returned. */
+function found(c: ToolCounts | undefined, tool: string): string {
+  if (!c) return "";
+  if (c.empty) return "nothing found";
+  if (tool === "get_story") return c.timeline ? plural(c.timeline, "earlier day") : "no earlier coverage";
+  const parts: string[] = [];
+  if (c.stories) parts.push(plural(c.stories, "story", "stories"));
+  if (c.posts) parts.push(plural(c.posts, "blog post"));
+  if (c.articles) parts.push(plural(c.articles, "article"));
+  if (c.timeline) parts.push(plural(c.timeline, "earlier day"));
+  return parts.join(", ") || "nothing found";
+}
+
+/** One tool call in words: what it's doing while it runs, what it did once finished. */
+function describe(step: Activity): string {
   const a = step.args;
+  const running = step.state === "running";
+  const c = step.counts;
+  let what: string;
   switch (step.tool) {
     case "search_news":
-      return `Searched “${String(a.query ?? "")}”`;
-    case "get_today_news":
-      return a.scope === "feed" ? "Read today's full feed" : "Read today's brief";
+      what = `${running ? "Searching" : "Searched"} “${String(a.query ?? "")}”`;
+      if (c?.matched_query) what += ` → “${c.matched_query}”`;
+      break;
+    case "get_today_news": {
+      const which = a.scope === "feed" ? "full feed" : "brief";
+      what = c?.date ? `Read the ${shortDate(c.date)} ${which}` : `${running ? "Reading" : "Read"} the latest ${which}`;
+      break;
+    }
     case "get_brief_by_date":
-      return `Read the brief for ${String(a.date ?? "")}`;
+      what = `${running ? "Reading" : "Read"} the brief for ${String(a.date ?? "")}`;
+      break;
     case "get_story":
-      return "Read the story and its timeline";
+      what = `${running ? "Reading" : "Read"} the story and its timeline`;
+      break;
     case "get_company_news":
-      return `Checked ${String(a.company ?? "company")} news`;
+      what = `${running ? "Looking up" : "Looked up"} ${String(a.company ?? "company")} coverage`;
+      break;
     case "get_top_articles":
-      return "Checked Top articles";
+      what = `${running ? "Checking" : "Checked"} Top articles`;
+      break;
     case "get_company_posts":
-      return a.company ? `Checked ${String(a.company)}'s blog` : "Checked company blogs";
+      what = `${running ? "Checking" : "Checked"} ${a.company ? `${String(a.company)} blog posts` : "company blog posts"}`;
+      break;
     default:
-      return step.tool;
+      what = step.tool;
+  }
+  if (running) return `${what}…`;
+  if (step.state === "failed") return `${what}: failed${step.error ? ` (${step.error})` : ""}`;
+  const result = found(c, step.tool);
+  return result ? `${what} · ${result}` : what;
+}
+
+function phaseText(phase: Phase, steps: Activity[]): string {
+  switch (phase.kind) {
+    case "sending":
+      return "Sending your question…";
+    case "thinking":
+      return phase.round === 1 && steps.length === 0 ? "Deciding where to look…" : "Reading what it found…";
+    case "retry":
+      return `OpenAI is ${phase.reason === "rate_limited" ? "rate-limiting us" : "having trouble"}; trying again in ${plural(phase.waitSeconds, "second")}…`;
   }
 }
+
+/** The finished questions and answers, sent back so follow-ups have context. Stopped and failed answers are left out. */
+function conversation(turns: Turn[]): { role: "user" | "assistant"; content: string }[] {
+  const out: { role: "user" | "assistant"; content: string }[] = [];
+  for (let i = 0; i < turns.length - 1; i++) {
+    const q = turns[i];
+    const a = turns[i + 1];
+    if (q.role === "user" && a.role === "assistant" && a.state === "done" && a.content) {
+      out.push({ role: "user", content: q.content }, { role: "assistant", content: a.content });
+    }
+  }
+  return out;
+}
+
+const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // A tiny, safe markdown renderer: paragraphs, "-" bullets, **bold** and
 // [text](https://links). Everything else stays plain text; no HTML is ever injected.
@@ -44,7 +131,7 @@ function inline(text: string): ReactNode[] {
     if (match.index > last) parts.push(text.slice(last, match.index));
     if (match[2]) {
       parts.push(
-        <a key={match.index} href={match[2]} target="_blank" rel="noopener noreferrer" className="text-accent underline-offset-2 hover:underline">
+        <a key={match.index} href={match[2]} target="_blank" rel="noopener noreferrer" className="rk-fade text-accent underline-offset-2 hover:underline">
           {match[1]}
         </a>,
       );
@@ -91,34 +178,182 @@ export function AskChat({ story }: { story?: FocusStory }) {
   const [focus, setFocus] = useState(story);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [announce, setAnnounce] = useState("");
+  const [away, setAway] = useState(false); // the reader scrolled up from the newest text
+  const active = useRef<{ id: number; controller: AbortController } | null>(null);
+  const turnsRef = useRef(turns);
+  const nextId = useRef(1);
+  const follow = useRef(true);
+  const autoY = useRef<number | null>(null); // where our last automatic scroll left the page
   const endRef = useRef<HTMLDivElement>(null);
 
-  async function ask(question: string) {
+  const busy = turns.some((t) => t.role === "assistant" && t.state === "working");
+
+  useEffect(() => {
+    turnsRef.current = turns;
+  }, [turns]);
+
+  // Leaving the page stops the answer, and with it the work on the server.
+  useEffect(() => () => active.current?.controller.abort(), []);
+
+  // Follow new text only while the reader is at (or near) the bottom.
+  useEffect(() => {
+    // "Bottom" is the end of the chat, not of the page (the site footer is below it).
+    const onScroll = () => {
+      const end = endRef.current;
+      if (!end) return;
+      const near = end.getBoundingClientRect().top <= window.innerHeight + NEAR_BOTTOM_PX;
+      follow.current = near;
+      setAway(!near);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!busy || !follow.current) return;
+    // The reader scrolled up since our last move, and its scroll event hasn't arrived yet.
+    if (autoY.current !== null && window.scrollY < autoY.current - 4) {
+      follow.current = false;
+      setAway(true);
+      return;
+    }
+    endRef.current?.scrollIntoView({ block: "end", behavior: "instant" });
+    autoY.current = window.scrollY;
+  }, [turns, busy]);
+
+  function jumpToLatest() {
+    follow.current = true;
+    autoY.current = null;
+    endRef.current?.scrollIntoView({ block: "end", behavior: reducedMotion() ? "instant" : "smooth" });
+  }
+
+  function update(id: number, change: (a: Answer) => Partial<Answer>) {
+    setTurns((all) => all.map((t) => (t.role === "assistant" && t.id === id ? { ...t, ...change(t) } : t)));
+  }
+
+  function stop() {
+    const current = active.current;
+    if (!current) return;
+    active.current = null;
+    current.controller.abort();
+    update(current.id, (a) => (a.state === "working" ? { state: "stopped", phase: null } : {}));
+    setAnnounce("Stopped.");
+  }
+
+  function apply(id: number, e: AskEvent) {
+    switch (e.type) {
+      case "status":
+        if (e.phase === "cached") update(id, () => ({ cached: e.date, phase: null }));
+        else if (e.phase === "thinking") update(id, () => ({ phase: { kind: "thinking", round: e.round } }));
+        else update(id, () => ({ phase: { kind: "retry", waitSeconds: e.waitSeconds, reason: e.reason } }));
+        break;
+      case "tool":
+        if (e.state === "started") {
+          update(id, (a) => ({ phase: null, steps: [...a.steps, { id: e.id, tool: e.tool, args: e.args, state: "running" }] }));
+        } else {
+          update(id, (a) => ({
+            steps: a.steps.map((s) =>
+              s.id === e.id ? { ...s, state: e.ok ? "done" : "failed", ok: e.ok, counts: e.counts, error: e.error } : s,
+            ),
+          }));
+        }
+        break;
+      case "delta":
+        update(id, (a) => ({ phase: null, content: a.content + e.text }));
+        break;
+      case "discard":
+        update(id, () => ({ content: "" }));
+        break;
+      case "citation":
+        // The link arrives in the next delta; nothing to do until then.
+        break;
+      case "done":
+        update(id, (a) => ({
+          state: "done",
+          phase: null,
+          content: e.answer,
+          truncated: e.truncated,
+          // A saved answer's steps were recorded on an earlier run; a live one's are already here.
+          steps: e.cached ? e.steps.map((s, i) => ({ ...s, id: `saved-${i}`, state: s.ok === false ? "failed" : "done" })) : a.steps,
+        }));
+        setAnnounce(e.truncated ? "Answer ready, but it was cut off." : "Answer ready.");
+        break;
+      case "error":
+        update(id, () => ({ state: "error", phase: null, error: e.message, retryable: e.retryable }));
+        setAnnounce(e.message);
+        break;
+    }
+  }
+
+  async function ask(question: string, replacing?: number) {
     const q = question.trim();
-    if (!q || busy) return;
-    const history = [...turns.filter((t) => !t.error), { role: "user" as const, content: q }];
-    setTurns([...turns, { role: "user", content: q }]);
+    if (!q) return;
+    // A new question replaces one still being answered.
+    if (active.current) stop();
+
+    const id = nextId.current++;
+    const controller = new AbortController();
+    active.current = { id, controller };
+    const history = [...conversation(turnsRef.current), { role: "user" as const, content: q }];
+    setTurns((all) => {
+      // Asking again after a failure: the failed attempt makes way for the new one.
+      const at = replacing === undefined ? -1 : all.findIndex((t) => t.role === "assistant" && t.id === replacing);
+      const kept = at > 0 ? [...all.slice(0, at - 1), ...all.slice(at + 1)] : all;
+      return [
+        ...kept,
+        { role: "user", content: q },
+        { role: "assistant", id, question: q, content: "", steps: [], phase: { kind: "sending" }, state: "working" },
+      ];
+    });
     setInput("");
-    setBusy(true);
+    setAnnounce("Looking into it.");
+    follow.current = true;
+    autoY.current = null;
+    requestAnimationFrame(() => endRef.current?.scrollIntoView({ block: "end", behavior: "instant" }));
+
+    // Give up if the server goes quiet; every event resets the clock.
+    let idle = setTimeout(() => controller.abort("timeout"), IDLE_MS);
+    const alive = () => {
+      clearTimeout(idle);
+      idle = setTimeout(() => controller.abort("timeout"), IDLE_MS);
+    };
+    const fail = (message: string, retryable = true) => {
+      update(id, () => ({ state: "error", phase: null, error: message, retryable }));
+      setAnnounce(message);
+    };
+
     try {
       const res = await fetch("/api/ask", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history.map(({ role, content }) => ({ role, content })), story: focus?.key }),
+        headers: { "Content-Type": "application/json", Accept: NDJSON },
+        body: JSON.stringify({ messages: history, story: focus?.key }),
+        signal: controller.signal,
       });
-      const data = await res.json();
-      setTurns((t) => [
-        ...t,
-        res.ok
-          ? { role: "assistant", content: data.answer, steps: data.steps }
-          : { role: "assistant", content: data.error ?? "Something went wrong.", error: true },
-      ]);
+      // Bad request or rate limit: a plain JSON error, sent before any work started.
+      if (!res.body || !(res.headers.get("content-type") ?? "").includes(NDJSON)) {
+        const data = await res.json().catch(() => ({}));
+        fail(data.error ?? "Something went wrong.", res.status !== 400);
+        return;
+      }
+      let ended = false;
+      for await (const e of readEvents(res.body)) {
+        if (active.current?.id !== id) break; // replaced or stopped
+        alive();
+        apply(id, e);
+        if (e.type === "done" || e.type === "error") ended = true;
+      }
+      if (!ended && active.current?.id === id) fail("The answer was cut off before it finished.");
     } catch {
-      setTurns((t) => [...t, { role: "assistant", content: "Couldn't reach ReadKernel. Check your connection.", error: true }]);
+      if (controller.signal.aborted && controller.signal.reason !== "timeout") return; // stopped by the reader
+      fail(
+        controller.signal.reason === "timeout"
+          ? "ReadKernel stopped responding. Please try again."
+          : "Couldn't reach ReadKernel. Check your connection.",
+      );
     } finally {
-      setBusy(false);
-      setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }), 50);
+      clearTimeout(idle);
+      if (active.current?.id === id) active.current = null;
     }
   }
 
@@ -159,62 +394,127 @@ export function AskChat({ story }: { story?: FocusStory }) {
         </div>
       )}
 
-      <div className="space-y-6" aria-live="polite">
+      {/* Announced to screen readers: the start and end of each answer, not every word. */}
+      <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {announce}
+      </p>
+
+      <div className="space-y-6">
         {turns.map((t, i) =>
           t.role === "user" ? (
-            <div key={i} className="flex justify-end">
-              <p className="max-w-[85%] rounded-2xl rounded-br-sm bg-ink px-4 py-2.5 text-paper">{t.content}</p>
+            <div key={`q${i}`} className="flex justify-end">
+              <p className="max-w-[85%] rounded-2xl rounded-br-sm bg-ink px-4 py-2.5 [overflow-wrap:anywhere] text-paper">
+                {t.content}
+              </p>
             </div>
           ) : (
-            <div key={i} className={`rounded-2xl border p-4 sm:p-5 ${t.error ? "border-accent/40 bg-accent-soft" : "border-line bg-card"}`}>
-              {t.steps && t.steps.length > 0 && (
-                <p className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted">
-                  {t.steps.map((s, j) => (
-                    <span key={j}>✓ {describe(s)}</span>
-                  ))}
-                </p>
-              )}
-              <div className="leading-relaxed">
-                <Markdown text={t.content} />
-              </div>
-            </div>
+            <AnswerCard key={`a${t.id}`} answer={t} onRetry={() => ask(t.question, t.id)} />
           ),
         )}
-        {busy && (
-          <div className="rounded-2xl border border-line bg-card p-4 text-xs text-muted" role="status">
-            Reading the news archive…
-          </div>
-        )}
-        <div ref={endRef} />
+        {/* scroll-mb keeps the newest line clear of the sticky question box */}
+        <div ref={endRef} className="scroll-mb-28" />
       </div>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          ask(input);
-        }}
-        className="sticky bottom-4 mt-6 flex gap-2 rounded-2xl border border-line bg-paper/95 p-2 backdrop-blur"
-      >
-        <label htmlFor="ask-input" className="sr-only">
-          Your question
-        </label>
-        <input
-          id="ask-input"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          maxLength={600}
-          placeholder={turns.length ? "Ask a follow-up…" : focus ? "Ask about this story…" : "Ask about any tech or AI news…"}
-          className="min-w-0 flex-1 bg-transparent px-3 py-2 outline-none"
-          disabled={busy}
-        />
-        <button
-          type="submit"
-          disabled={busy || !input.trim()}
-          className="rounded-xl bg-ink px-4 py-2 font-semibold text-paper hover:opacity-90 disabled:opacity-40"
+      <div className="sticky bottom-[max(1rem,env(safe-area-inset-bottom))] mt-6">
+        {busy && away && (
+          <button
+            type="button"
+            onClick={jumpToLatest}
+            className="rk-fade absolute -top-11 left-1/2 -translate-x-1/2 rounded-full border border-line bg-card px-3 py-1.5 font-mono text-xs text-muted shadow-sm hover:text-ink"
+          >
+            ↓ Jump to latest
+          </button>
+        )}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            ask(input);
+          }}
+          className="flex gap-2 rounded-2xl border border-line bg-paper/95 p-2 backdrop-blur"
         >
-          Ask
-        </button>
-      </form>
+          <label htmlFor="ask-input" className="sr-only">
+            Your question
+          </label>
+          <input
+            id="ask-input"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            maxLength={600}
+            placeholder={turns.length ? "Ask a follow-up…" : focus ? "Ask about this story…" : "Ask about any tech or AI news…"}
+            className="min-w-0 flex-1 bg-transparent px-3 py-2 outline-none"
+          />
+          {busy && !input.trim() ? (
+            <button type="button" onClick={stop} className="rounded-xl border border-line px-4 py-2 font-semibold hover:border-ink">
+              Stop
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={!input.trim()}
+              className="rounded-xl bg-ink px-4 py-2 font-semibold text-paper hover:opacity-90 disabled:opacity-40"
+            >
+              Ask
+            </button>
+          )}
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function AnswerCard({ answer: a, onRetry }: { answer: Answer; onRetry: () => void }) {
+  const failed = a.state === "error";
+  return (
+    <div
+      className={`rounded-2xl border p-4 [overflow-wrap:anywhere] sm:p-5 ${failed && !a.content ? "border-accent/40 bg-accent-soft" : "border-line bg-card"}`}
+    >
+      {a.cached && (
+        <p className="rk-fade mb-2 font-mono text-[11px] text-label">
+          Saved answer: this suggested question was answered earlier for the {shortDate(a.cached)} edition. Its lookups:
+        </p>
+      )}
+      {a.steps.length > 0 && (
+        <ul className="mb-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[11px] text-muted" aria-label="What Ask looked up">
+          {a.steps.map((s) => (
+            <li key={s.id} className={`rk-fade ${s.state === "failed" ? "text-accent" : ""}`}>
+              {s.state === "running" ? "" : s.state === "failed" ? "✗ " : "✓ "}
+              {describe(s)}
+            </li>
+          ))}
+        </ul>
+      )}
+      {a.phase && a.state === "working" && (
+        <p key={JSON.stringify(a.phase)} className="rk-fade font-mono text-xs text-muted">
+          {phaseText(a.phase, a.steps)}
+        </p>
+      )}
+      {a.content && (
+        <div className="leading-relaxed">
+          <Markdown text={a.content} />
+        </div>
+      )}
+      {a.truncated && <p className="mt-2 font-mono text-xs text-muted">This answer was cut off: it ran too long.</p>}
+      {a.state === "stopped" && (
+        <p className="mt-2 flex items-center gap-3 font-mono text-xs text-muted">
+          Stopped{a.content ? " before the answer was finished" : ""}.
+          <button type="button" onClick={onRetry} className="text-accent hover:underline">
+            Ask again
+          </button>
+        </p>
+      )}
+      {failed && (
+        <div className={`flex flex-wrap items-center gap-3 ${a.content ? "mt-3 rounded-xl border border-accent/40 bg-accent-soft px-3 py-2 text-sm" : ""}`}>
+          <p>
+            {a.error}
+            {a.content ? " What's above is unfinished." : ""}
+          </p>
+          {a.retryable && (
+            <button type="button" onClick={onRetry} className="font-semibold text-accent hover:underline">
+              Try again
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

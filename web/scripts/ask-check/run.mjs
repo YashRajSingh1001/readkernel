@@ -1,7 +1,11 @@
 // Runs the fixed Ask questions in cases.json against /api/ask and writes a
 // markdown report to web/.ask-runs/. See README.md.
 //
-//   node scripts/ask-check/run.mjs [--base http://localhost:3000] [--only page|typed|general|scope] [--case <id>]
+//   node scripts/ask-check/run.mjs [--base http://localhost:3000] [--only page|typed|general|scope] [--case <id>] [--stream]
+//
+// --stream asks the way the chat does (NDJSON events) and also checks the
+// stream itself: it ends in "done", the streamed text adds up to the final
+// answer, and no OFF_TOPIC marker or code fence was ever streamed.
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -16,6 +20,7 @@ const flag = (name, fallback) => {
 const base = flag("base", "http://localhost:3000").replace(/\/$/, "");
 const only = flag("only", "");
 const caseId = flag("case", "");
+const stream = argv.includes("--stream");
 
 const LIMIT_WAIT_MS = 60_000; // /api/ask allows 12 questions per 10 minutes
 const BUSY_WAIT_MS = 30_000; // the AI was busy or out of quota ("resting"); not an answer to grade
@@ -28,9 +33,18 @@ async function ask(question, story, history = []) {
     const started = Date.now();
     const res = await fetch(`${base}/api/ask`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(stream ? { Accept: "application/x-ndjson" } : {}) },
       body: JSON.stringify({ messages: [...history, { role: "user", content: question }], ...(story ? { story } : {}) }),
     });
+    if (stream && (res.headers.get("content-type") ?? "").includes("ndjson")) {
+      const { data, streamCheck } = await readStream(res);
+      if (data.retryBusy && attempt < 3) {
+        console.log(`  AI busy; waiting ${BUSY_WAIT_MS / 1000}s`);
+        await sleep(BUSY_WAIT_MS);
+        continue;
+      }
+      return { status: data.error ? 503 : 200, ms: Date.now() - started, answer: data.answer ?? data.error ?? "", steps: data.steps ?? [], streamCheck };
+    }
     const data = await res.json().catch(() => ({}));
     if (res.status === 429) {
       console.log(`  rate limited; waiting ${LIMIT_WAIT_MS / 1000}s`);
@@ -45,6 +59,31 @@ async function ask(question, story, history = []) {
     return { status: res.status, ms: Date.now() - started, answer: data.answer ?? data.error ?? "", steps: data.steps ?? [] };
   }
   return { status: 429, ms: 0, answer: "Still rate limited after retries.", steps: [] };
+}
+
+/** Reads the NDJSON event stream; returns the final answer and what the stream itself did. */
+async function readStream(res) {
+  const text = await res.text();
+  const events = text.split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  let shown = "";
+  const problems = [];
+  for (const e of events) {
+    if (e.type === "delta") {
+      shown += e.text;
+      if (/OFF_TOPIC|```/.test(shown)) problems.push("blocked text was streamed");
+    }
+    if (e.type === "discard") shown = "";
+  }
+  const end = events.at(-1);
+  if (!end || (end.type !== "done" && end.type !== "error")) problems.push("stream ended without done/error");
+  const done = end?.type === "done" ? end : null;
+  // A declined question's fixed reply arrives in done, with nothing streamed.
+  if (done && shown && shown !== done.answer) problems.push("streamed text differs from the final answer");
+  const data = done ?? { error: end?.message ?? "no answer", retryBusy: end?.type === "error" && /resting/.test(end.message ?? "") };
+  return {
+    data,
+    streamCheck: { events: events.length, tools: events.filter((e) => e.type === "tool" && e.state === "started").length, ok: problems.length === 0, problems: [...new Set(problems)] },
+  };
 }
 
 // The fixed reply for questions outside tech and AI news (lib/server/ask-scope.ts).
@@ -105,11 +144,11 @@ const lines = [
   "",
   `Base: ${base}. Read each answer against the checklist in scripts/ask-check/README.md.`,
   "",
-  "| case | variant | answered | linked | links | words | says not covered | scope | tool calls | seconds |",
-  "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+  `| case | variant | answered | linked | links | words | says not covered | scope | tool calls | seconds |${stream ? " stream |" : ""}`,
+  `| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |${stream ? " --- |" : ""}`,
   ...results.map(
     (r) =>
-      `| ${r.id} | ${r.variant} | ${tick(r.checks.answered)} | ${tick(r.checks.linked)} | ${r.checks.links} | ${r.checks.words}${r.checks.under_limit ? "" : " (long)"} | ${r.checks.says_not_covered ? "yes" : "no"} | ${scope(r)} | ${r.checks.tool_calls} | ${(r.ms / 1000).toFixed(1)} |`,
+      `| ${r.id} | ${r.variant} | ${tick(r.checks.answered)} | ${tick(r.checks.linked)} | ${r.checks.links} | ${r.checks.words}${r.checks.under_limit ? "" : " (long)"} | ${r.checks.says_not_covered ? "yes" : "no"} | ${scope(r)} | ${r.checks.tool_calls} | ${(r.ms / 1000).toFixed(1)} |${stream ? ` ${r.streamCheck ? (r.streamCheck.ok ? "ok" : `**${r.streamCheck.problems.join("; ")}**`) : "json"} |` : ""}`,
   ),
   "",
 ];

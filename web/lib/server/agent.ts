@@ -7,17 +7,26 @@ import "server-only";
 // today's brief... It loops (ask -> call tools -> read results) until it can
 // answer, at most MAX_STEPS times, and must cite every claim with a link from
 // the tool results. It only answers tech and AI news questions (ask-scope.ts).
+//
+// Every model call streams. While it runs, askAgent() reports what is really
+// happening through onEvent (lib/ask-stream.ts): each model request, each tool
+// call with what it found, and the answer text as the model writes it.
 
+import { AnswerGuard, countResult, urlsIn, type AskEvent, type AskStep } from "../ask-stream";
 import { NEWS_TOOLS, runTool } from "../tools";
-import { isOffTopicAnswer, looksLikeCode, OFF_TOPIC_MARKER, OFF_TOPIC_REPLY } from "./ask-scope";
+import { looksLikeCode, OFF_TOPIC_MARKER, OFF_TOPIC_REPLY } from "./ask-scope";
 
 const MAX_STEPS = 5;
 const MAX_TOOL_RESULT = 12_000; // characters of tool output passed back to the model
+const IDLE_MS = 45_000; // no data from OpenAI for this long: the call has stalled
+const TOTAL_MS = 120_000; // a whole answer, tools and retries included
 
 export type ChatTurn = { role: "user" | "assistant"; content: string };
-export type AgentStep = { tool: string; args: Record<string, unknown> };
-// complete: the model wrote a real answer (not a "sorry" fallback), so it can be cached.
-export type AgentAnswer = { answer: string; steps: AgentStep[]; complete: boolean };
+export type AgentStep = AskStep;
+// complete: the model wrote a whole, real answer (not a "sorry" fallback, not cut
+// off), so it can be cached. truncated: the model ran out of room mid-answer.
+export type AgentAnswer = { answer: string; steps: AgentStep[]; complete: boolean; truncated: boolean };
+export type AgentOptions = { storyKey?: string; signal?: AbortSignal; onEvent?: (event: AskEvent) => void };
 
 type ToolCall = { id: string; type: "function"; function: { name: string; arguments: string } };
 type Message =
@@ -26,9 +35,10 @@ type Message =
   // as they are so the model keeps its reasoning between steps.
   | { role: "assistant"; content: string | null; tool_calls?: ToolCall[]; items?: unknown[] }
   | { role: "tool"; tool_call_id: string; content: string };
-type ModelReply = { content: string | null; tool_calls?: ToolCall[]; items?: unknown[] };
 
 export class AgentUnavailable extends Error {}
+/** OpenAI went quiet, or the whole answer took longer than TOTAL_MS. */
+export class AgentTimeout extends Error {}
 
 function systemPrompt(focused: boolean): string {
   const today = new Intl.DateTimeFormat("en-GB", {
@@ -66,30 +76,91 @@ const FOCUS_RULES = [
   "If ReadKernel's coverage names no rivals, say so plainly instead of naming any from memory.",
 ];
 
-/** POST with retries on rate limits and server errors. */
-async function postWithRetry(url: string, key: string, body: Record<string, unknown>): Promise<unknown> {
-  for (let attempt = 0; attempt < 3; attempt++) {
+/** Waits, unless the reader leaves first. */
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) return reject(signal.reason);
+    const done = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", stop);
+    };
+    const timer = setTimeout(() => {
+      done();
+      resolve();
+    }, ms);
+    const stop = () => {
+      done();
+      reject(signal.reason);
+    };
+    signal.addEventListener("abort", stop, { once: true });
+  });
+}
+
+/** Retry-After in seconds: a number of seconds or an HTTP date. */
+function retryAfter(header: string | null): number | null {
+  if (!header) return null;
+  const seconds = Number(header);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds);
+  const at = Date.parse(header);
+  return Number.isNaN(at) ? null : Math.max(0, (at - Date.now()) / 1000);
+}
+
+/** POST that streams back, with retries on rate limits and server errors before any of it arrives. */
+async function openStream(url: string, key: string, body: Record<string, unknown>, signal: AbortSignal, emit: (e: AskEvent) => void): Promise<Response> {
+  const ATTEMPTS = 3;
+  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
     const res = await fetch(url, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal,
     });
     if (res.status === 429 || res.status >= 500) {
       const reason = (await res.text()).slice(0, 200);
       // Out of credit: waiting won't help.
       if (reason.includes("insufficient_quota")) throw new AgentUnavailable("The AI account has no credit left");
-      const wait = Number(res.headers.get("retry-after")) || 2 ** attempt;
+      if (attempt === ATTEMPTS - 1) break;
+      const wait = Math.ceil(retryAfter(res.headers.get("retry-after")) ?? 2 ** attempt);
       // Retry-After is a minimum. A longer wait won't end while the reader
       // waits, so stop now.
       if (wait > 8) throw new AgentUnavailable(`The AI asked us to wait ${wait}s: ${reason}`);
       console.warn(`[ask] AI ${res.status} (attempt ${attempt + 1}), waiting ${wait}s: ${reason}`);
-      await new Promise((r) => setTimeout(r, wait * 1000));
+      emit({ type: "status", phase: "retry", waitSeconds: wait, reason: res.status === 429 ? "rate_limited" : "server_error" });
+      await sleep(wait * 1000, signal);
       continue;
     }
-    if (!res.ok) throw new Error(`AI ${res.status}: ${(await res.text()).slice(0, 300)}`);
-    return res.json();
+    if (!res.ok || !res.body) throw new Error(`AI ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    return res;
   }
   throw new AgentUnavailable("The AI is busy right now");
+}
+
+/** Server-sent events from a response body, as parsed JSON data. */
+async function* sseData(body: ReadableStream<Uint8Array>, onBytes: () => void): AsyncGenerator<Record<string, unknown>> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) return;
+      onBytes();
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+      let end: number;
+      while ((end = buffer.indexOf("\n\n")) >= 0) {
+        const block = buffer.slice(0, end);
+        buffer = buffer.slice(end + 2);
+        const data = block
+          .split("\n")
+          .filter((l) => l.startsWith("data:"))
+          .map((l) => l.slice(5).trimStart())
+          .join("\n");
+        if (data && data !== "[DONE]") yield JSON.parse(data);
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 const OPENAI_TOOLS = NEWS_TOOLS.map((t) => ({
@@ -99,7 +170,16 @@ const OPENAI_TOOLS = NEWS_TOOLS.map((t) => ({
   parameters: t.inputSchema,
 }));
 
-type OpenAIItem = { type: string; call_id?: string; name?: string; arguments?: string; content?: { type: string; text?: string }[] };
+type OpenAIItem = {
+  id?: string;
+  type: string;
+  phase?: string;
+  call_id?: string;
+  name?: string;
+  arguments?: string;
+  content?: { type: string; text?: string }[];
+};
+type ModelReply = { tool_calls: ToolCall[]; items: unknown[]; status: string; incompleteReason?: string };
 
 /** Our chat-style history as Responses API input items. */
 function toResponsesInput(messages: Message[]): unknown[] {
@@ -117,52 +197,109 @@ function toResponsesInput(messages: Message[]): unknown[] {
 
 /**
  * One step of the conversation, through OpenAI's Responses API (the model is
- * set by ASK_MODEL). Nothing is stored on OpenAI's side (store: false); the
- * encrypted reasoning comes back to us and is sent again with the next step.
+ * set by ASK_MODEL), streamed. Answer text goes into `guard` as it arrives;
+ * "commentary" text the model writes before calling tools does not. Nothing is
+ * stored on OpenAI's side (store: false); the encrypted reasoning comes back to
+ * us and is sent again with the next step.
  */
-async function callModel(messages: Message[], useTools: boolean): Promise<ModelReply> {
+async function callModel(
+  messages: Message[],
+  useTools: boolean,
+  guard: AnswerGuard,
+  signal: AbortSignal,
+  emit: (e: AskEvent) => void,
+): Promise<ModelReply> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new AgentUnavailable("OPENAI_API_KEY is not set");
-  const data = (await postWithRetry("https://api.openai.com/v1/responses", key, {
-    model: process.env.ASK_MODEL || "gpt-6-luna",
-    input: toResponsesInput(messages),
-    reasoning: { effort: process.env.ASK_REASONING_EFFORT || "medium" },
-    // Reasoning tokens count against this too, so leave room beyond the answer.
-    max_output_tokens: 8000,
-    store: false,
-    include: ["reasoning.encrypted_content"],
-    // The last step keeps the tools listed but can't call them, so the start of
-    // the request stays the same and OpenAI can reuse its cache.
-    tools: OPENAI_TOOLS,
-    tool_choice: useTools ? "auto" : "none",
-  })) as { status?: string; incomplete_details?: { reason?: string } | null; output?: OpenAIItem[] };
 
-  const output = data.output ?? [];
-  if (data.status && data.status !== "completed") {
-    console.warn(`[ask] AI reply ${data.status}: ${data.incomplete_details?.reason ?? "no reason given"}`);
-  }
-  const calls: ToolCall[] = output
-    .filter((i) => i.type === "function_call" && i.call_id && i.name)
-    .map((i) => ({ id: i.call_id!, type: "function", function: { name: i.name!, arguments: i.arguments ?? "{}" } }));
-  const text = output
-    .filter((i) => i.type === "message")
-    .flatMap((i) => i.content ?? [])
-    .filter((c) => c.type === "output_text")
-    .map((c) => c.text ?? "")
-    .join("");
-  return {
-    content: text || null,
-    tool_calls: calls.length ? calls : undefined,
-    items: calls.length ? output.filter((i) => i.type === "reasoning" || i.type === "function_call") : undefined,
+  // Give up on a call that goes quiet, as well as when the reader leaves.
+  const idle = new AbortController();
+  let timer = setTimeout(() => idle.abort(), IDLE_MS);
+  const callSignal = AbortSignal.any([signal, idle.signal]);
+  const alive = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => idle.abort(), IDLE_MS);
   };
+
+  try {
+    const res = await openStream(
+      "https://api.openai.com/v1/responses",
+      key,
+      {
+        model: process.env.ASK_MODEL || "gpt-6-luna",
+        input: toResponsesInput(messages),
+        reasoning: { effort: process.env.ASK_REASONING_EFFORT || "medium" },
+        // Reasoning tokens count against this too, so leave room beyond the answer.
+        max_output_tokens: 8000,
+        store: false,
+        include: ["reasoning.encrypted_content"],
+        // The last step keeps the tools listed but can't call them, so the start of
+        // the request stays the same and OpenAI can reuse its cache.
+        tools: OPENAI_TOOLS,
+        tool_choice: useTools ? "auto" : "none",
+        stream: true,
+      },
+      callSignal,
+      emit,
+    );
+    alive();
+
+    const answerItems = new Set<string>();
+    const items: OpenAIItem[] = [];
+    type Finished = { status?: string; incomplete_details?: { reason?: string } | null };
+    let finished = null as Finished | null;
+
+    for await (const event of sseData(res.body!, alive)) {
+      const item = event.item as OpenAIItem | undefined;
+      switch (event.type) {
+        case "response.output_item.added":
+          // A message that isn't commentary before a tool call is the answer.
+          if (item?.type === "message" && item.id && item.phase !== "commentary") answerItems.add(item.id);
+          break;
+        case "response.output_text.delta":
+          if (answerItems.has(event.item_id as string)) flush(guard.push(String(event.delta ?? "")), emit);
+          break;
+        case "response.output_item.done":
+          if (item) items.push(item);
+          break;
+        case "response.completed":
+        case "response.incomplete":
+          finished = event.response as Finished;
+          break;
+        case "response.failed": {
+          const error = (event.response as { error?: { message?: string } })?.error;
+          throw new Error(`AI reply failed: ${error?.message ?? "no reason given"}`);
+        }
+        case "error":
+          throw new Error(`AI stream error: ${String((event as { message?: unknown }).message ?? JSON.stringify(event)).slice(0, 300)}`);
+      }
+    }
+    if (!finished) throw new Error("The AI's reply stopped before it finished");
+
+    const status = finished.status ?? "completed";
+    if (status !== "completed") console.warn(`[ask] AI reply ${status}: ${finished.incomplete_details?.reason ?? "no reason given"}`);
+    const calls: ToolCall[] = items
+      .filter((i) => i.type === "function_call" && i.call_id && i.name)
+      .map((i) => ({ id: i.call_id!, type: "function", function: { name: i.name!, arguments: i.arguments ?? "{}" } }));
+    return {
+      tool_calls: calls,
+      items: items.filter((i) => i.type === "reasoning" || i.type === "function_call"),
+      status,
+      incompleteReason: finished.incomplete_details?.reason,
+    };
+  } catch (err) {
+    if (idle.signal.aborted && !signal.aborted) throw new AgentTimeout(`No data from the AI for ${IDLE_MS / 1000}s`);
+    if (signal.aborted) console.info(`[ask] OpenAI request aborted: ${String((signal.reason as Error)?.name ?? signal.reason)}`);
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
-/** Drop citation markers the model sometimes adds in its own style, like 【6†source】. */
-export function tidy(answer: string): string {
-  return answer
-    .replace(/\s*【[^】]*】/g, "")
-    .replace(/[ \t]+$/gm, "")
-    .trim();
+/** Sends what the guard released: citations first, then the text that shows them. */
+function flush(out: { delta: string; citations: { url: string; label: string }[] }, emit: (e: AskEvent) => void) {
+  for (const c of out.citations) emit({ type: "citation", ...c });
+  if (out.delta) emit({ type: "delta", text: out.delta });
 }
 
 function collectCites(value: unknown, into: string[]): void {
@@ -181,48 +318,106 @@ export function withSources(answer: string, cites: string[]): string {
   return `${answer}\n\nSources: ${[...new Set(cites)].slice(0, 5).join(" · ")}`;
 }
 
-/**
- * The story the reader is asking about, loaded as if the model had called
- * get_story itself, so its first step can go to related coverage.
- * Null when the key doesn't match a story.
- */
-async function preloadStory(storyKey: string): Promise<{ messages: Message[]; step: AgentStep; result: unknown } | null> {
-  const args = { story_key: storyKey };
-  const outcome = await runTool("get_story", args);
-  if (!outcome.ok || !(outcome.result as { story?: unknown }).story) return null;
-  const call: ToolCall = { id: "preload_story", type: "function", function: { name: "get_story", arguments: JSON.stringify(args) } };
+/** What one tool call found, for the reader and for the model. */
+async function callTool(
+  id: string,
+  name: string,
+  args: Record<string, unknown>,
+  emit: (e: AskEvent) => void,
+): Promise<{ step: AgentStep; result?: unknown; content: string }> {
+  emit({ type: "tool", id, state: "started", tool: name, args });
+  const outcome = await runTool(name, args);
+  if (!outcome.ok) {
+    emit({ type: "tool", id, state: "finished", ok: false, error: outcome.error });
+    return { step: { tool: name, args, ok: false, error: outcome.error }, content: JSON.stringify({ error: outcome.error }) };
+  }
+  const counts = countResult(name, outcome.result);
+  emit({ type: "tool", id, state: "finished", ok: true, counts });
   return {
-    messages: [
-      { role: "assistant", content: null, tool_calls: [call] },
-      { role: "tool", tool_call_id: call.id, content: JSON.stringify(outcome.result).slice(0, MAX_TOOL_RESULT) },
-    ],
-    step: { tool: "get_story", args },
+    step: { tool: name, args, ok: true, counts },
     result: outcome.result,
+    content: JSON.stringify(outcome.result).slice(0, MAX_TOOL_RESULT),
   };
 }
 
-export async function askAgent(history: ChatTurn[], options: { storyKey?: string } = {}): Promise<AgentAnswer> {
+export async function askAgent(history: ChatTurn[], options: AgentOptions = {}): Promise<AgentAnswer> {
+  const signal = AbortSignal.any([...(options.signal ? [options.signal] : []), AbortSignal.timeout(TOTAL_MS)]);
+  try {
+    return await answer(history, options.storyKey, signal, options.onEvent ?? (() => {}));
+  } catch (err) {
+    if (signal.aborted && (signal.reason as Error)?.name === "TimeoutError") {
+      throw new AgentTimeout(`No answer within ${TOTAL_MS / 1000}s`);
+    }
+    throw err;
+  }
+}
+
+async function answer(history: ChatTurn[], storyKey: string | undefined, signal: AbortSignal, emit: (e: AskEvent) => void): Promise<AgentAnswer> {
   // Pasted code or an error trace: not a news question, and no need to ask the AI.
-  if (looksLikeCode(history.at(-1)!.content)) return { answer: OFF_TOPIC_REPLY, steps: [], complete: false };
-  const preload = options.storyKey ? await preloadStory(options.storyKey) : null;
+  if (looksLikeCode(history.at(-1)!.content)) return { answer: OFF_TOPIC_REPLY, steps: [], complete: false, truncated: false };
+
+  // Links the answer may keep: URLs the model was actually given this run, and
+  // ones in Ask's earlier answers in this chat.
+  const known = new Set<string>(history.filter((t) => t.role === "assistant").flatMap((t) => urlsIn(t.content)));
+  const cites: string[] = []; // every citation the model was given, for withSources()
+  const learn = (content: string, result: unknown) => {
+    const urls = urlsIn(content);
+    urls.forEach((u) => known.add(u));
+    const given = new Set(urls);
+    const found: string[] = [];
+    collectCites(result, found);
+    // Only citations whose link survived the MAX_TOOL_RESULT cut.
+    cites.push(...found.filter((c) => urlsIn(c).every((u) => given.has(u))));
+  };
+
+  // The story the reader opened Ask from, loaded as if the model had called
+  // get_story itself, so its first step can go to related coverage.
+  const steps: AgentStep[] = [];
+  const messages: Message[] = [];
+  let focused = false;
+  if (storyKey) {
+    const args = { story_key: storyKey };
+    const used = await callTool("preload_story", "get_story", args, emit);
+    steps.push(used.step);
+    if (used.result && (used.result as { story?: unknown }).story) {
+      focused = true;
+      const call: ToolCall = { id: "preload_story", type: "function", function: { name: "get_story", arguments: JSON.stringify(args) } };
+      messages.push({ role: "assistant", content: null, tool_calls: [call] }, { role: "tool", tool_call_id: call.id, content: used.content });
+      learn(used.content, used.result);
+    }
+  }
   // After the latest question, where the model's own get_story call would go.
-  const messages: Message[] = [{ role: "system", content: systemPrompt(preload !== null) }, ...history, ...(preload?.messages ?? [])];
-  const steps: AgentStep[] = preload ? [preload.step] : [];
-  const cites: string[] = []; // every citation the tools offered, for withSources()
-  if (preload) collectCites(preload.result, cites);
+  messages.unshift({ role: "system", content: systemPrompt(focused) }, ...history);
 
   for (let step = 0; step < MAX_STEPS; step++) {
+    signal.throwIfAborted();
     // On the last step, no more tools: it must answer with what it has.
     const last = step === MAX_STEPS - 1;
-    const reply = await callModel(messages, !last);
-    const calls = reply.tool_calls ?? [];
+    emit({ type: "status", phase: "thinking", round: step + 1 });
+    const guard = new AnswerGuard(known);
+    const reply = await callModel(messages, !last, guard, signal, emit);
+    const calls = reply.tool_calls;
+
     if (calls.length === 0) {
-      const answer = tidy(reply.content ?? "");
-      if (!answer) return { answer: "Sorry, I couldn't put an answer together. Try rephrasing.", steps, complete: false };
-      if (isOffTopicAnswer(answer)) return { answer: OFF_TOPIC_REPLY, steps, complete: false };
-      return { answer: withSources(answer, cites), steps, complete: true };
+      flush(guard.finish(), emit);
+      if (guard.unconfirmed.length) console.warn(`[ask] unlinked ${guard.unconfirmed.length} URL(s) no tool returned:`, guard.unconfirmed);
+      // The model declined (OFF_TOPIC) or wrote code anyway: neither was shown.
+      if (guard.blocked) return { answer: OFF_TOPIC_REPLY, steps, complete: false, truncated: false };
+      if (!guard.text) {
+        return { answer: "Sorry, I couldn't put an answer together. Try rephrasing.", steps, complete: false, truncated: false };
+      }
+      const full = withSources(guard.text, cites);
+      if (full !== guard.text) {
+        const extra = full.slice(guard.text.length);
+        flush({ delta: extra, citations: [...extra.matchAll(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g)].map((m) => ({ label: m[1], url: m[2] })) }, emit);
+      }
+      const truncated = reply.status === "incomplete";
+      return { answer: full, steps, complete: !truncated, truncated };
     }
-    messages.push({ role: "assistant", content: reply.content ?? null, tool_calls: calls, items: reply.items });
+
+    // Text before a tool call wasn't the answer after all.
+    if (guard.text) emit({ type: "discard" });
+    messages.push({ role: "assistant", content: null, tool_calls: calls, items: reply.items });
     for (const call of calls.slice(0, 4)) {
       let args: Record<string, unknown> = {};
       try {
@@ -230,16 +425,15 @@ export async function askAgent(history: ChatTurn[], options: { storyKey?: string
       } catch {
         // leave empty; the tool reports what's missing
       }
-      steps.push({ tool: call.function.name, args });
-      const outcome = await runTool(call.function.name, args);
-      if (outcome.ok) collectCites(outcome.result, cites);
-      const content = JSON.stringify(outcome.ok ? outcome.result : { error: outcome.error });
-      messages.push({ role: "tool", tool_call_id: call.id, content: content.slice(0, MAX_TOOL_RESULT) });
+      const used = await callTool(call.id, call.function.name, args, emit);
+      steps.push(used.step);
+      if (used.result !== undefined) learn(used.content, used.result);
+      messages.push({ role: "tool", tool_call_id: call.id, content: used.content });
     }
     // Calls beyond the first four are answered with a note, so the conversation stays valid.
     for (const call of calls.slice(4)) {
       messages.push({ role: "tool", tool_call_id: call.id, content: '{"error":"Too many tools at once; use fewer."}' });
     }
   }
-  return { answer: "Sorry, that took too many steps. Try a narrower question.", steps, complete: false };
+  return { answer: "Sorry, that took too many steps. Try a narrower question.", steps, complete: false, truncated: false };
 }
