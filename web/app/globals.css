@@ -330,3 +330,13 @@ body {
     padding: 1px;
   }
 }
+
+/* Content revealed by a toggle (e.g. "Show N more sources"): opacity only. */
+.rk-reveal {
+  animation: rk-reveal var(--motion-fast) var(--ease-out);
+}
+@keyframes rk-reveal {
+  from {
+    opacity: 0;
+  }
+}

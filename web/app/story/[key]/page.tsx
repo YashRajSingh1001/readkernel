@@ -81,6 +81,24 @@ async function StoryView({ params }: { params: PageProps<"/story/[key]">["params
   const url = `${siteUrl()}/story/${key}`;
   const sourceCount = new Set(story.sources.map((s) => s.name)).size;
 
+  // "Read the coverage" shows the first five links; the rest sit behind "Show N more".
+  const COVERAGE_SHOWN = 5;
+  const topSources = story.sources.slice(0, COVERAGE_SHOWN);
+  const moreSources = story.sources.slice(COVERAGE_SHOWN);
+  const coverageItem = (s: (typeof story.sources)[number]) => (
+    <li key={s.url}>
+      <a href={s.url} target="_blank" rel="noopener noreferrer" className="group flex gap-3 py-3">
+        <SourceIcons sources={[s]} max={1} />
+        <span className="min-w-0 flex-1">
+          <span className="block leading-snug group-hover:text-accent">{s.title} ↗</span>
+          <span className="text-sm text-muted">
+            {domainOf(s.url)} · {timeAgo(s.published, now)}
+          </span>
+        </span>
+      </a>
+    </li>
+  );
+
   // Structured data for search engines and AI crawlers. The summary is ReadKernel's, so
   // ReadKernel is the author and publisher; the reporting it is based on is listed in
   // isBasedOn. The image is our own share card, not a publisher's photo.
@@ -190,27 +208,8 @@ async function StoryView({ params }: { params: PageProps<"/story/[key]">["params
           <span className="shrink-0 text-sm font-semibold text-accent group-hover:underline">Ask</span>
         </Link>
 
-        <section className="mt-8">
-          <h2 className="text-xl font-bold">Read the coverage</h2>
-          <ul className="mt-3 divide-y divide-line">
-            {story.sources.map((s) => (
-              <li key={s.url}>
-                <a href={s.url} target="_blank" rel="noopener noreferrer" className="group flex gap-3 py-3">
-                  <SourceIcons sources={[s]} max={1} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block leading-snug group-hover:text-accent">{s.title} ↗</span>
-                    <span className="text-xs text-muted">
-                      {domainOf(s.url)} · {timeAgo(s.published, now)}
-                    </span>
-                  </span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        </section>
-
         {earlier.length > 1 && (
-          <section className="mt-10" aria-labelledby="so-far">
+          <section className="mt-8" aria-labelledby="so-far">
             <h2 id="so-far" className="text-xl font-bold">
               This story so far
             </h2>
@@ -235,6 +234,26 @@ async function StoryView({ params }: { params: PageProps<"/story/[key]">["params
             </ol>
           </section>
         )}
+
+        <section className="mt-10">
+          <h2 className="text-xl font-bold">Read the coverage</h2>
+          <ul className="mt-3 divide-y divide-line border-b border-line">
+            {topSources.map(coverageItem)}
+          </ul>
+          {/* The rest stay one tap away. <details> is a native, keyboard-friendly toggle that
+              screen readers announce as expanded or collapsed. */}
+          {moreSources.length > 0 && (
+            <details className="group">
+              <summary className="cursor-pointer list-none py-3 text-sm font-semibold text-accent hover:underline [&::-webkit-details-marker]:hidden">
+                <span className="group-open:hidden">
+                  Show {moreSources.length} more {moreSources.length === 1 ? "source" : "sources"}
+                </span>
+                <span className="hidden group-open:inline">Show fewer sources</span>
+              </summary>
+              <ul className="rk-reveal divide-y divide-line border-b border-line">{moreSources.map(coverageItem)}</ul>
+            </details>
+          )}
+        </section>
 
         {related.length > 0 && (
           <section className="mt-10">
