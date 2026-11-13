@@ -24,6 +24,8 @@ type Answer = {
   steps: Activity[];
   phase: Phase | null;
   state: "working" | "done" | "stopped" | "error";
+  startedAt: number; // when the question was sent
+  seconds?: number; // how long the answer took, from sending to the last event
   cached?: string; // the edition date of a saved answer
   truncated?: boolean;
   error?: string;
@@ -171,19 +173,41 @@ const BULLET = /^\s*([-*•]|\d+\.)\s+/;
 function Markdown({ text }: { text: string }) {
   // Blocks are split by blank lines; inside one, runs of bullet lines become a
   // list and other lines a paragraph ("Intro:\n- a\n- b" is common).
-  const parts: { list: boolean; lines: string[] }[] = [];
+  // "## Title" lines become a heading, "### Label" a small section label.
+  type Part = { kind: "p" | "list" | "h2" | "h3"; lines: string[] };
+  const parts: Part[] = [];
   for (const block of text.split(/\n{2,}/)) {
-    let current: { list: boolean; lines: string[] } | null = null;
+    let current: Part | null = null;
     for (const line of block.split("\n").filter((l) => l.trim())) {
-      const list = BULLET.test(line);
-      if (!current || current.list !== list) parts.push((current = { list, lines: [] }));
+      const heading = /^\s*(#{1,6})\s+/.exec(line);
+      if (heading) {
+        parts.push({ kind: heading[1].length <= 2 ? "h2" : "h3", lines: [line.replace(/^\s*#+\s+/, "")] });
+        current = null;
+        continue;
+      }
+      const kind = BULLET.test(line) ? "list" : "p";
+      if (!current || current.kind !== kind) parts.push((current = { kind, lines: [] }));
       current.lines.push(line);
     }
   }
   return (
     <>
-      {parts.map(({ list, lines }, i) => {
-        if (list) {
+      {parts.map(({ kind, lines }, i) => {
+        if (kind === "h2") {
+          return (
+            <h2 key={i} className="mt-6 mb-3 text-xl font-semibold first:mt-0">
+              {inline(lines[0])}
+            </h2>
+          );
+        }
+        if (kind === "h3") {
+          return (
+            <h3 key={i} className="mt-5 mb-2 text-xs font-semibold tracking-wide text-muted uppercase first:mt-0">
+              {inline(lines[0])}
+            </h3>
+          );
+        }
+        if (kind === "list") {
           const numbered = /^\s*\d+\./.test(lines[0]);
           const List = numbered ? "ol" : "ul";
           return (
@@ -312,6 +336,7 @@ export function AskChat({ story }: { story?: FocusStory }) {
         update(id, (a) => ({
           state: "done",
           phase: null,
+          seconds: (Date.now() - a.startedAt) / 1000,
           content: e.answer,
           truncated: e.truncated,
           // A saved answer's steps were recorded on an earlier run; a live one's are already here.
@@ -349,7 +374,7 @@ export function AskChat({ story }: { story?: FocusStory }) {
       return [
         ...kept,
         { role: "user", content: q },
-        { role: "assistant", id, question: q, content: "", steps: [], phase: { kind: "sending" }, state: "working" },
+        { role: "assistant", id, question: q, content: "", steps: [], phase: { kind: "sending" }, state: "working", startedAt: Date.now() },
       ];
     });
     setInput("");
@@ -404,53 +429,135 @@ export function AskChat({ story }: { story?: FocusStory }) {
     }
   }
 
-  return (
-    <div>
-      {focus && (
-        <div className="mb-6 flex items-start gap-3 rounded-md border border-accent/40 bg-accent-soft px-4 py-3 text-sm">
-          <p className="min-w-0 flex-1">
-            <span className="text-xs font-semibold text-muted">Asking about</span>
-            <Link href={`/story/${focus.key}`} className="mt-0.5 block font-semibold hover:text-accent">
-              {focus.headline}
-            </Link>
-          </p>
-          <button
-            type="button"
-            onClick={() => setFocus(undefined)}
-            disabled={busy}
-            className="shrink-0 text-muted hover:text-ink disabled:opacity-40"
-            aria-label="Stop asking about this story"
-          >
-            ✕
-          </button>
-        </div>
-      )}
+  const empty = turns.length === 0;
+  const suggestions = focus ? STORY_SUGGESTIONS : SUGGESTIONS;
 
-      {turns.length === 0 && (
-        <div className="grid gap-2 sm:grid-cols-2">
-          {(focus ? STORY_SUGGESTIONS : SUGGESTIONS).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => ask(s)}
-              className="rounded-md border border-line bg-card px-4 py-3 text-left text-sm hover:border-ink"
-            >
-              {s}
-            </button>
+  const composer = (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        ask(input);
+      }}
+      className="flex items-end gap-2 rounded-[28px] border border-line bg-card py-2 pr-2 pl-5 shadow-sm focus-within:border-ink"
+    >
+      <label htmlFor="ask-input" className="sr-only">
+        Your question
+      </label>
+      <textarea
+        ref={inputRef}
+        id="ask-input"
+        rows={1}
+        value={input}
+        onChange={(e) => {
+          setInput(e.target.value);
+          // Grow with the text, up to about eight lines.
+          e.target.style.height = "auto";
+          e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
+        }}
+        onKeyDown={(e) => {
+          // Enter asks, Shift+Enter starts a new line.
+          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+            e.preventDefault();
+            ask(input);
+          }
+        }}
+        maxLength={600}
+        placeholder={empty ? (focus ? "Ask about this story" : "Ask ReadKernel") : "Ask a follow-up"}
+        className="max-h-[200px] min-w-0 flex-1 resize-none self-center bg-transparent py-2 text-[17px] leading-6 outline-none placeholder:text-muted"
+      />
+      {busy && !input.trim() ? (
+        <button
+          type="button"
+          onClick={stop}
+          aria-label="Stop answering"
+          className="grid size-10 shrink-0 place-items-center rounded-full bg-ink text-paper hover:opacity-90"
+        >
+          <span className="size-3 rounded-[2px] bg-paper" aria-hidden />
+        </button>
+      ) : (
+        <button
+          type="submit"
+          disabled={!input.trim()}
+          aria-label="Ask"
+          className="grid size-10 shrink-0 place-items-center rounded-full bg-ink text-paper hover:opacity-90 disabled:opacity-30"
+        >
+          <svg viewBox="0 0 20 20" className="size-5" aria-hidden>
+            <path d="M10 15V5m0 0-4.5 4.5M10 5l4.5 4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      )}
+    </form>
+  );
+
+  const focusChip = focus && (
+    <p className={`flex items-center gap-2 text-sm text-muted ${empty ? "justify-center" : "mb-6"}`}>
+      <span className="shrink-0">Asking about</span>
+      <Link href={`/story/${focus.key}`} className="min-w-0 truncate font-semibold text-ink hover:text-accent">
+        {focus.headline}
+      </Link>
+      <button
+        type="button"
+        onClick={() => setFocus(undefined)}
+        disabled={busy}
+        className="shrink-0 px-1 hover:text-ink disabled:opacity-40"
+        aria-label="Stop asking about this story"
+      >
+        ✕
+      </button>
+    </p>
+  );
+
+  // Announced to screen readers: the start and end of each answer, not every word.
+  const liveRegion = (
+    <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+      {announce}
+    </p>
+  );
+
+  // Before the first question: a centred prompt, the question box, and suggestions under it.
+  if (empty) {
+    return (
+      <div className="mx-auto flex min-h-[calc(100svh-16rem)] max-w-2xl flex-col justify-center py-10">
+        <h1 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl">
+          {focus ? "What do you want to know about this story?" : "What do you want to know?"}
+        </h1>
+        <p className="mt-3 mb-8 text-center text-muted">
+          Ask ReadKernel searches everything it has covered, and the web when that&apos;s thin, then answers with links.
+        </p>
+        {focusChip && <div className="mb-4">{focusChip}</div>}
+        {composer}
+        <ul className="mt-6 space-y-1">
+          {suggestions.map((s, i) => (
+            <li key={s}>
+              <button
+                type="button"
+                onClick={() => ask(s)}
+                className="flex w-full items-center gap-4 rounded-md px-4 py-3 text-left text-[17px] text-muted hover:bg-sunk hover:text-ink"
+              >
+                <SuggestionIcon index={i} story={Boolean(focus)} />
+                {s}
+              </button>
+            </li>
           ))}
-        </div>
-      )}
+        </ul>
+        {liveRegion}
+      </div>
+    );
+  }
 
-      {/* Announced to screen readers: the start and end of each answer, not every word. */}
-      <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">
-        {announce}
-      </p>
+  return (
+    <div className="mx-auto max-w-2xl">
+      <h1 className="sr-only">Ask the news</h1>
+      {focusChip}
+      {liveRegion}
 
-      <div className="space-y-8">
+      <div className="space-y-10">
         {turns.map((t, i) =>
           t.role === "user" ? (
             <div key={`q${i}`} className="flex justify-end">
-              <p className="max-w-[85%] rounded-lg bg-sunk px-4 py-2.5 whitespace-pre-wrap [overflow-wrap:anywhere]">{t.content}</p>
+              <p className="max-w-[85%] rounded-3xl bg-sunk px-5 py-3 text-[17px] whitespace-pre-wrap [overflow-wrap:anywhere]">
+                {t.content}
+              </p>
             </div>
           ) : (
             <AnswerView
@@ -477,73 +584,48 @@ export function AskChat({ story }: { story?: FocusStory }) {
             ↓ Jump to latest
           </button>
         )}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            ask(input);
-          }}
-          className="flex items-end gap-2 rounded-lg border border-line bg-card p-2 shadow-sm focus-within:border-ink"
-        >
-          <label htmlFor="ask-input" className="sr-only">
-            Your question
-          </label>
-          <textarea
-            ref={inputRef}
-            id="ask-input"
-            rows={1}
-            value={input}
-            onChange={(e) => {
-              setInput(e.target.value);
-              // Grow with the text, up to about eight lines.
-              e.target.style.height = "auto";
-              e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
-            }}
-            onKeyDown={(e) => {
-              // Enter asks, Shift+Enter starts a new line.
-              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                ask(input);
-              }
-            }}
-            maxLength={600}
-            placeholder={turns.length ? "Ask a follow-up…" : focus ? "Ask about this story…" : "Ask about any tech or AI news…"}
-            className="max-h-[200px] min-w-0 flex-1 resize-none bg-transparent px-3 py-2 leading-6 outline-none"
-          />
-          {busy && !input.trim() ? (
-            <button
-              type="button"
-              onClick={stop}
-              aria-label="Stop answering"
-              className="grid size-10 shrink-0 place-items-center rounded-md bg-ink text-paper hover:opacity-90"
-            >
-              <span className="size-3 rounded-[2px] bg-paper" aria-hidden />
-            </button>
-          ) : (
-            <button
-              type="submit"
-              disabled={!input.trim()}
-              aria-label="Ask"
-              className="grid size-10 shrink-0 place-items-center rounded-md bg-ink text-paper hover:opacity-90 disabled:opacity-30"
-            >
-              <svg viewBox="0 0 20 20" className="size-5" aria-hidden>
-                <path d="M10 15V5m0 0-4.5 4.5M10 5l4.5 4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          )}
-        </form>
-        <p className="mt-1.5 text-center text-[11px] text-muted">
-          Every answer links its sources. AI can make mistakes, so check them.
-        </p>
+        {composer}
+        <p className="mt-1.5 text-center text-[11px] text-muted">Every answer links its sources. AI can make mistakes, so check them.</p>
       </div>
     </div>
   );
 }
 
-/** "3 ReadKernel lookups · 1 web search": what an answer's steps did, in one line. */
-function summarize(steps: Activity[]): string {
-  const web = steps.filter((s) => s.tool === "web_search").length;
-  const own = steps.length - web;
-  return [own ? plural(own, "ReadKernel lookup") : "", web ? plural(web, "web search", "web searches") : ""].filter(Boolean).join(" · ");
+/** Small line icons for the suggested questions, in the order of lib/ask.ts. */
+function SuggestionIcon({ index, story }: { index: number; story: boolean }) {
+  const paths = story
+    ? [
+        "M7 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm6 0a3 3 0 1 0 0-6M1.5 17c.6-3 2.8-5 5.5-5s4.9 2 5.5 5m1-5c2.4 0 4.3 1.8 4.9 5", // people: competitors
+        "M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.5-11.5-2 5-5 2 2-5 5-2Z", // compass: the wider space
+        "M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm0-12v4l3 2", // clock: how it developed
+        "M7.5 15h5M8 18h4M10 2a5.5 5.5 0 0 0-3.2 10c.5.4.7.9.7 1.5V14h5v-.5c0-.6.2-1.1.7-1.5A5.5 5.5 0 0 0 10 2Z", // bulb: why it matters
+      ]
+    : [
+        "M11 2 4 11h5l-1 7 7-9h-5l1-7Z", // bolt: today's biggest news
+        "M3 18V5l6-3v16M9 8h8v10M12 11h2m-2 3h2M5.5 8h1m-1 3h1m-1 3h1M1 18h18", // building: a company
+        "M12.5 3.5a4 4 0 0 0-5 5L3 13a1.4 1.4 0 0 0 2 2l4.5-4.5a4 4 0 0 0 5-5l-2.3 2.3-2-2 2.3-2.3Z", // wrench: engineering
+        "M10 2 3 6v8l7 4 7-4V6l-7-4Zm0 0v0M3 6l7 4 7-4m-7 4v8", // cube: models
+      ];
+  return (
+    <svg viewBox="0 0 20 20" className="size-5 shrink-0 text-accent" aria-hidden>
+      <path d={paths[index % paths.length]} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** "Worked for 12s · 3 ReadKernel lookups · 1 web search": what an answer took, in one line. */
+function summarize(a: Answer): string {
+  const web = a.steps.filter((s) => s.tool === "web_search").length;
+  const own = a.steps.length - web;
+  const took =
+    a.seconds === undefined ? "" : a.seconds < 60 ? `Worked for ${Math.max(1, Math.round(a.seconds))}s` : `Worked for ${Math.floor(a.seconds / 60)}m ${Math.round(a.seconds % 60)}s`;
+  return [
+    a.cached ? "Saved answer" : took,
+    own ? plural(own, "ReadKernel lookup") : "",
+    web ? plural(web, "web search", "web searches") : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function AnswerView({ answer: a, last, onRetry }: { answer: Answer; last: boolean; onRetry: () => void }) {
@@ -559,24 +641,30 @@ function AnswerView({ answer: a, last, onRetry }: { answer: Answer; last: boolea
 
   return (
     <div className="[overflow-wrap:anywhere]">
-      {a.cached && (
-        <p className="rk-fade mb-2 text-xs text-label">
-          Saved answer: this suggested question was answered earlier for the {shortDate(a.cached)} edition.
-        </p>
-      )}
-      {a.steps.length > 0 && (
-        <div className="mb-3 text-[13px] text-muted">
+      {(a.steps.length > 0 || (!working && summarize(a))) && (
+        <div className="mb-3 text-[15px] text-muted">
           {!working && (
-            <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex items-center gap-1.5 hover:text-ink">
-              <span>{summarize(a.steps)}</span>
-              <span aria-hidden className="text-[10px]">
-                {open ? "▾" : "▸"}
-              </span>
+            <button
+              type="button"
+              onClick={() => setOpen(!open)}
+              aria-expanded={open}
+              disabled={a.steps.length === 0 && !a.cached}
+              className="flex items-center gap-1.5 hover:text-ink disabled:hover:text-muted"
+            >
+              <span>{summarize(a)}</span>
+              {(a.steps.length > 0 || a.cached) && (
+                <svg viewBox="0 0 20 20" className={`size-4 ${open ? "rotate-90" : ""}`} aria-hidden>
+                  <path d="m8 5 5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
             </button>
+          )}
+          {open && a.cached && (
+            <p className="mt-2 text-[13px]">This suggested question was answered earlier for the {shortDate(a.cached)} edition; these are that run&apos;s lookups.</p>
           )}
           {showSteps && (
             <ul
-              className={`space-y-1 ${working ? "" : "mt-2 border-l border-line pl-3"}`}
+              className={`space-y-1 text-[13px] ${working ? "" : "mt-2 border-l border-line pl-3"}`}
               aria-label={a.cached ? "What Ask looked up on the saved run" : "What Ask looked up"}
             >
               {a.steps.map((s) => (

@@ -13,12 +13,7 @@ export const metadata: Metadata = {
 export default function AskPage({ searchParams }: PageProps<"/ask">) {
   return (
     <Container>
-      <p className="text-sm font-semibold text-label">Ask ReadKernel</p>
-      <h1 className="mt-1 text-4xl font-extrabold tracking-tight">Ask the news</h1>
-      <p className="mt-2 mb-8 text-muted">
-        Ask about any company, product or story. ReadKernel searches everything it has covered, follows the story over
-        time, looks further on the web when its own coverage is thin, and answers with links to the sources it used.
-      </p>
+      {/* AskChat draws the page heading: a centred prompt before the first question, like a chat app. */}
       <Suspense fallback={<AskChat />}>
         <AskForStory searchParams={searchParams} />
       </Suspense>

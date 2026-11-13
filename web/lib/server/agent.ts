@@ -62,7 +62,7 @@ function systemPrompt(focused: boolean): string {
         ]
       : []),
     "Never stretch an item to fit the question: if a story or post isn't actually about what was asked, leave it out rather than guess a connection.",
-    "Lead with a direct answer, then short bullet points if useful. Keep it under 200 words unless the reader asks for detail, background or a backstory; then up to about 400 words. No tables or headings (the chat can't show them). Plain English, no hype.",
+    "Lead with a direct answer, then short bullet points if useful. Keep it under 200 words unless the reader asks for detail, background or a backstory; then up to about 400 words. No tables. A detailed answer may open with a short title line (## Title) and group its points under short ### section labels; a short answer needs neither. Plain English, no hype.",
     web
       ? "If nothing relevant turns up in ReadKernel's coverage or on the web, say so."
       : "If the tools find nothing relevant, say ReadKernel hasn't covered it.",
