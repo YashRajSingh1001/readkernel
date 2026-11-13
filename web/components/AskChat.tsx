@@ -51,6 +51,7 @@ function found(c: ToolCounts | undefined, tool: string): string {
   if (c.posts) parts.push(plural(c.posts, "blog post"));
   if (c.articles) parts.push(plural(c.articles, "article"));
   if (c.timeline) parts.push(plural(c.timeline, "earlier day"));
+  if (c.pages) parts.push(plural(c.pages, "page"));
   return parts.join(", ") || "nothing found";
 }
 
@@ -81,6 +82,11 @@ function describe(step: Activity): string {
       break;
     case "get_top_articles":
       what = `${running ? "Checking" : "Checked"} Top articles`;
+      break;
+    case "web_search":
+      if (running) what = "Searching the web";
+      else if (a.url) what = `Opened ${String(a.url).replace(/^https?:\/\/(www\.)?/, "").split("/")[0]}`;
+      else what = a.query ? `Searched the web for “${String(a.query)}”` : "Searched the web";
       break;
     case "get_company_posts":
       what = `${running ? "Checking" : "Checked"} ${a.company ? `${String(a.company)} blog posts` : "company blog posts"}`;
@@ -254,7 +260,9 @@ export function AskChat({ story }: { story?: FocusStory }) {
         } else {
           update(id, (a) => ({
             steps: a.steps.map((s) =>
-              s.id === e.id ? { ...s, state: e.ok ? "done" : "failed", ok: e.ok, counts: e.counts, error: e.error } : s,
+              s.id === e.id
+                ? { ...s, args: e.args ?? s.args, state: e.ok ? "done" : "failed", ok: e.ok, counts: e.counts, error: e.error }
+                : s,
             ),
           }));
         }

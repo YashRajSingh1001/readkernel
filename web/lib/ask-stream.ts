@@ -17,6 +17,8 @@ export type ToolCounts = {
   matched_query?: string;
   /** The tool answered but found nothing, e.g. "No story with key …". */
   empty?: boolean;
+  /** web_search: how many pages the search returned. */
+  pages?: number;
 };
 
 /** One tool call, as the chat lists it. Older saved answers only have tool and args. */
@@ -35,7 +37,8 @@ export type AskEvent =
   /** A saved answer to a suggested question is being sent instead of a new AI run. */
   | { type: "status"; phase: "cached"; date: string }
   | { type: "tool"; id: string; state: "started"; tool: string; args: Record<string, unknown> }
-  | { type: "tool"; id: string; state: "finished"; ok: boolean; counts?: ToolCounts; error?: string }
+  /** args: set when they're only known once the call is done (web searches). */
+  | { type: "tool"; id: string; state: "finished"; ok: boolean; args?: Record<string, unknown>; counts?: ToolCounts; error?: string }
   /** Answer text, appended as generated. All deltas joined equal done.answer unless replaced. */
   | { type: "delta"; text: string }
   /** Text streamed so far turned out not to be the answer (the model went on to call tools). */

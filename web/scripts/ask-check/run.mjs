@@ -100,7 +100,7 @@ function checks(result) {
     links: links.length,
     domains: [...new Set(links.map((u) => new URL(u).hostname.replace(/^www\./, "")))],
     words,
-    under_limit: words <= 220, // the prompt asks for 180; allow a little for links and the Sources line
+    under_limit: words <= 450, // the prompt allows about 400 when the reader asks for detail; a little more for links
     says_not_covered: NOT_COVERED.test(result.answer),
     tool_calls: result.steps.length,
     declined: DECLINED.test(result.answer),
