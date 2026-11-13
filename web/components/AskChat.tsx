@@ -539,7 +539,7 @@ export function AskChat({ story }: { story?: FocusStory }) {
   // Before the first question: a centred prompt, the question box, and suggestions under it.
   if (empty) {
     return (
-      <div className="mx-auto flex min-h-[calc(100svh-16rem)] max-w-2xl flex-col justify-center py-10">
+      <div data-ask-app className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center pb-16">
         <h1 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl">
           {focus ? "What do you want to know about this story?" : "What do you want to know?"}
         </h1>
@@ -568,12 +568,14 @@ export function AskChat({ story }: { story?: FocusStory }) {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
+    // Fills the page under the header (see [data-ask-app] in globals.css), so the question
+    // box sits at the bottom of the screen even when the conversation is short.
+    <div data-ask-app className="mx-auto flex w-full max-w-2xl flex-1 flex-col">
       <h1 className="sr-only">Ask the news</h1>
       {focusChip}
       {liveRegion}
 
-      <div className="space-y-10">
+      <div className="flex-1 space-y-10">
         {turns.map((t, i) =>
           t.role === "user" ? (
             <div key={`q${i}`} className="flex justify-end">
@@ -596,7 +598,7 @@ export function AskChat({ story }: { story?: FocusStory }) {
       </div>
 
       {/* The question box stays at the bottom of the screen on a solid bar, so answers scroll behind it cleanly. */}
-      <div className="sticky bottom-0 mt-8 bg-paper pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="sticky bottom-0 mt-8 bg-paper pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {busy && away && (
           <button
             type="button"

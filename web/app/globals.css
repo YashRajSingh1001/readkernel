@@ -147,3 +147,15 @@ body {
     scroll-behavior: auto;
   }
 }
+
+/* Ask is a full-screen chat, like a chat app: no site footer, and the chat
+   fills the space under the header so its question box sits at the bottom of
+   the screen however short the conversation is (components/AskChat.tsx). */
+body:has([data-ask-app]) > footer {
+  display: none;
+}
+main:has([data-ask-app]) {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}

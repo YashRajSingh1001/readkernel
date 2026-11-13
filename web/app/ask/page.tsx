@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function AskPage({ searchParams }: PageProps<"/ask">) {
   return (
-    <Container>
+    <Container className="flex flex-1 flex-col">
       {/* AskChat draws the page heading: a centred prompt before the first question, like a chat app. */}
       <Suspense fallback={<AskChat />}>
         <AskForStory searchParams={searchParams} />
