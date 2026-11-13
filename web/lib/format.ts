@@ -113,15 +113,21 @@ export function isValidDate(value: string): boolean {
   return DATE_RE.test(value) && !Number.isNaN(Date.parse(value));
 }
 
-export function formatDate(date: string, style: "long" | "short" = "long"): string {
+export function formatDate(date: string, style: "long" | "short" | "full" = "long"): string {
   const d = new Date(`${date}T00:00:00Z`);
   return d.toLocaleDateString("en-GB", {
     timeZone: "UTC",
-    weekday: style === "long" ? "long" : undefined,
+    weekday: style === "short" ? undefined : "long",
     day: "numeric",
-    month: style === "long" ? "long" : "short",
-    year: style === "short" ? "numeric" : undefined,
+    month: style === "short" ? "short" : "long",
+    year: style === "long" ? undefined : "numeric",
   });
+}
+
+/** "6:12 am IST": when an edition was published, in the brief's home time zone. */
+export function formatTimeIST(iso: string): string {
+  const time = new Date(iso).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit" });
+  return `${time} IST`;
 }
 
 export function timeAgo(iso: string, now = Date.now()): string {

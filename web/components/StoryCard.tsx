@@ -44,7 +44,7 @@ export function StoryCard({ story, now, rank, variant = "standard", showImage = 
   );
 
   const meta = (
-    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[0.8125rem] text-muted">
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted">
       <span className="font-semibold text-accent">{TOPICS[story.topic] ?? story.topic}</span>
       {story.kind === "model_release" && <span className="font-semibold text-label">Model release</span>}
       <span aria-hidden>·</span>
@@ -59,7 +59,7 @@ export function StoryCard({ story, now, rank, variant = "standard", showImage = 
   );
 
   const footer = (
-    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-muted">
       <SourceIcons sources={story.sources} />
       {story.story_key && lead && (
         <SaveButton
@@ -85,7 +85,7 @@ export function StoryCard({ story, now, rank, variant = "standard", showImage = 
         <div className="min-w-0 flex-1">
           {meta}
           <div className="mt-1">{title}</div>
-          <div className="mt-1.5 text-xs text-muted">
+          <div className="mt-1.5 text-sm text-muted">
             <SourceIcons sources={story.sources} max={3} />
           </div>
         </div>

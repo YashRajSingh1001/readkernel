@@ -1,14 +1,14 @@
-/* eslint-disable @next/next/no-img-element -- source icons from Google's icon service */
 import Link from "next/link";
 
 import { CompanyPostCard } from "@/components/CompanyPostCard";
 import { Container } from "@/components/Container";
 import { SignupForm } from "@/components/SignupForm";
+import { SourcesStrip } from "@/components/SourcesStrip";
 import { StoryCard } from "@/components/StoryCard";
-import { faviconUrl, formatDate, getLatestEdition } from "@/lib/brief";
+import { formatDate, getLatestEdition } from "@/lib/brief";
 import { highlights, listCompanyPosts } from "@/lib/companies";
-import { readingMinutes } from "@/lib/format";
-import { FEATURED_SOURCES, SOURCES } from "@/lib/sources";
+import { formatTimeIST, readingMinutes } from "@/lib/format";
+import { SOURCES } from "@/lib/sources";
 
 /**
  * The front page reads like a newspaper's: today's edition first, the pitch
@@ -26,16 +26,25 @@ export default async function Home() {
     <>
       {/* Masthead: what this is, and the sign-up, on the first screen */}
       <Container size="wide">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b-2 border-ink pb-2 text-sm">
-          <span className="font-semibold">{edition ? formatDate(edition.date) : "The daily brief"}</span>
-          <span className="text-muted">
-            {edition
-              ? `${edition.stories.length} stories · ${sourceCount} sources · ${readingMinutes(edition.stories)} min read`
-              : `${SOURCES.length} sources, read every morning`}
-          </span>
+        {/* Dateline: the edition's date, when it was published, and what's in it */}
+        <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-1 border-b-2 border-ink pb-3">
+          <p className="font-serif text-xl font-semibold sm:text-2xl">
+            {edition ? formatDate(edition.date, "full") : "The daily brief"}
+          </p>
+          {edition && (
+            <p className="text-[0.9375rem] text-muted tabular-nums">
+              <span className="whitespace-nowrap">Published {formatTimeIST(edition.generated_at)}</span>
+              <span aria-hidden> · </span>
+              <span className="whitespace-nowrap">
+                {edition.stories.length} stories from {sourceCount} sources
+              </span>
+              <span aria-hidden> · </span>
+              <span className="whitespace-nowrap">{readingMinutes(edition.stories)}-minute read</span>
+            </p>
+          )}
         </div>
 
-        <div className="grid gap-8 border-b border-line py-8 lg:grid-cols-[1fr_24rem] lg:gap-12 lg:py-10">
+        <div className="grid gap-8 py-8 lg:grid-cols-[1fr_24rem] lg:gap-12">
           <div>
             <h1 className="max-w-3xl text-4xl title-serif text-balance sm:text-5xl">
               Today&apos;s tech and AI news, boiled down to ten stories.
@@ -62,6 +71,7 @@ export default async function Home() {
             </p>
           </div>
         </div>
+        <SourcesStrip sources={SOURCES} />
       </Container>
 
       {/* Today's brief: the lead story large, the next five as a numbered list */}
@@ -129,27 +139,9 @@ export default async function Home() {
         </Container>
       )}
 
-      {/* Where the news comes from, and the other ways to read it */}
+      {/* The other ways to read it */}
       <Container size="wide" className="pt-14">
-        <div className="grid gap-x-12 gap-y-8 border-t-2 border-ink pt-6 lg:grid-cols-2">
-          <section aria-labelledby="sources-heading">
-            <h2 id="sources-heading" className="text-[0.9375rem] font-bold">
-              Reading {SOURCES.length} sources, including
-            </h2>
-            <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2.5">
-              {FEATURED_SOURCES.map((s) => (
-                <li key={s.name} className="flex items-center gap-2 text-sm">
-                  <img src={faviconUrl(s.site)} alt="" width={16} height={16} loading="lazy" referrerPolicy="no-referrer" className="h-4 w-4 rounded-sm" />
-                  {s.name}
-                </li>
-              ))}
-              <li className="text-sm">
-                <Link href="/sources" className="text-accent hover:underline">
-                  and {SOURCES.length - FEATURED_SOURCES.length} more
-                </Link>
-              </li>
-            </ul>
-          </section>
+        <div className="max-w-3xl border-t-2 border-ink pt-6">
           <section aria-labelledby="elsewhere-heading">
             <h2 id="elsewhere-heading" className="text-[0.9375rem] font-bold">
               Read it where you work

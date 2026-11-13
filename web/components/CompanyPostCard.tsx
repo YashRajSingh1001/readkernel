@@ -10,7 +10,7 @@ export function CompanyPostCard({ post, variant = "standard" }: Props) {
   const category = COMPANY_CATEGORIES[post.category] ?? post.category;
 
   const meta = (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.8125rem] text-muted">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
       <Link href={`/companies?company=${encodeURIComponent(post.company)}`} className="flex items-center gap-1.5 font-medium text-ink hover:text-accent">
         {/* eslint-disable-next-line @next/next/no-img-element -- favicons come from Google's favicon service */}
         <img src={faviconUrl(post.link)} alt="" width={16} height={16} loading="lazy" referrerPolicy="no-referrer" className="h-4 w-4 rounded" />

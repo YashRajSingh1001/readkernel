@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Fragment } from "react";
 
-import { formatDate, readingMinutes, type Edition } from "@/lib/format";
+import { formatDate, formatTimeIST, readingMinutes, type Edition } from "@/lib/format";
 import { siteUrl } from "@/lib/site";
 import { Container } from "./Container";
 import { ShareButtons } from "./ShareButtons";
@@ -19,10 +19,10 @@ export function EditionView({ edition, isLatest = false }: { edition: Edition; i
   return (
     <Container>
       <header className="mb-8">
-        <h1 className="text-4xl title-serif sm:text-5xl">{formatDate(edition.date)}</h1>
-        <p className="mt-2 text-sm text-muted">
-          <span className="font-semibold text-ink">{isLatest ? "Today's brief" : "Daily brief"}</span> ·{" "}
-          {edition.stories.length} stories from {sourceCount} sources · about {minutes} min read
+        <h1 className="text-4xl title-serif sm:text-5xl">{formatDate(edition.date, "full")}</h1>
+        <p className="mt-2 text-[0.9375rem] text-muted tabular-nums">
+          <span className="font-semibold text-ink">{isLatest ? "Today's brief" : "Daily brief"}</span> · published{" "}
+          {formatTimeIST(edition.generated_at)} · {edition.stories.length} stories from {sourceCount} sources · about {minutes} min read
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <ShareButtons url={url} title={`ReadKernel · ${formatDate(edition.date)}`} />
