@@ -124,6 +124,22 @@ function conversation(turns: Turn[]): { role: "user" | "assistant"; content: str
   return out;
 }
 
+/** The links in an answer, once each: by now every one was confirmed by the server. */
+function sourcesIn(text: string): { url: string; label: string; host: string }[] {
+  const seen = new Map<string, { url: string; label: string; host: string }>();
+  for (const m of text.matchAll(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g)) {
+    if (seen.has(m[2])) continue;
+    let host = m[2];
+    try {
+      host = new URL(m[2]).hostname.replace(/^www\./, "");
+    } catch {
+      // keep the URL
+    }
+    seen.set(m[2], { url: m[2], label: m[1], host });
+  }
+  return [...seen.values()];
+}
+
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // A tiny, safe markdown renderer: paragraphs, "-" bullets, **bold** and
@@ -150,23 +166,38 @@ function inline(text: string): ReactNode[] {
   return parts;
 }
 
+const BULLET = /^\s*([-*•]|\d+\.)\s+/;
+
 function Markdown({ text }: { text: string }) {
-  const blocks = text.split(/\n{2,}/);
+  // Blocks are split by blank lines; inside one, runs of bullet lines become a
+  // list and other lines a paragraph ("Intro:\n- a\n- b" is common).
+  const parts: { list: boolean; lines: string[] }[] = [];
+  for (const block of text.split(/\n{2,}/)) {
+    let current: { list: boolean; lines: string[] } | null = null;
+    for (const line of block.split("\n").filter((l) => l.trim())) {
+      const list = BULLET.test(line);
+      if (!current || current.list !== list) parts.push((current = { list, lines: [] }));
+      current.lines.push(line);
+    }
+  }
   return (
     <>
-      {blocks.map((block, i) => {
-        const lines = block.split("\n").filter((l) => l.trim());
-        if (lines.length > 0 && lines.every((l) => /^\s*([-*•]|\d+\.)\s+/.test(l))) {
+      {parts.map(({ list, lines }, i) => {
+        if (list) {
+          const numbered = /^\s*\d+\./.test(lines[0]);
+          const List = numbered ? "ol" : "ul";
           return (
-            <ul key={i} className="my-2 list-disc space-y-1 pl-5">
+            <List key={i} className={`my-3 space-y-1.5 pl-6 ${numbered ? "list-decimal" : "list-disc"}`}>
               {lines.map((l, j) => (
-                <li key={j}>{inline(l.replace(/^\s*([-*•]|\d+\.)\s+/, ""))}</li>
+                <li key={j} className="pl-1">
+                  {inline(l.replace(BULLET, ""))}
+                </li>
               ))}
-            </ul>
+            </List>
           );
         }
         return (
-          <p key={i} className="my-2">
+          <p key={i} className="my-3 first:mt-0">
             {lines.map((l, j) => (
               <Fragment key={j}>
                 {j > 0 && <br />}
@@ -368,9 +399,9 @@ export function AskChat({ story }: { story?: FocusStory }) {
   return (
     <div>
       {focus && (
-        <div className="mb-4 flex items-start gap-3 rounded-xl border border-accent/40 bg-accent-soft px-4 py-3 text-sm">
+        <div className="mb-6 flex items-start gap-3 rounded-md border border-accent/40 bg-accent-soft px-4 py-3 text-sm">
           <p className="min-w-0 flex-1">
-            <span className="font-mono text-[11px] tracking-wide text-label uppercase">Asking about</span>
+            <span className="text-xs font-semibold text-muted">Asking about</span>
             <Link href={`/story/${focus.key}`} className="mt-0.5 block font-semibold hover:text-accent">
               {focus.headline}
             </Link>
@@ -394,7 +425,7 @@ export function AskChat({ story }: { story?: FocusStory }) {
               key={s}
               type="button"
               onClick={() => ask(s)}
-              className="rounded-xl border border-line bg-card px-4 py-3 text-left text-sm hover:border-ink"
+              className="rounded-md border border-line bg-card px-4 py-3 text-left text-sm hover:border-ink"
             >
               {s}
             </button>
@@ -407,28 +438,27 @@ export function AskChat({ story }: { story?: FocusStory }) {
         {announce}
       </p>
 
-      <div className="space-y-6">
+      <div className="space-y-8">
         {turns.map((t, i) =>
           t.role === "user" ? (
             <div key={`q${i}`} className="flex justify-end">
-              <p className="max-w-[85%] rounded-2xl rounded-br-sm bg-ink px-4 py-2.5 [overflow-wrap:anywhere] text-paper">
-                {t.content}
-              </p>
+              <p className="max-w-[85%] rounded-lg bg-sunk px-4 py-2.5 whitespace-pre-wrap [overflow-wrap:anywhere]">{t.content}</p>
             </div>
           ) : (
-            <AnswerCard key={`a${t.id}`} answer={t} onRetry={() => ask(t.question, t.id)} />
+            <AnswerView key={`a${t.id}`} answer={t} onRetry={() => ask(t.question, t.id)} />
           ),
         )}
         {/* scroll-mb keeps the newest line clear of the sticky question box */}
-        <div ref={endRef} className="scroll-mb-28" />
+        <div ref={endRef} className="scroll-mb-32" />
       </div>
 
-      <div className="sticky bottom-[max(1rem,env(safe-area-inset-bottom))] mt-6">
+      {/* The question box stays at the bottom of the screen on a solid bar, so answers scroll behind it cleanly. */}
+      <div className="sticky bottom-0 mt-8 bg-paper pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {busy && away && (
           <button
             type="button"
             onClick={jumpToLatest}
-            className="rk-fade absolute -top-11 left-1/2 -translate-x-1/2 rounded-full border border-line bg-card px-3 py-1.5 font-mono text-xs text-muted shadow-sm hover:text-ink"
+            className="rk-fade absolute -top-9 left-1/2 -translate-x-1/2 rounded-full border border-line bg-card px-3 py-1.5 text-xs text-muted shadow-sm hover:text-ink"
           >
             ↓ Jump to latest
           </button>
@@ -438,80 +468,169 @@ export function AskChat({ story }: { story?: FocusStory }) {
             e.preventDefault();
             ask(input);
           }}
-          className="flex gap-2 rounded-2xl border border-line bg-paper/95 p-2 backdrop-blur"
+          className="flex items-end gap-2 rounded-lg border border-line bg-card p-2 shadow-sm focus-within:border-ink"
         >
           <label htmlFor="ask-input" className="sr-only">
             Your question
           </label>
-          <input
+          <textarea
             id="ask-input"
+            rows={1}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value);
+              // Grow with the text, up to about eight lines.
+              e.target.style.height = "auto";
+              e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
+            }}
+            onKeyDown={(e) => {
+              // Enter asks, Shift+Enter starts a new line.
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                e.currentTarget.style.height = "auto";
+                ask(input);
+              }
+            }}
             maxLength={600}
             placeholder={turns.length ? "Ask a follow-up…" : focus ? "Ask about this story…" : "Ask about any tech or AI news…"}
-            className="min-w-0 flex-1 bg-transparent px-3 py-2 outline-none"
+            className="max-h-[200px] min-w-0 flex-1 resize-none bg-transparent px-3 py-2 leading-6 outline-none"
           />
           {busy && !input.trim() ? (
-            <button type="button" onClick={stop} className="rounded-xl border border-line px-4 py-2 font-semibold hover:border-ink">
-              Stop
+            <button
+              type="button"
+              onClick={stop}
+              aria-label="Stop answering"
+              className="grid size-10 shrink-0 place-items-center rounded-md bg-ink text-paper hover:opacity-90"
+            >
+              <span className="size-3 rounded-[2px] bg-paper" aria-hidden />
             </button>
           ) : (
             <button
               type="submit"
               disabled={!input.trim()}
-              className="rounded-xl bg-ink px-4 py-2 font-semibold text-paper hover:opacity-90 disabled:opacity-40"
+              aria-label="Ask"
+              className="grid size-10 shrink-0 place-items-center rounded-md bg-ink text-paper hover:opacity-90 disabled:opacity-30"
             >
-              Ask
+              <svg viewBox="0 0 20 20" className="size-5" aria-hidden>
+                <path d="M10 15V5m0 0-4.5 4.5M10 5l4.5 4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </button>
           )}
         </form>
+        <p className="mt-1.5 text-center text-[11px] text-muted">
+          Every answer links its sources. AI can make mistakes, so check them.
+        </p>
       </div>
     </div>
   );
 }
 
-function AnswerCard({ answer: a, onRetry }: { answer: Answer; onRetry: () => void }) {
+/** "3 ReadKernel lookups · 1 web search": what an answer's steps did, in one line. */
+function summarize(steps: Activity[]): string {
+  const web = steps.filter((s) => s.tool === "web_search").length;
+  const own = steps.length - web;
+  return [own ? plural(own, "ReadKernel lookup") : "", web ? plural(web, "web search", "web searches") : ""].filter(Boolean).join(" · ");
+}
+
+function AnswerView({ answer: a, onRetry }: { answer: Answer; onRetry: () => void }) {
+  const working = a.state === "working";
   const failed = a.state === "error";
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [allSources, setAllSources] = useState(false);
+  const sources = sourcesIn(a.content);
+  const shownSources = allSources ? sources : sources.slice(0, 5);
+  // While Ask works, its steps show as they happen; afterwards they fold into one line.
+  const showSteps = working || open;
+
   return (
-    <div
-      className={`rounded-2xl border p-4 [overflow-wrap:anywhere] sm:p-5 ${failed && !a.content ? "border-accent/40 bg-accent-soft" : "border-line bg-card"}`}
-    >
+    <div className="[overflow-wrap:anywhere]">
       {a.cached && (
-        <p className="rk-fade mb-2 font-mono text-[11px] text-label">
-          Saved answer: this suggested question was answered earlier for the {shortDate(a.cached)} edition. Its lookups:
+        <p className="rk-fade mb-2 text-xs text-label">
+          Saved answer: this suggested question was answered earlier for the {shortDate(a.cached)} edition.
         </p>
       )}
       {a.steps.length > 0 && (
-        <ul className="mb-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[11px] text-muted" aria-label="What Ask looked up">
-          {a.steps.map((s) => (
-            <li key={s.id} className={`rk-fade ${s.state === "failed" ? "text-accent" : ""}`}>
-              {s.state === "running" ? "" : s.state === "failed" ? "✗ " : "✓ "}
-              {describe(s)}
-            </li>
-          ))}
-        </ul>
+        <div className="mb-3 text-[13px] text-muted">
+          {!working && (
+            <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex items-center gap-1.5 hover:text-ink">
+              <span>{summarize(a.steps)}</span>
+              <span aria-hidden className="text-[10px]">
+                {open ? "▾" : "▸"}
+              </span>
+            </button>
+          )}
+          {showSteps && (
+            <ul
+              className={`space-y-1 ${working ? "" : "mt-2 border-l border-line pl-3"}`}
+              aria-label={a.cached ? "What Ask looked up on the saved run" : "What Ask looked up"}
+            >
+              {a.steps.map((s) => (
+                <li key={s.id} className={`rk-fade ${s.state === "failed" ? "text-accent" : ""}`}>
+                  {s.state === "running" ? "" : s.state === "failed" ? "✗ " : "✓ "}
+                  {describe(s)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
-      {a.phase && a.state === "working" && (
-        <p key={JSON.stringify(a.phase)} className="rk-fade font-mono text-xs text-muted">
+      {a.phase && working && (
+        <p key={JSON.stringify(a.phase)} className="rk-fade text-[13px] text-muted">
           {phaseText(a.phase, a.steps)}
         </p>
       )}
       {a.content && (
-        <div className="leading-relaxed">
+        <div className="text-[17px] leading-7">
           <Markdown text={a.content} />
         </div>
       )}
-      {a.truncated && <p className="mt-2 font-mono text-xs text-muted">This answer was cut off: it ran too long.</p>}
+
+      {sources.length > 0 && (
+        <div className="mt-4">
+          <p className="mb-1.5 text-xs font-semibold text-muted">Sources</p>
+          <ul className="flex flex-wrap gap-1.5">
+            {shownSources.map((x) => (
+              <li key={x.url} className="rk-fade">
+                <a
+                  href={x.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={x.url}
+                  className="inline-flex max-w-[16rem] items-baseline gap-1.5 rounded-md border border-line bg-card px-2.5 py-1 text-xs hover:border-ink"
+                >
+                  <span className="truncate font-semibold">{x.label}</span>
+                  <span className="truncate text-muted">{x.host}</span>
+                </a>
+              </li>
+            ))}
+            {sources.length > 5 && (
+              <li>
+                <button
+                  type="button"
+                  onClick={() => setAllSources(!allSources)}
+                  aria-expanded={allSources}
+                  className="rounded-md px-2.5 py-1 text-xs text-muted hover:text-ink"
+                >
+                  {allSources ? "Show fewer" : `+${sources.length - 5} more`}
+                </button>
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
+
+      {a.truncated && <p className="mt-3 text-[13px] text-muted">This answer was cut off: it ran too long.</p>}
       {a.state === "stopped" && (
-        <p className="mt-2 flex items-center gap-3 font-mono text-xs text-muted">
+        <p className="mt-3 flex items-center gap-3 text-[13px] text-muted">
           Stopped{a.content ? " before the answer was finished" : ""}.
-          <button type="button" onClick={onRetry} className="text-accent hover:underline">
+          <button type="button" onClick={onRetry} className="font-semibold text-accent hover:underline">
             Ask again
           </button>
         </p>
       )}
       {failed && (
-        <div className={`flex flex-wrap items-center gap-3 ${a.content ? "mt-3 rounded-xl border border-accent/40 bg-accent-soft px-3 py-2 text-sm" : ""}`}>
+        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-md border border-accent/40 bg-accent-soft px-3 py-2 text-sm">
           <p>
             {a.error}
             {a.content ? " What's above is unfinished." : ""}
@@ -521,6 +640,28 @@ function AnswerCard({ answer: a, onRetry }: { answer: Answer; onRetry: () => voi
               Try again
             </button>
           )}
+        </div>
+      )}
+      {a.state === "done" && a.content && (
+        <div className="mt-3 flex gap-3 text-xs text-muted">
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(a.content);
+                setCopied(true);
+              } catch {
+                // clipboard blocked; nothing to show
+              }
+            }}
+            onBlur={() => setCopied(false)}
+            className="hover:text-ink"
+          >
+            {copied ? "Copied" : "Copy"}
+          </button>
+          <button type="button" onClick={onRetry} className="hover:text-ink">
+            Ask again
+          </button>
         </div>
       )}
     </div>
