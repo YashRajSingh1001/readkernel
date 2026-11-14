@@ -26,7 +26,7 @@ with every source linked. It is built to run at zero cost.
 ## How the pipeline works
 
 ```
-sources.yaml -> fetch -> filter -> group -> rank -> summarise -> Supabase + data/latest.json -> website
+sources.yaml -> fetch -> filter -> group -> rank -> summarise -> fact-check -> Supabase + data/latest.json -> website
 ```
 
 | Step | File | What it does |
@@ -36,6 +36,7 @@ sources.yaml -> fetch -> filter -> group -> rank -> summarise -> Supabase + data
 | Group | `kernel/group.py` | Local embeddings find look-alike articles. Clear matches merge; borderline ones are checked by the AI. |
 | Rank | `kernel/rank.py` | Score = number of sources + source trust + freshness, nudged by an AI editor's 1-5 rating. Max 3 stories per topic. |
 | Summarise | `kernel/summarise.py` | Headline, 2-3 sentence summary, "why it matters" and news/model-release per story, cached so each story is summarised once. |
+| Fact-check | `kernel/factcheck.py` | Checks AI story text against the article snippets. A failed or missing check uses the publisher's text; each story's outcome is saved with the edition. |
 | Photos | `kernel/images.py` | The publisher's own preview photo (RSS media or the page's og:image), shown from their site with a credit. |
 | Threads | `kernel/threads.py` | Links a story to the same ongoing story on earlier days, for the "This story so far" timeline. |
 | Top articles | `kernel/discussions.py` | The most-upvoted Hacker News posts, with a one-line summary each. |
