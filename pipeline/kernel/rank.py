@@ -36,14 +36,23 @@ def base_score(story: Story, now: datetime | None = None) -> float:
 def rank_stories(stories: list[Story], llm: LLM | None = None, now: datetime | None = None) -> list[Story]:
     for story in stories:
         story.score = base_score(story, now)
+        story.importance = None
     ranked = sorted(stories, key=lambda s: -s.score)
     if llm:
-        _apply_editor(ranked[:EDITOR_CANDIDATES], llm)
+        candidates = ranked[:EDITOR_CANDIDATES]
+        try:
+            ratings = _editor_ratings(candidates, llm)
+        except Exception as exc:
+            print(f"    [rank] editor failed, keeping base ranking: {exc!r}")
+            ratings = {}
+        for k, rating in ratings.items():
+            candidates[k].importance = rating
+            candidates[k].score += EDITOR_WEIGHT * (rating - 3)
         ranked.sort(key=lambda s: -s.score)
     return ranked
 
 
-def _apply_editor(candidates: list[Story], llm: LLM) -> None:
+def _editor_ratings(candidates: list[Story], llm: LLM) -> dict[int, int]:
     payload = {
         f"s{k}": {
             "headline": s.lead.title,
@@ -53,12 +62,33 @@ def _apply_editor(candidates: list[Story], llm: LLM) -> None:
         for k, s in enumerate(candidates)
     }
     reply = llm.json(EDITOR_SYSTEM, json.dumps({"stories": payload}, ensure_ascii=False), max_tokens=600)
-    ratings = (reply or {}).get("ratings", {})
-    for k, story in enumerate(candidates):
-        value = ratings.get(f"s{k}")
-        if isinstance(value, (int, float)) and 1 <= value <= 5:
-            story.importance = int(value)
-            story.score += EDITOR_WEIGHT * (value - 3)
+    if reply is None:
+        return {}
+    if not isinstance(reply, dict):
+        print(f"    [rank] editor reply is not an object ({type(reply).__name__}), ignoring it")
+        return {}
+    ratings = reply.get("ratings")
+    if not isinstance(ratings, dict):
+        print(f"    [rank] editor ratings are not an object ({type(ratings).__name__}), ignoring them")
+        return {}
+    result: dict[int, int] = {}
+    for k in range(len(candidates)):
+        rating = _valid_rating(ratings.get(f"s{k}"))
+        if rating is not None:
+            result[k] = rating
+    return result
+
+
+def _valid_rating(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, float):
+        if not value.is_integer():
+            return None
+        value = int(value)
+    if isinstance(value, int) and 1 <= value <= 5:
+        return value
+    return None
 
 
 def pick_brief(ranked: list[Story], count: int, per_topic: int = 3) -> list[Story]:
