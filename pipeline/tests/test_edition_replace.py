@@ -143,14 +143,16 @@ OLD_EXTRA = {n: {"image_url": f"https://img/{n}", "image_credit": "Old", "kind":
 def expected(run, size, extra=None):
     fake = FakePostgrest()
     save_supabase(edition(run, size, extra), connect(fake))
-    return snapshot(fake), fake.requests
+    return snapshot(fake)
 
 
 @pytest.mark.parametrize("old_size,new_size", SHAPES)
 def test_rerun_never_leaves_the_edition_empty_or_mixed(old_size, new_size):
-    old, _ = expected("old", old_size, OLD_EXTRA)
-    new, steps = expected("new", new_size)
-    for fail_at in range(1, steps + 1):
+    old = expected("old", old_size, OLD_EXTRA)
+    new = expected("new", new_size)
+    fail_at, reached = 0, True
+    while reached:
+        fail_at += 1
         fake = FakePostgrest()
         db = connect(fake)
         save_supabase(edition("old", old_size, OLD_EXTRA), db)
@@ -160,11 +162,33 @@ def test_rerun_never_leaves_the_edition_empty_or_mixed(old_size, new_size):
             save_supabase(edition("new", new_size), db)
         except httpx.HTTPError:
             pass
+        reached = fake.requests >= fail_at
         check_edition(fake, old, new)
 
         fake.fail_at = None
         save_supabase(edition("new", new_size), db)
         assert snapshot(fake) == new, f"rerun after failing at request {fail_at} did not converge"
+    assert fail_at > 10
+
+
+def test_crash_between_discussions_delete_and_upsert_keeps_old_discussions():
+    fake = FakePostgrest()
+    db = connect(fake)
+    save_supabase(edition("old", 5), db)
+    seen = []
+    original = fake.handle
+
+    def crash_on_discussions_post(request):
+        seen.append((request.method, request.url.path))
+        if request.method == "POST" and request.url.path.endswith("/discussions"):
+            raise Interrupted("connection lost", request=request)
+        return original(request)
+
+    db.client = httpx.Client(transport=httpx.MockTransport(crash_on_discussions_post), headers=db.client.headers)
+    with pytest.raises(httpx.HTTPError):
+        save_supabase(edition("new", 3), db)
+    assert ("DELETE", "/rest/v1/discussions") in seen
+    assert [r["title"] for r in fake.rows("discussions")] == ["old talk 1", "old talk 2", "old talk 3"]
 
 
 def test_rerun_clears_columns_the_new_story_does_not_have():
