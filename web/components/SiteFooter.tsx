@@ -33,6 +33,7 @@ const COLUMNS = [
       { href: "/guides", label: "Guides" },
       { href: "/newsletters", label: "Newsletter reviews" },
       { href: "/compare", label: "Compare" },
+      { href: "/roadmap", label: "Roadmap" },
     ],
   },
   {

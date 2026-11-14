@@ -25,7 +25,13 @@ const MAKERS: { name: string; initials: string; role: string; linkedin: string; 
     linkedin: "https://www.linkedin.com/in/yash-raj-singh-1001/",
     photo: "/team/yash-raj-singh.jpg",
   },
-  { name: "Agamjyot Singh Chadha", initials: "AC", role: "Co-creator", linkedin: "https://www.linkedin.com/in/agamjyot-singh-chadha/" },
+  {
+    name: "Agamjyot Singh Chadha",
+    initials: "AC",
+    role: "Co-creator",
+    linkedin: "https://www.linkedin.com/in/agamjyot-singh-chadha/",
+    photo: "/team/agamjyot-singh-chadha.jpg",
+  },
 ];
 
 export default function ContactPage() {
