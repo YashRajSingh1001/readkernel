@@ -39,7 +39,6 @@ class Database:
         return result.stdout.strip()
 
     def latest(self):
-        # Same nested read/filter used by web/lib/brief.ts; story_count is no guard.
         response = httpx.get(self.url + "/editions", params={
             "select": "*,stories(*),discussions(*)",
             "stories.order": "position.asc", "discussions.order": "position.asc",
@@ -78,7 +77,6 @@ def server():
                 create schema auth; create table auth.users (id uuid primary key);
                 create function auth.uid() returns uuid language sql as 'select null::uuid';
             """)
-            # 009 schedules production cron/GitHub dispatches; it does not change these tables.
             for migration in sorted(MIGRATIONS.glob("*.sql")):
                 if not migration.name.startswith("009_"):
                     database.sql(migration.read_text())
@@ -142,7 +140,6 @@ def edition(run, size):
 def test_rerun_replaces_complete_edition_and_tags(database, old_size, new_size):
     old, new = edition("old", old_size), edition("new", new_size)
     save_supabase(old, database.db)
-    # Move persistent keys between positions, including a swap of positions 1 and 3.
     new["feed"].reverse()
     save_supabase(new, database.db)
     row, = database.latest()

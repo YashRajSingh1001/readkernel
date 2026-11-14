@@ -14,7 +14,6 @@ as $$
 declare
   edition_day date := (p_edition->>'date')::date;
 begin
-  -- This upsert also locks the day until commit, serializing concurrent reruns.
   insert into public.editions (date, generated_at, ai, story_count, stats)
   select date, generated_at, ai, story_count, stats
   from jsonb_populate_record(null::public.editions, p_edition)
@@ -35,7 +34,6 @@ begin
     image_url, image_credit, kind, thread_id
   from jsonb_populate_recordset(null::public.stories, p_stories);
 
-  -- Omitted discussions preserve the existing list; [] explicitly clears it.
   if p_discussions is not null and p_discussions <> 'null'::jsonb then
     delete from public.discussions where edition_date = edition_day;
     insert into public.discussions (
