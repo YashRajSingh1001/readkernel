@@ -81,7 +81,6 @@ def test_shopping_posts_dropped_without_per_source_exclude(title, source):
 def test_source_excludes_still_drop_plural_and_singular_deal(source):
     assert not kept("Grab these deals before they're gone", source)
     assert not kept("AirPods Pro deal ends tonight", source)
-    # Known trade-off: these sources' per-source "deal" also drops real deal news.
     assert not kept("Microsoft signs $10B AI deal", source)
 
 
