@@ -437,8 +437,14 @@ sequenceDiagram
 - Tested 27 October 2026: "What has Nvidia been up to?" → one search, four facts, sources listed.
   "What did Uber write about AI?" → its first, filtered search found nothing, so it **retried by
   itself** without the filter and found Uber's AutoClean post.
-- Runs on OpenAI's `gpt-6-luna` at medium reasoning, with no fallback: Ask is off until
-  `OPENAI_API_KEY` is set in Vercel's environment variables. The pipeline's AI is separate and stays on Groq.
+- Runs on OpenAI's `gpt-6-luna` at medium reasoning. **Fallback:** if OpenAI turns a question away before
+  answering (out of credit, no key, a refused key, or still busy after retries), Groq's `gpt-oss-120b`
+  answers it instead, from that step on, with ReadKernel's tools but no web search (`web/lib/server/agent.ts`,
+  `callGroq`). A timeout, a reader's Stop or a reply that breaks off part way is not retried on Groq.
+  Groq's free tier allows 8,000 tokens a minute, shared with the pipeline, so its requests are kept small
+  (tool results cut to 4,000 characters, low reasoning) and may wait up to 30 s for their turn; under heavy
+  use expect "busy" replies until OpenAI has credit again. `ai_usage` rows then say `provider = 'groq'` and
+  `details.fallback_from = 'openai'`. `ASK_PROVIDER=groq` forces Groq (for testing).
 - The website never names the AI services it uses (the privacy page says "AI services"), and Ask
   declines questions about which AI runs it.
 
@@ -755,10 +761,11 @@ Template: [`.env.example`](../.env.example).
 | Setting | Used by | Value now | Meaning |
 | --- | --- | --- | --- |
 | `LLM_PROVIDER` | pipeline | `groq` | `groq`, `claude`, `openai` or `none` |
-| `GROQ_API_KEY` | pipeline | (secret) | Free key from console.groq.com |
+| `GROQ_API_KEY` | pipeline, website | (secret) | Free key from console.groq.com. The website uses it only as Ask's fallback |
 | `GROQ_MODEL` | pipeline | `openai/gpt-oss-120b` | Model on Groq |
-| `OPENAI_API_KEY` | website | (secret) | Ask ReadKernel's AI. Not read by the pipeline, which stays on Groq |
+| `OPENAI_API_KEY` | website | (secret) | Ask ReadKernel's AI. Not read by the pipeline, which stays on Groq. Ask falls back to Groq without it |
 | `ASK_MODEL` / `ASK_REASONING_EFFORT` | website | `gpt-6-luna` / `medium` | OpenAI model and reasoning level for Ask |
+| `ASK_PROVIDER` | website | (OpenAI first) | `groq`: Ask answers with Groq only. Otherwise Groq (`GROQ_API_KEY`, `GROQ_MODEL`) is the fallback when OpenAI can't answer |
 | `AI_USAGE_LOG` | both | not set (on) | `off` stops saving AI token counts to `ai_usage` |
 | `MAX_AGE_HOURS` | pipeline | 36 | How old an article may be |
 | `STORIES_PER_BRIEF` / `FEED_SIZE` | pipeline | 10 / 30 | Brief and feed size |

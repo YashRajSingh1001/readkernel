@@ -11,6 +11,10 @@ import "server-only";
 // Every model call streams. While it runs, askAgent() reports what is really
 // happening through onEvent (lib/ask-stream.ts): each model request, each tool
 // call with what it found, and the answer text as the model writes it.
+//
+// Ask runs on OpenAI. If OpenAI turns the request away (no credit left, no key,
+// a refused key, or still busy after retries), Groq's free gpt-oss-120b takes
+// over for the rest of that answer, with ReadKernel's own tools but no web search.
 
 import { AnswerGuard, countResult, urlsIn, type AskEvent, type AskStep } from "../ask-stream";
 import { NEWS_TOOLS, runTool } from "../tools";
@@ -19,7 +23,13 @@ import { looksLikeCode, OFF_TOPIC_MARKER, OFF_TOPIC_REPLY } from "./ask-scope";
 
 const MAX_STEPS = 5;
 const MAX_TOOL_RESULT = 12_000; // characters of tool output passed back to the model
-const IDLE_MS = 45_000; // no data from OpenAI for this long: the call has stalled
+// Groq's free tier allows 8,000 tokens a minute (shared with the pipeline), so its
+// requests are kept small: shorter tool results, short reasoning.
+const GROQ_TOOL_RESULT = 4_000;
+// How long a rate-limited request may wait for its turn: OpenAI's waits are short;
+// Groq's free tier frees up within a minute, and the reader sees the countdown.
+const MAX_WAIT_S = { openai: 8, groq: 30 };
+const IDLE_MS = 45_000; // no data from the AI for this long: the call has stalled
 const TOTAL_MS = 120_000; // a whole answer, tools and retries included
 
 export type ChatTurn = { role: "user" | "assistant"; content: string };
@@ -38,11 +48,15 @@ type Message =
   | { role: "assistant"; content: string | null; tool_calls?: ToolCall[]; items?: unknown[] }
   | { role: "tool"; tool_call_id: string; content: string };
 
+/** The AI turned the request away before answering (no key, no credit, busy): safe to try another. */
 export class AgentUnavailable extends Error {}
 /** OpenAI went quiet, or the whole answer took longer than TOTAL_MS. */
 export class AgentTimeout extends Error {}
 
-function systemPrompt(focused: boolean): string {
+type Provider = "openai" | "groq";
+
+/** web: the model has web_search. note: it may write a short note to the reader before its first tool call. */
+function systemPrompt(focused: boolean, { web, note }: { web: boolean; note: boolean }): string {
   const today = new Intl.DateTimeFormat("en-GB", {
     timeZone: process.env.TIMEZONE || "Asia/Kolkata",
     weekday: "long",
@@ -50,15 +64,16 @@ function systemPrompt(focused: boolean): string {
     month: "long",
     year: "numeric",
   }).format(new Date());
-  const web = webSearchOn();
   return [
     `You are Ask ReadKernel, the assistant of ReadKernel, a daily tech and AI news brief. Today is ${today}.`,
     web
       ? "Answer questions about tech and AI news using only what your tools return, never from memory, which may be out of date. Start with ReadKernel's own coverage (the news tools). Use web_search as well for background, more detail, history, people's careers, competitors, or anything ReadKernel hasn't covered or covers thinly, and to check whether something has changed since."
       : "Answer questions about tech and AI news using ONLY what the tools return. Always call a tool before answering a news question; never answer from memory, which may be out of date.",
-    "Before your first tool call, write one short sentence to the reader saying what you're about to check, e.g. \"I'll check ReadKernel's coverage of Nvidia and the latest reporting.\" Write it only once (no more notes before later tool calls), don't repeat it in your answer, and write none for an out-of-scope question.",
+    note
+      ? "Before your first tool call, write one short sentence to the reader saying what you're about to check, e.g. \"I'll check ReadKernel's coverage of Nvidia and the latest reporting.\" Write it only once (no more notes before later tool calls), don't repeat it in your answer, and write none for an out-of-scope question."
+      : "Don't write anything before a tool call; write only the final answer.",
     "Search with short keyword queries (a company, product or person). If a call finds nothing, try again before giving up: drop filters (like subject), use search_news, or try another wording. Use get_story to follow a story's timeline.",
-    "Cite every fact by copying the cite field of the story or post it came from, right after the fact, for example: Nvidia may buy part of Meta's share sale ([Bloomberg](https://www.bloomberg.com/...)). Never use other citation styles such as 【1†source】 or [1]. Mention dates when they matter.",
+    "Cite every fact by copying the cite field of the story or post it came from, right after the fact, for example: Nvidia may buy part of Meta's share sale ([Bloomberg](https://www.bloomberg.com/...)). Keep the square-bracketed name: a bare (https://...) is not a citation. Never use other citation styles such as 【1†source】 or [1]. Mention dates when they matter.",
     ...(web
       ? [
           "For a fact from web_search, link the page it came from the same way, named after its publisher, e.g. ([Reuters](https://www.reuters.com/...)). Prefer reputable news outlets and companies' own pages. Never link a page the search didn't return.",
@@ -126,7 +141,14 @@ function retryAfter(header: string | null): number | null {
 }
 
 /** POST that streams back, with retries on rate limits and server errors before any of it arrives. */
-async function openStream(url: string, key: string, body: Record<string, unknown>, signal: AbortSignal, emit: (e: AskEvent) => void): Promise<Response> {
+async function openStream(
+  url: string,
+  key: string,
+  body: Record<string, unknown>,
+  signal: AbortSignal,
+  emit: (e: AskEvent) => void,
+  maxWait = MAX_WAIT_S.openai,
+): Promise<Response> {
   const ATTEMPTS = 3;
   for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
     const res = await fetch(url, {
@@ -135,15 +157,29 @@ async function openStream(url: string, key: string, body: Record<string, unknown
       body: JSON.stringify(body),
       signal,
     });
+    // The key is missing its credit or isn't accepted: waiting won't help.
+    if (res.status === 401 || res.status === 402 || res.status === 403) {
+      throw new AgentUnavailable(`The AI refused the key (${res.status}): ${(await res.text()).slice(0, 200)}`);
+    }
+    // Groq sometimes rejects a tool call its model wrote badly; asking again usually works.
+    if (res.status === 400 && attempt < ATTEMPTS - 1) {
+      const text = await res.text();
+      if (text.includes("tool_use_failed")) {
+        console.warn(`[ask] AI wrote a broken tool call (attempt ${attempt + 1}), asking again`);
+        continue;
+      }
+      throw new Error(`AI 400: ${text.slice(0, 300)}`);
+    }
     if (res.status === 429 || res.status >= 500) {
-      const reason = (await res.text()).slice(0, 200);
-      // Out of credit: waiting won't help.
-      if (reason.includes("insufficient_quota")) throw new AgentUnavailable("The AI account has no credit left");
+      const text = await res.text();
+      const reason = text.slice(0, 200);
+      // Out of credit: waiting won't help. (OpenAI names it after a long message, so check the whole body.)
+      if (/insufficient_quota|billing_hard_limit|billing_not_active/.test(text)) throw new AgentUnavailable("The AI account has no credit left");
       if (attempt === ATTEMPTS - 1) break;
       const wait = Math.ceil(retryAfter(res.headers.get("retry-after")) ?? 2 ** attempt);
       // Retry-After is a minimum. A longer wait won't end while the reader
       // waits, so stop now.
-      if (wait > 8) throw new AgentUnavailable(`The AI asked us to wait ${wait}s: ${reason}`);
+      if (wait > maxWait) throw new AgentUnavailable(`The AI asked us to wait ${wait}s: ${reason}`);
       console.warn(`[ask] AI ${res.status} (attempt ${attempt + 1}), waiting ${wait}s: ${reason}`);
       emit({ type: "status", phase: "retry", waitSeconds: wait, reason: res.status === 429 ? "rate_limited" : "server_error" });
       await sleep(wait * 1000, signal);
@@ -219,6 +255,31 @@ function toResponsesInput(messages: Message[]): unknown[] {
   });
 }
 
+/** Base URL of OpenAI's API (OPENAI_BASE_URL can point it at a test stub). */
+function openaiBase(): string {
+  return (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
+}
+
+/** Gives up on a call that goes quiet, as well as when the reader leaves. */
+function idleWatch(signal: AbortSignal) {
+  const idle = new AbortController();
+  let timer = setTimeout(() => idle.abort(), IDLE_MS);
+  return {
+    signal: AbortSignal.any([signal, idle.signal]),
+    alive() {
+      clearTimeout(timer);
+      timer = setTimeout(() => idle.abort(), IDLE_MS);
+    },
+    /** The error to throw: a timeout if the call went quiet, else the original one. */
+    explain(err: unknown, provider: string): unknown {
+      if (idle.signal.aborted && !signal.aborted) return new AgentTimeout(`No data from the AI for ${IDLE_MS / 1000}s`);
+      if (signal.aborted) console.info(`[ask] ${provider} request aborted: ${String((signal.reason as Error)?.name ?? signal.reason)}`);
+      return err;
+    },
+    stop: () => clearTimeout(timer),
+  };
+}
+
 /**
  * One step of the conversation, through OpenAI's Responses API (the model is
  * set by ASK_MODEL), streamed. Answer text goes into `guard` as it arrives;
@@ -238,18 +299,11 @@ async function callModel(
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new AgentUnavailable("OPENAI_API_KEY is not set");
 
-  // Give up on a call that goes quiet, as well as when the reader leaves.
-  const idle = new AbortController();
-  let timer = setTimeout(() => idle.abort(), IDLE_MS);
-  const callSignal = AbortSignal.any([signal, idle.signal]);
-  const alive = () => {
-    clearTimeout(timer);
-    timer = setTimeout(() => idle.abort(), IDLE_MS);
-  };
-
+  const watch = idleWatch(signal);
+  const alive = watch.alive;
   try {
     const res = await openStream(
-      "https://api.openai.com/v1/responses",
+      `${openaiBase()}/responses`,
       key,
       {
         model: process.env.ASK_MODEL || "gpt-6-luna",
@@ -265,7 +319,7 @@ async function callModel(
         tool_choice: useTools ? "auto" : "none",
         stream: true,
       },
-      callSignal,
+      watch.signal,
       emit,
     );
     usage?.startCall(); // only now: a refused request (429, no credit) isn't billed
@@ -346,12 +400,108 @@ async function callModel(
       webSteps,
     };
   } catch (err) {
-    if (idle.signal.aborted && !signal.aborted) throw new AgentTimeout(`No data from the AI for ${IDLE_MS / 1000}s`);
-    if (signal.aborted) console.info(`[ask] OpenAI request aborted: ${String((signal.reason as Error)?.name ?? signal.reason)}`);
-    throw err;
+    throw watch.explain(err, "OpenAI");
   } finally {
-    clearTimeout(timer);
+    watch.stop();
   }
+}
+
+const GROQ_TOOLS = NEWS_TOOLS.map((t) => ({
+  type: "function" as const,
+  function: { name: t.name, description: t.description, parameters: t.inputSchema },
+}));
+
+/** Our history as Chat Completions messages (OpenAI's reasoning and web search items can't go to Groq). */
+function toChatMessages(messages: Message[]): unknown[] {
+  return messages.map((m) => {
+    if (m.role === "assistant") return { role: "assistant", content: m.content ?? "", ...(m.tool_calls?.length ? { tool_calls: m.tool_calls } : {}) };
+    if (m.role === "tool") return { ...m, content: m.content.slice(0, GROQ_TOOL_RESULT) };
+    return m;
+  });
+}
+
+/**
+ * One step through Groq (GROQ_MODEL, default openai/gpt-oss-120b), streamed:
+ * the fallback when OpenAI can't take the request. Only ReadKernel's own tools;
+ * Groq has no web search we can check links against.
+ */
+async function callGroq(
+  messages: Message[],
+  useTools: boolean,
+  guard: AnswerGuard,
+  signal: AbortSignal,
+  emit: (e: AskEvent) => void,
+  usage?: AskUsage,
+): Promise<ModelReply> {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) throw new AgentUnavailable("GROQ_API_KEY is not set");
+
+  const watch = idleWatch(signal);
+  try {
+    const res = await openStream(
+      "https://api.groq.com/openai/v1/chat/completions",
+      key,
+      {
+        model: groqModel(),
+        messages: toChatMessages(messages),
+        // On the last step the tools are left out, so it has to answer.
+        ...(useTools ? { tools: GROQ_TOOLS, tool_choice: "auto" } : {}),
+        reasoning_effort: "low",
+        temperature: 0.2,
+        max_completion_tokens: 3000,
+        stream: true,
+      },
+      watch.signal,
+      emit,
+      MAX_WAIT_S.groq,
+    );
+    usage?.startCall();
+    watch.alive();
+
+    // Tool calls arrive in pieces, keyed by index.
+    const calls: { id?: string; name?: string; arguments: string }[] = [];
+    let finish: string | null = null;
+    let used: unknown = null;
+    for await (const chunk of sseData(res.body!, watch.alive)) {
+      const choice = (chunk.choices as { delta?: Record<string, unknown>; finish_reason?: string | null }[] | undefined)?.[0];
+      const delta = choice?.delta as { content?: string | null; tool_calls?: { index?: number; id?: string; function?: { name?: string; arguments?: string } }[] } | undefined;
+      if (delta?.content) flush(guard.push(delta.content), emit);
+      for (const t of delta?.tool_calls ?? []) {
+        const c = (calls[t.index ?? calls.length] ??= { arguments: "" });
+        if (t.id) c.id = t.id;
+        if (t.function?.name) c.name = t.function.name;
+        if (t.function?.arguments) c.arguments += t.function.arguments;
+      }
+      if (choice?.finish_reason) finish = choice.finish_reason;
+      const u = chunk.usage ?? (chunk.x_groq as { usage?: unknown } | undefined)?.usage;
+      if (u) used = u;
+      const error = chunk.error as { message?: string } | undefined;
+      if (error) throw new Error(`AI stream error: ${String(error.message ?? JSON.stringify(error)).slice(0, 300)}`);
+    }
+    usage?.add(used);
+    if (!finish) throw new Error("The AI's reply stopped before it finished");
+    if (finish === "length") console.warn("[ask] Groq reply cut off: too long");
+
+    const toolCalls: ToolCall[] = calls
+      .filter((c) => c.name)
+      .map((c, i) => ({ id: c.id ?? `groq_${i}`, type: "function", function: { name: c.name!, arguments: c.arguments || "{}" } }));
+    return { tool_calls: toolCalls, items: [], status: finish === "length" ? "incomplete" : "completed", webSteps: [] };
+  } catch (err) {
+    throw watch.explain(err, "Groq");
+  } finally {
+    watch.stop();
+  }
+}
+
+function groqModel(): string {
+  return process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+}
+
+/** Which AI starts: OpenAI unless ASK_PROVIDER=groq, or OpenAI has no key and Groq has one. */
+function firstProvider(): Provider {
+  if (process.env.ASK_PROVIDER === "groq") return "groq";
+  if (!process.env.OPENAI_API_KEY && process.env.GROQ_API_KEY) return "groq";
+  return "openai";
 }
 
 /** Sends what the guard released: citations first, then the text that shows them. */
@@ -468,15 +618,36 @@ async function answer(
     }
   }
   // After the latest question, where the model's own get_story call would go.
-  messages.unshift({ role: "system", content: systemPrompt(focused) }, ...history);
+  let provider = firstProvider();
+  const prompt = () => systemPrompt(focused, provider === "openai" ? { web: webSearchOn(), note: true } : { web: false, note: false });
+  messages.unshift({ role: "system", content: prompt() }, ...history);
+  if (provider === "groq") usage?.switchTo("groq", groqModel(), process.env.ASK_PROVIDER !== "groq");
 
   for (let step = 0; step < MAX_STEPS; step++) {
     signal.throwIfAborted();
     // On the last step, no more tools: it must answer with what it has.
     const last = step === MAX_STEPS - 1;
     emit({ type: "status", phase: "thinking", round: step + 1 });
-    const guard = new AnswerGuard(known);
-    const reply = await callModel(messages, !last, guard, signal, emit, (urls) => urls.forEach((u) => known.add(u)), usage);
+    let guard = new AnswerGuard(known);
+    let reply: ModelReply;
+    if (provider === "openai") {
+      try {
+        reply = await callModel(messages, !last, guard, signal, emit, (urls) => urls.forEach((u) => known.add(u)), usage);
+      } catch (err) {
+        // OpenAI turned the request away before writing anything: Groq takes over this
+        // step and the rest of the answer. A timeout, a reader's Stop or a reply that broke
+        // off part way is not retried elsewhere.
+        if (!(err instanceof AgentUnavailable) || signal.aborted || !process.env.GROQ_API_KEY) throw err;
+        console.warn(`[ask] OpenAI unavailable (${err.message}); answering with Groq`);
+        provider = "groq";
+        usage?.switchTo("groq", groqModel(), true);
+        messages[0] = { role: "system", content: prompt() };
+        guard = new AnswerGuard(known);
+        reply = await callGroq(messages, !last, guard, signal, emit, usage);
+      }
+    } else {
+      reply = await callGroq(messages, !last, guard, signal, emit, usage);
+    }
     steps.push(...reply.webSteps);
     const calls = reply.tool_calls;
 

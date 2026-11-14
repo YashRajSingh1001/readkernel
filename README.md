@@ -154,9 +154,9 @@ Manual runs build the brief without emailing unless you tick "send_email".
 1. vercel.com -> **Add New -> Project** -> import this GitHub repo.
 2. **Root Directory: `web`** (the framework is detected as Next.js).
 3. **Environment Variables**: add the website's settings from `.env`: `SUPABASE_URL`,
-   `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `OPENAI_API_KEY` and the email settings,
-   with `SITE_URL` set to the Vercel address (or your domain). The pipeline's keys (like
-   `GROQ_API_KEY`) aren't needed there.
+   `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `OPENAI_API_KEY`, `GROQ_API_KEY` (Ask's
+   fallback when OpenAI is out of credit) and the email settings, with `SITE_URL` set to the Vercel
+   address (or your domain).
 4. **Deploy.** Every push to `main` redeploys automatically.
 
 ### Custom domain

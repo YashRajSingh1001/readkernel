@@ -120,7 +120,7 @@ function phaseText(phase: Phase, steps: Activity[]): string {
     case "thinking":
       return phase.round === 1 && steps.length === 0 ? "Deciding where to look…" : "Reading what it found…";
     case "retry":
-      return `OpenAI is ${phase.reason === "rate_limited" ? "rate-limiting us" : "having trouble"}; trying again in ${plural(phase.waitSeconds, "second")}…`;
+      return `${phase.reason === "rate_limited" ? "The AI is busy" : "The AI is having trouble"}; trying again in ${plural(phase.waitSeconds, "second")}…`;
   }
 }
 
