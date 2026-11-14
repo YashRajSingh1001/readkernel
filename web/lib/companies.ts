@@ -54,13 +54,9 @@ export async function searchCompanyPosts(query: string, limit = 20): Promise<Com
   const q = query.trim().slice(0, 100);
   if (q.length < 2) return [];
   if (supabase()) {
-    try {
-      return await rest<CompanyPost[]>(
-        `company_posts?select=${COLUMNS}&search=wfts(english).${encodeURIComponent(q)}&order=published.desc&limit=${limit}`,
-      );
-    } catch {
-      return [];
-    }
+    return rest<CompanyPost[]>(
+      `company_posts?select=${COLUMNS}&search=wfts(english).${encodeURIComponent(q)}&order=published.desc&limit=${limit}`,
+    );
   }
   const words = q.toLowerCase().split(/\s+/);
   return (await listCompanyPosts())

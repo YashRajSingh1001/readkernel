@@ -3,6 +3,7 @@ import { NDJSON, type AskEvent } from "@/lib/ask-stream";
 import { getLatestEdition } from "@/lib/brief";
 import { AgentTimeout, AgentUnavailable, askAgent, type AgentAnswer, type ChatTurn } from "@/lib/server/agent";
 import { AskUsage, recordAskUsage, type AskOutcome } from "@/lib/server/ai-usage";
+import { shouldCacheAnswer } from "@/lib/news-search";
 import { askCacheKey, readCachedAnswer, saveCachedAnswer } from "@/lib/server/ask-cache";
 import { OFF_TOPIC_REPLY } from "@/lib/server/ask-scope";
 
@@ -141,8 +142,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const save = async (result: { answer: string; steps: unknown[]; complete: boolean }) => {
-    if (cacheKey && result.complete) await saveCachedAnswer(cacheKey, { answer: result.answer, steps: result.steps as never });
+  const save = async (result: AgentAnswer) => {
+    if (cacheKey && shouldCacheAnswer(result)) await saveCachedAnswer(cacheKey, { answer: result.answer, steps: result.steps });
   };
 
   if (!streaming) {
@@ -150,7 +151,7 @@ export async function POST(request: Request) {
       const result = await askAgent(turns, { storyKey, signal: request.signal, usage });
       await save(result);
       await logUsage(outcomeOf(result), result);
-      return Response.json(result);
+      return Response.json({ answer: result.answer, steps: result.steps, complete: result.complete, truncated: result.truncated });
     } catch (err) {
       console.error("[ask]", err);
       await logUsage(request.signal.aborted ? "stopped" : "failed");
