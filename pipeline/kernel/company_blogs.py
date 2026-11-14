@@ -32,6 +32,7 @@ from .fetch import USER_AGENT, fetch_all
 from .filter import canonical_url
 from .images import page_preview_image
 from .llm import LLM, make_llm
+from .usage import record_usage
 from .models import Source
 from .store import Supabase
 
@@ -368,7 +369,9 @@ def main() -> None:
         return
 
     fill_from_pages(new)
-    describe(new, None if args.no_ai else make_llm(settings))
+    llm = None if args.no_ai else make_llm(settings)
+    describe(new, llm)
+    record_usage(db, llm, "company_blogs")
     save(new, db, settings.data_dir)
     print(f"[companies] saved {len(new)} posts to {'Supabase' if db else settings.data_dir / LOCAL_FILE}")
     for p in sorted(new, key=lambda p: -p.score)[:10]:

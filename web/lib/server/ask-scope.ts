@@ -4,10 +4,11 @@ import "server-only";
 // 1. looksLikeCode(): pasted code or error output is turned away before any AI call.
 // 2. The system prompt (agent.ts) tells the AI to reply OFF_TOPIC to anything
 //    else, such as coding help, homework or general knowledge.
-// 3. isOffTopicAnswer(): an answer carrying that marker, or a code block, is
-//    replaced with OFF_TOPIC_REPLY, so a tricked AI still can't hand out code.
+// 3. AnswerGuard (lib/ask-stream.ts) stops the streamed answer the moment it
+//    carries that marker or a code block, before any of it is shown, and the
+//    answer becomes OFF_TOPIC_REPLY, so a tricked AI still can't hand out code.
 
-export const OFF_TOPIC_MARKER = "OFF_TOPIC";
+export { OFF_TOPIC_MARKER } from "../ask-stream";
 
 export const OFF_TOPIC_REPLY =
   "I can only help with tech and AI news, so I can't answer that. Try asking what's happened with a company, product or topic, for example: What has Nvidia been up to this week?";
@@ -23,9 +24,4 @@ export function looksLikeCode(text: string): boolean {
   if (/Traceback \(most recent call last\)|^\s+at \S+ \(.+:\d+:\d+\)$|\b\w+(?:Error|Exception): .+\n/m.test(text)) return true;
   const lines = text.split("\n").filter((l) => l.trim());
   return lines.filter((l) => CODE_LINE.test(l)).length >= 2;
-}
-
-/** True when the AI declined the question, or wrote code anyway. */
-export function isOffTopicAnswer(answer: string): boolean {
-  return answer.includes(OFF_TOPIC_MARKER) || /```/.test(answer);
 }

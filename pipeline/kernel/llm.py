@@ -24,6 +24,12 @@ class LLM:
         self.api_key = api_key
         self.model = model
         self._client = httpx.Client(timeout=TIMEOUT)
+        # Token counts over every call this run, as the provider reported them
+        # (see usage.py). input includes cached and cache_write; output includes reasoning.
+        self.usage = {
+            "calls": 0, "calls_without_usage": 0, "input": 0, "cached_input": 0,
+            "cache_write": 0, "output": 0, "reasoning": 0,
+        }
 
     def __repr__(self) -> str:
         return f"LLM({self.provider}:{self.model})"
@@ -68,7 +74,9 @@ class LLM:
                 },
             )
             response.raise_for_status()
-            blocks = response.json().get("content", [])
+            data = response.json()
+            self._add_usage(data.get("usage"))
+            blocks = data.get("content", [])
             return "".join(b.get("text", "") for b in blocks if b.get("type") == "text")
 
         # Groq and OpenAI share the chat-completions format.
@@ -98,7 +106,31 @@ class LLM:
             url, headers={"Authorization": f"Bearer {self.api_key}"}, json=body
         )
         response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"] or ""
+        data = response.json()
+        self._add_usage(data.get("usage"))
+        return data["choices"][0]["message"]["content"] or ""
+
+    def _add_usage(self, usage: dict | None) -> None:
+        """Adds one reply's usage. Counted before the reply is parsed: a bad reply still costs."""
+        u = self.usage
+        u["calls"] += 1  # replies only: refused (429) and failed requests aren't billed
+        if not isinstance(usage, dict):
+            u["calls_without_usage"] += 1
+            return
+        if self.provider == "claude":
+            # Anthropic counts cache reads and writes apart from input_tokens.
+            read = usage.get("cache_read_input_tokens") or 0
+            write = usage.get("cache_creation_input_tokens") or 0
+            u["input"] += (usage.get("input_tokens") or 0) + read + write
+            u["cached_input"] += read
+            u["cache_write"] += write
+            u["output"] += usage.get("output_tokens") or 0
+            return
+        # Groq and OpenAI chat completions.
+        u["input"] += usage.get("prompt_tokens") or 0
+        u["output"] += usage.get("completion_tokens") or 0
+        u["cached_input"] += (usage.get("prompt_tokens_details") or {}).get("cached_tokens") or 0
+        u["reasoning"] += (usage.get("completion_tokens_details") or {}).get("reasoning_tokens") or 0
 
 
 def _retry_after(response: httpx.Response) -> float | None:

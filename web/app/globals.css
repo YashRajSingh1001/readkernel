@@ -128,3 +128,34 @@ body {
   padding-left: 1rem;
   color: var(--muted);
 }
+
+/* Ask: status lines and confirmed citation links fade in as the server reports
+   them. Opacity only, no movement; nothing at all with reduced motion. */
+@keyframes rk-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+.rk-fade {
+  animation: rk-fade-in 120ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rk-fade {
+    animation: none;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Ask is a full-screen chat, like a chat app: no site footer, and the chat
+   fills the space under the header so its question box sits at the bottom of
+   the screen however short the conversation is (components/AskChat.tsx). */
+body:has([data-ask-app]) > footer {
+  display: none;
+}
+main:has([data-ask-app]) {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}

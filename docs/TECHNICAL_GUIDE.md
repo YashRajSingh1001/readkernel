@@ -437,8 +437,14 @@ sequenceDiagram
 - Tested 27 October 2026: "What has Nvidia been up to?" → one search, four facts, sources listed.
   "What did Uber write about AI?" → its first, filtered search found nothing, so it **retried by
   itself** without the filter and found Uber's AutoClean post.
-- Runs on OpenAI's `gpt-6-luna` at medium reasoning, with no fallback: Ask is off until
-  `OPENAI_API_KEY` is set in Vercel's environment variables. The pipeline's AI is separate and stays on Groq.
+- Runs on OpenAI's `gpt-6-luna` at medium reasoning. **Fallback:** if OpenAI turns a question away before
+  answering (out of credit, no key, a refused key, or still busy after retries), Groq's `gpt-oss-120b`
+  answers it instead, from that step on, with ReadKernel's tools but no web search (`web/lib/server/agent.ts`,
+  `callGroq`). A timeout, a reader's Stop or a reply that breaks off part way is not retried on Groq.
+  Groq's free tier allows 8,000 tokens a minute, shared with the pipeline, so its requests are kept small
+  (tool results cut to 4,000 characters, low reasoning) and may wait up to 30 s for their turn; under heavy
+  use expect "busy" replies until OpenAI has credit again. `ai_usage` rows then say `provider = 'groq'` and
+  `details.fallback_from = 'openai'`. `ASK_PROVIDER=groq` forces Groq (for testing).
 - The website never names the AI services it uses (the privacy page says "AI services"), and Ask
   declines questions about which AI runs it.
 
@@ -519,6 +525,7 @@ run by hand in Supabase's SQL Editor; each one can safely run again.
 | `watch_hits` | Stories each wish matched, with the agent's reason (never repeated) | Pipeline and website server only |
 | `story_companies` | Which companies each story is about (slug + name), one row per story per company per day | Everyone |
 | `ask_answers` | Stored answers to Ask's suggested questions, per story per day | Website server and pipeline only |
+| `ai_usage`, `ai_prices` | AI token counts (one row per Ask question and per pipeline job run) and the prices that turn them into cost | Website server and pipeline only |
 
 | Migration | Added |
 | --- | --- |
@@ -529,6 +536,7 @@ run by hand in Supabase's SQL Editor; each one can safely run again.
 | `005_company_posts.sql` | company_posts, the "company read" setting |
 | `006_watches.sql` | watches, watch_hits |
 | `007_companies_and_ask_cache.sql` | story_companies, ask_answers |
+| `008_ai_usage.sql` | ai_usage, ai_prices, and the views ai_usage_costed and ai_cost_daily |
 
 **Why Supabase:** free, real SQL (joins, full-text search, constraints), **Row Level Security**
 (rules inside the database decide who can read what), a ready-made REST API so neither program needs
@@ -712,6 +720,35 @@ so they're free and repeatable.
 | Resend | **3,000 emails/month, 100/day** | One per subscriber per day | **Past ~90 subscribers**, upgrade Resend or split sending. |
 | Domain | — | ₹899/year from year two | Turn on auto-renew in GoDaddy. |
 
+### What the AI costs
+
+Every Ask question, and every pipeline job that calls the AI, saves one row to `ai_usage` with the token
+counts the provider reported (input, cached input, output, reasoning, web searches). Ask also records how
+the question ended (`answered`, `cached`, `off_topic`, `failed`, `stopped`, …), never the question itself.
+Cost is worked out from `ai_prices` when you read it, so updating a price corrects old rows too; a model with
+no price row shows no cost. Runs on your own machine are saved as `env = 'local'`; set `AI_USAGE_LOG=off`
+to skip saving altogether. The same totals are printed as an `[ask-usage]` or `[usage]` log line.
+
+In Supabase's SQL Editor:
+
+```sql
+-- Day by day: questions, average tokens and cost per question, and the pipeline's runs
+select * from ai_cost_daily where env = 'production' order by day desc, source;
+
+-- Average per Ask question over the last 7 days, cached answers included
+select count(*) as questions, round(avg(input_tokens + output_tokens)) as avg_tokens,
+       round(avg(cost_usd), 5) as avg_cost_usd, sum(cost_usd) as total_usd
+from ai_usage_costed
+where source = 'ask' and env = 'production' and created_at > now() - interval '7 days';
+
+-- When a price changes
+update ai_prices set input_per_m = 0.10, cached_input_per_m = 0.01, output_per_m = 0.50
+where provider = 'openai' and model = 'gpt-6-luna';
+```
+
+A question stopped mid-answer may have been billed for a call that never reported its usage; those show
+in `calls_without_usage`, so the totals can be slightly low.
+
 ---
 
 ## 15. Settings reference
@@ -724,10 +761,12 @@ Template: [`.env.example`](../.env.example).
 | Setting | Used by | Value now | Meaning |
 | --- | --- | --- | --- |
 | `LLM_PROVIDER` | pipeline | `groq` | `groq`, `claude`, `openai` or `none` |
-| `GROQ_API_KEY` | pipeline | (secret) | Free key from console.groq.com |
+| `GROQ_API_KEY` | pipeline, website | (secret) | Free key from console.groq.com. The website uses it only as Ask's fallback |
 | `GROQ_MODEL` | pipeline | `openai/gpt-oss-120b` | Model on Groq |
-| `OPENAI_API_KEY` | website | (secret) | Ask ReadKernel's AI. Not read by the pipeline, which stays on Groq |
+| `OPENAI_API_KEY` | website | (secret) | Ask ReadKernel's AI. Not read by the pipeline, which stays on Groq. Ask falls back to Groq without it |
 | `ASK_MODEL` / `ASK_REASONING_EFFORT` | website | `gpt-6-luna` / `medium` | OpenAI model and reasoning level for Ask |
+| `ASK_PROVIDER` | website | (OpenAI first) | `groq`: Ask answers with Groq only. Otherwise Groq (`GROQ_API_KEY`, `GROQ_MODEL`) is the fallback when OpenAI can't answer |
+| `AI_USAGE_LOG` | both | not set (on) | `off` stops saving AI token counts to `ai_usage` |
 | `MAX_AGE_HOURS` | pipeline | 36 | How old an article may be |
 | `STORIES_PER_BRIEF` / `FEED_SIZE` | pipeline | 10 / 30 | Brief and feed size |
 | `EMBEDDINGS` | pipeline | `local` | `local` (bge-small) or `simple` (word overlap, no download) |

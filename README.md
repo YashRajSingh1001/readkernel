@@ -71,7 +71,7 @@ Output goes to `pipeline/data/latest.json` and `pipeline/data/brief-YYYY-MM-DD.j
 ## Database (Supabase)
 
 1. Create a free project at supabase.com.
-2. Open **SQL Editor** and run each file in `db/migrations/` in order (`001_init.sql` to `007_companies_and_ask_cache.sql`).
+2. Open **SQL Editor** and run each file in `db/migrations/` in order (`001_init.sql` to `008_ai_usage.sql`).
 3. From **Project Settings -> API**, copy:
    - the project URL, **secret** key and **publishable** key into `.env` (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`,
      `SUPABASE_PUBLISHABLE_KEY`). The pipeline and the website both read this one file.
@@ -154,9 +154,9 @@ Manual runs build the brief without emailing unless you tick "send_email".
 1. vercel.com -> **Add New -> Project** -> import this GitHub repo.
 2. **Root Directory: `web`** (the framework is detected as Next.js).
 3. **Environment Variables**: add the website's settings from `.env`: `SUPABASE_URL`,
-   `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `OPENAI_API_KEY` and the email settings,
-   with `SITE_URL` set to the Vercel address (or your domain). The pipeline's keys (like
-   `GROQ_API_KEY`) aren't needed there.
+   `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `OPENAI_API_KEY`, `GROQ_API_KEY` (Ask's
+   fallback when OpenAI is out of credit) and the email settings, with `SITE_URL` set to the Vercel
+   address (or your domain).
 4. **Deploy.** Every push to `main` redeploys automatically.
 
 ### Custom domain

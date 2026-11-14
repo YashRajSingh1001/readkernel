@@ -26,6 +26,7 @@ import numpy as np
 from .config import load_settings
 from .embed import embed
 from .llm import LLM, make_llm
+from .usage import record_usage
 from .store import Supabase
 
 SHORTLIST = 6  # items per wish sent to the AI
@@ -156,6 +157,8 @@ def main() -> None:
     candidates, used = shortlist(watches, items, settings.embeddings, settings.data_dir / "models")
     llm = None if args.no_ai else make_llm(settings)
     rows = hit_rows(confirm(watches, items, candidates, llm, used), day)
+    if not args.dry_run:
+        record_usage(db, llm, "watches")
     wishes = {w["id"]: w["description"] for w in watches}
     for r in rows:
         print(f"   \"{wishes[r['watch_id']]}\" -> {r['title'][:70]}  ({r['reason']})")

@@ -6,10 +6,14 @@ import "server-only";
 // can land on a fresh instance. Until the migration has run, every lookup
 // misses and nothing is stored, so Ask works exactly as before.
 
-import type { AgentStep } from "./agent";
+import type { AskStep } from "../ask-stream";
 import { adminConfigured, adminRest } from "./admin-db";
 
-export type CachedAnswer = { answer: string; steps: AgentStep[] };
+export type CachedAnswer = { answer: string; steps: AskStep[] };
+
+// ASK_CACHE=off skips the table entirely and ASK_CACHE=read never writes to it,
+// for trying Ask locally against the live database without storing test answers.
+const mode = () => process.env.ASK_CACHE ?? "on";
 
 /** The edition date is part of the key: "How has this developed?" changes daily. */
 export function askCacheKey(editionDate: string, question: string, storyKey?: string): string {
@@ -17,7 +21,7 @@ export function askCacheKey(editionDate: string, question: string, storyKey?: st
 }
 
 export async function readCachedAnswer(key: string): Promise<CachedAnswer | null> {
-  if (!adminConfigured()) return null;
+  if (!adminConfigured() || mode() === "off") return null;
   try {
     const rows = await adminRest<CachedAnswer[]>(`ask_answers?select=answer,steps&key=eq.${encodeURIComponent(key)}&limit=1`);
     return rows?.[0] ?? null;
@@ -28,7 +32,7 @@ export async function readCachedAnswer(key: string): Promise<CachedAnswer | null
 }
 
 export async function saveCachedAnswer(key: string, value: CachedAnswer): Promise<void> {
-  if (!adminConfigured()) return;
+  if (!adminConfigured() || mode() !== "on") return;
   try {
     await adminRest("ask_answers", {
       method: "POST",
