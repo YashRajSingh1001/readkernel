@@ -77,13 +77,14 @@ class FakeDB:
     def __init__(self, fail=False):
         self.calls, self.fail = [], fail
 
-    def delete(self, table, **filters):
-        self.calls.append(("delete", table, filters))
+    def upsert(self, table, rows, on_conflict=None):
+        self.calls.append(("upsert", table, rows))
         if self.fail:
             raise httpx.HTTPStatusError("relation story_companies does not exist", request=None, response=None)
 
-    def insert(self, table, rows):
-        self.calls.append(("insert", table, rows))
+    def select(self, table, params):
+        self.calls.append(("select", table, params))
+        return []
 
 
 def test_story_companies_rows_are_slugged_and_deduped():
@@ -94,8 +95,8 @@ def test_story_companies_rows_are_slugged_and_deduped():
     ]}
     db = FakeDB()
     save_story_companies(output, db)
-    assert db.calls[0] == ("delete", "story_companies", {"edition_date": "2026-11-08"})
-    rows = db.calls[1][2]
+    assert db.calls[1] == ("select", "story_companies", {"select": "story_key,company", "edition_date": "eq.2026-11-08"})
+    rows = db.calls[0][2]
     assert [(r["story_key"], r["company"]) for r in rows] == [("abc123", "openai"), ("abc123", "anthropic")]
 
 

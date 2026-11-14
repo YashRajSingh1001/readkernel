@@ -35,22 +35,26 @@ def fake_db(handler) -> tuple[Supabase, list[httpx.Request]]:
     return db, seen
 
 
+def rest_ok(request: httpx.Request) -> httpx.Response:
+    return httpx.Response(200, json=[]) if request.method == "GET" else httpx.Response(201)
+
+
 def test_save_supabase_replaces_the_days_stories():
-    db, seen = fake_db(lambda r: httpx.Response(201))
+    db, seen = fake_db(rest_ok)
     save_supabase(OUTPUT, db)
-    calls = [(r.method, r.url.path, r.url.params.get("edition_date")) for r in seen]
+    calls = [(r.method, r.url.path, dict(r.url.params)) for r in seen]
     assert calls == [
-        ("POST", "/rest/v1/editions", None),
-        ("DELETE", "/rest/v1/stories", "eq.2026-10-18"),
-        ("POST", "/rest/v1/stories", None),
-        ("DELETE", "/rest/v1/story_companies", "eq.2026-10-18"),
+        ("POST", "/rest/v1/editions", {}),
+        ("DELETE", "/rest/v1/stories", {"edition_date": "eq.2026-10-18", "position": "gt.2"}),
+        ("POST", "/rest/v1/stories", {"on_conflict": "edition_date,position"}),
+        ("GET", "/rest/v1/story_companies", {"select": "story_key,company", "edition_date": "eq.2026-10-18", "limit": "1000", "offset": "0"}),
     ]
     stories = json.loads(seen[2].content)
     assert [s["position"] for s in stories] == [1, 2]
 
 
 def test_save_supabase_saves_whole_feed_with_brief_marked():
-    db, seen = fake_db(lambda r: httpx.Response(201))
+    db, seen = fake_db(rest_ok)
     brief = [dict(OUTPUT["stories"][0], brief_position=1, story_key="k1")]
     feed = brief + [dict(OUTPUT["stories"][1], brief_position=None, story_key="k2")]
     save_supabase({**OUTPUT, "stories": brief, "feed": feed}, db)
