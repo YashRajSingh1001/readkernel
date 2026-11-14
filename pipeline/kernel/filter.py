@@ -26,8 +26,13 @@ def _title_key(title: str) -> str:
 
 
 def _has_word(title: str, words: list[str] | tuple[str, ...]) -> bool:
-    lowered = title.lower()
-    return any(re.search(rf"(?<![a-z0-9]){re.escape(w)}(?![a-z0-9])", lowered) for w in words)
+    lowered = title.lower().replace("\u2019", "'")
+    for w in words:
+        before = r"(?<![a-z0-9])" if w[:1].isalnum() else ""
+        after = r"(?![a-z0-9])" if w[-1:].isalnum() else ""
+        if re.search(before + re.escape(w) + after, lowered):
+            return True
+    return False
 
 
 def filter_articles(

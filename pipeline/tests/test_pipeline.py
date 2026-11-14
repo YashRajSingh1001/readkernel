@@ -28,7 +28,7 @@ def art(title, source="A", hours_ago=1, topic="tech", weight=1.0, url=None, desc
 def test_sources_file_is_valid():
     sources, exclude = load_sources(PIPELINE_DIR / "sources.yaml")
     assert len(sources) >= 25
-    assert "deal" in exclude
+    assert "best deals" in exclude and "deal" not in exclude
 
 
 def test_clean_text_strips_html():
