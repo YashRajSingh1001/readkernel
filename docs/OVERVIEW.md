@@ -70,7 +70,7 @@ flowchart TD
     B --> C["3. Group<br/>Merge articles about the same event into one story"]
     C --> D["4. Rank<br/>Score by coverage + trust + freshness + AI editor"]
     D --> E["5. Summarise<br/>Headline, summary, why it matters"]
-    E --> E2["6. Fact-check agent<br/>Every claim checked against the articles"]
+    E --> E2["6. Fact-check agent<br/>Check AI text or use the publisher's words"]
     E2 --> F["7. Photos, timelines, Top articles"]
     F --> G["8. Save to the database"]
     G --> H["9. Company blogs<br/>Add only new posts, sort by subject"]
@@ -86,7 +86,7 @@ flowchart TD
 | **Group** | A small AI model on the computer spots look-alike headlines. Groq double-checks the unclear ones. |
 | **Rank** | More outlets + more trusted outlets + newer = higher. An AI "editor" nudges each story up or down. |
 | **Summarise** | Groq writes the headline, a 2–3 sentence summary and "why it matters". Each story is summarised once and remembered. |
-| **Fact-check** | A second AI pass checks every claim against the articles; unsupported text is rewritten and re-checked, or replaced by the publisher's own words. |
+| **Fact-check** | A second AI pass checks AI story text against the article snippets. Unsupported text is rewritten and re-checked; failed or missing checks use the publisher's own words. Each story's outcome is saved with the edition. |
 | **Photos** | The publisher's own preview photo (the one WhatsApp shows), loaded from their site with credit. |
 | **Timelines** | Links today's story to the same ongoing story on earlier days ("This story so far"). |
 | **Top articles** | The most-upvoted Hacker News posts of the day, one line each. |
@@ -99,7 +99,7 @@ flowchart TD
 | What | Where | What it does |
 | --- | --- | --- |
 | **Ask ReadKernel** | [readkernel.in/ask](https://readkernel.in/ask) | A chat. The AI decides which tools to use (search, open a story's timeline, read today's brief), loops until it can answer, and links every fact. |
-| **Fact-check agent** | Every morning | Checks, rewrites and re-checks summaries before anything is published. |
+| **Fact-check agent** | Every morning | Checks AI story text before saving; uses publisher text when the check cannot pass. |
 | **Watch alerts agent** | Every morning, on the settings page | Matches each day's news against each reader's plain-English wishes. |
 | **MCP server** | `https://readkernel.in/mcp` | Lets Claude, Cursor and other AI assistants use ReadKernel's 7 news tools. |
 | **Local MCP server** | `pipeline/kernel/mcp_server.py` | The same idea run on your own computer (works offline; by a collaborator). |

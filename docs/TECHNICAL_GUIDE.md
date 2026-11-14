@@ -239,16 +239,28 @@ flowchart LR
     C --> D{"Check the<br/>rewrite again"}
     D -- yes --> FIX["Publish the correction"]
     D -- no --> FB["Use the publisher's<br/>own words instead"]
+    D -- no answer --> FB
 ```
 
-- Checks 5 stories per AI call. No AI-written text, first draft or rewrite, is **ever** published
+- Checks 5 stories per AI call. No AI-written story text, first draft or rewrite, is published
   without a passing check.
-- If the checker gives no answer for a story (the AI call failed or skipped that story), the story uses
-  the publisher's own words. This is not cached, so the next run checks the AI summary again.
-- Verdicts are cached, so each story is checked once, even across runs (a check with no answer is not a verdict).
-- Stories that use the publisher's own text (no AI summary) are not checked.
+- If the checker gives no valid answer for a story (the AI call failed, skipped that story, or returned
+  a malformed verdict or correction), the story uses the publisher's own words. This is not cached,
+  so the next run checks the AI summary again. It never replaces the cached AI draft.
+- Completed checks are cached across runs: a passing draft, a checked rewrite, or a publisher fallback
+  after two valid `fix` verdicts. Check-cache version 2 ignores older entries, which could include
+  permanent fallbacks caused by malformed replies. Summary-cache entries are unchanged.
+- Stories that already use the publisher's own text (including runs without AI) are not checked.
+  If an AI draft reaches the checker without an AI client, it falls back to publisher text too.
+- Publisher text means the lead article's title and first two description sentences, with no
+  "why it matters". If the description is empty, only the title remains; the summary stays empty.
 - Each run logs the result, for example `fact-check: 26 ok, 4 fixed, 0 replaced by the publisher's
   words`, plus a line for every correction saying what was unsupported.
+- Each local story saves `fact_check`: `ok` (passed), `fixed` (rewrite passed), `fallback` (replaced
+  by publisher text), or `unchecked` (publisher text that did not need an AI check). The aggregate
+  counts remain in `stats.fact_check`. `stats.fact_check_by_story` maps every feed story's `story_key`
+  to its outcome, in both local JSON and Supabase's existing `editions.stats` JSON column. No migration
+  or website change is needed; older editions have no per-story state and are not backfilled.
 
 *Why:* the summariser is told to use only snippet facts, but models still slip (the "2024" incident).
 A second, narrow job ("is this claim in the text?") catches far more than a longer prompt could.
@@ -514,7 +526,7 @@ run by hand in Supabase's SQL Editor; each one can safely run again.
 
 | Table | Holds | Who can read it |
 | --- | --- | --- |
-| `editions` | One row per day: date, time built, AI used, story count | Everyone |
+| `editions` | One row per day: date, time built, AI used, story count, stats including per-story fact-check outcomes | Everyone |
 | `stories` | Every story of every day: headline, summary, why it matters, topic, kind, score, sources, photo, brief position, `story_key`, `thread_id`, search index | Everyone |
 | `discussions` | Each day's Top articles | Everyone |
 | `company_posts` | Company blog posts: address (unique), title, company, summary, subject, depth, score, photo, HN points, date added, search index | Everyone |
@@ -686,7 +698,8 @@ variables, never in the code.
   unsubscribe people by accident.
 - **No localhost links:** if the site's address is ever misconfigured as `localhost`, emails use the
   address the reader actually signed up on.
-- **AI safety:** article text is passed as data, never as instructions, and every AI answer is checked.
+- **AI safety:** article text is passed as data, never as instructions. AI-written story text must
+  pass a check against the article snippets before publication; failed or missing checks use publisher text.
 - **Saved stories** without sign-in stay in the reader's own browser; nothing is sent to us.
 
 ---

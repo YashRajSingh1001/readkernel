@@ -9,7 +9,7 @@ from .llm import LLM
 from .models import Story
 from .summarise import SummaryOut, fallback_summary
 
-CHECK_VERSION = 1
+CHECK_VERSION = 2
 BATCH = 5
 ROUNDS = 2
 
@@ -48,6 +48,9 @@ def _ask(stories: list[Story], llm: LLM) -> dict[int, dict]:
 
 
 def _correction(answer: dict, story: Story) -> dict | None:
+    problems = answer.get("problems", [])
+    if not isinstance(problems, list) or any(not isinstance(p, str) for p in problems):
+        return None
     try:
         fixed = SummaryOut(
             headline=answer.get("headline") or "",
@@ -68,8 +71,16 @@ def _apply(story: Story, text: dict, outcome: str) -> None:
 def fact_check(stories: list[Story], llm: LLM | None, cache=None) -> dict[str, int]:
     counts = {"ok": 0, "fixed": 0, "fallback": 0, "unchecked": 0}
     todo = [s for s in stories if s.extra.get("summary_source") == "ai"]
-    counts["unchecked"] = len(stories) - len(todo) if llm else len(stories)
+    for story in stories:
+        if story.extra.get("summary_source") != "ai":
+            story.extra["fact_check"] = "unchecked"
+            counts["unchecked"] += 1
     if not llm:
+        for story in todo:
+            print(f"    [fact-check] checker unavailable for \"{story.headline[:70]}\": using the publisher's words")
+            _apply(story, _publisher_words(story), "fallback")
+            story.extra.pop("first_key", None)
+            counts["fallback"] += 1
         return counts
 
     pending: list[Story] = []
@@ -91,9 +102,11 @@ def fact_check(stories: list[Story], llm: LLM | None, cache=None) -> dict[str, i
             answers = _ask(batch, llm)
             for i, story in enumerate(batch):
                 answer = answers.get(i)
-                if answer is None:
+                fixed = _correction(answer, story) if answer and answer.get("verdict") == "fix" else None
+                if answer is None or (answer.get("verdict") != "ok" and fixed is None):
                     print(f"    [fact-check] no answer for \"{story.headline[:70]}\": using the publisher's words")
                     _apply(story, _publisher_words(story), "fallback")
+                    story.extra.pop("first_key", None)
                     counts["fallback"] += 1
                     continue
                 if answer.get("verdict") == "ok":
@@ -101,7 +114,6 @@ def fact_check(stories: list[Story], llm: LLM | None, cache=None) -> dict[str, i
                     _remember(cache, story, originals[i], outcome)
                     counts[outcome] += 1
                     continue
-                fixed = _correction(answer, story)
                 if fixed and round_no < ROUNDS:
                     story.extra.setdefault("first_key", originals[i])
                     story.extra["problems"] = [str(p)[:200] for p in answer.get("problems") or []][:5]
