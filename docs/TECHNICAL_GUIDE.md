@@ -816,7 +816,7 @@ In the order they happened (October 2026):
 | Next.js 16 rejected old-style caching settings | Switched to `"use cache"` + `cacheLife`, wrapped URL-reading pages in `Suspense`. |
 | Groq retired Llama 3.3 70B | Moved to `openai/gpt-oss-120b`; added the word "json" every prompt needs. |
 | AI wrote "2024" into a story; politics ranked high | Strict "facts from snippets only" prompt with today's date; editor rates politics 1–2. |
-| A friend's confirmation link pointed at `localhost` | Emails now fall back to the address the reader signed up on. |
+| A tester's confirmation link pointed at `localhost` | Emails now fall back to the address the reader signed up on. |
 | Domain connected; home internet kept the old GoDaddy address | Waited for DNS caches; nameservers on Vercel. |
 | Story of the day had no photo (publisher blocked us) | Try up to 3 outlets; designed fallback card. |
 | Email moved from Gmail to Resend on our domain | Added `EMAIL_REPLY_TO` so replies reach Gmail. |
