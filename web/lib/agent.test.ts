@@ -8,8 +8,6 @@ import * as packing from "./tool-packing.ts";
 import type { ChatTurn } from "./server/agent.ts";
 import type { runTool } from "./tools.ts";
 
-// Load the real agent without Next's server-only marker or database dependencies.
-// Transpilation also resolves its extensionless imports for the plain Node test runner.
 function load(file: string, dependencies: Record<string, unknown>): Record<string, unknown> {
   const source = readFileSync(new URL(file, import.meta.url), "utf8");
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
