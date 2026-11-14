@@ -48,6 +48,7 @@ function found(c: ToolCounts | undefined, tool: string): string {
   if (c.articles) parts.push(plural(c.articles, "article"));
   if (c.timeline) parts.push(plural(c.timeline, "earlier day"));
   if (c.pages) parts.push(plural(c.pages, "page"));
+  if (c.unavailable) parts.push("some results unavailable");
   return parts.join(", ") || "nothing found";
 }
 

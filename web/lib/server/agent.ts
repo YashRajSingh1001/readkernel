@@ -14,7 +14,7 @@ const TOTAL_MS = 120_000;
 
 export type ChatTurn = { role: "user" | "assistant"; content: string };
 export type AgentStep = AskStep;
-export type AgentAnswer = { answer: string; steps: AgentStep[]; complete: boolean; truncated: boolean };
+export type AgentAnswer = { answer: string; steps: AgentStep[]; complete: boolean; truncated: boolean; degraded?: boolean };
 export type AgentOptions = { storyKey?: string; signal?: AbortSignal; onEvent?: (event: AskEvent) => void; usage?: AskUsage };
 
 type ToolCall = { id: string; type: "function"; function: { name: string; arguments: string } };
@@ -459,23 +459,29 @@ async function callTool(
   args: Record<string, unknown>,
   emit: (e: AskEvent) => void,
   signal: AbortSignal,
-): Promise<{ step: AgentStep; result?: unknown; content: string }> {
+): Promise<{ step: AgentStep; result?: unknown; content: string; degraded: boolean }> {
   signal.throwIfAborted();
   emit({ type: "tool", id, state: "started", tool: name, args });
   const outcome = await untilAborted(runTool(name, args), signal);
   if (!outcome.ok) {
     emit({ type: "tool", id, state: "finished", ok: false, error: outcome.error });
-    return { step: { tool: name, args, ok: false, error: outcome.error }, content: JSON.stringify({ error: outcome.error }) };
+    return {
+      step: { tool: name, args, ok: false, error: outcome.error },
+      content: JSON.stringify({ error: outcome.error }),
+      degraded: outcome.unavailable === true,
+    };
   }
   const counts = countResult(name, outcome.result);
   emit({ type: "tool", id, state: "finished", ok: true, counts });
-  return { step: { tool: name, args, ok: true, counts }, result: outcome.result, content: "" };
+  return { step: { tool: name, args, ok: true, counts }, result: outcome.result, content: "", degraded: counts.unavailable === true };
 }
 
 export async function askAgent(history: ChatTurn[], options: AgentOptions = {}): Promise<AgentAnswer> {
   const signal = AbortSignal.any([...(options.signal ? [options.signal] : []), AbortSignal.timeout(TOTAL_MS)]);
+  const trace = { degraded: false };
   try {
-    return await answer(history, options.storyKey, signal, options.onEvent ?? (() => {}), options.usage);
+    const result = await answer(history, options.storyKey, signal, options.onEvent ?? (() => {}), trace, options.usage);
+    return trace.degraded ? { ...result, degraded: true } : result;
   } catch (err) {
     if (signal.aborted && (signal.reason as Error)?.name === "TimeoutError") {
       throw new AgentTimeout(`No answer within ${TOTAL_MS / 1000}s`);
@@ -489,6 +495,7 @@ async function answer(
   storyKey: string | undefined,
   signal: AbortSignal,
   emit: (e: AskEvent) => void,
+  trace: { degraded: boolean },
   usage?: AskUsage,
 ): Promise<AgentAnswer> {
   if (looksLikeCode(history.at(-1)!.content)) return { answer: OFF_TOPIC_REPLY, steps: [], complete: false, truncated: false };
@@ -503,6 +510,7 @@ async function answer(
     const args = { story_key: storyKey };
     const used = await callTool("preload_story", "get_story", args, emit, signal);
     steps.push(used.step);
+    if (used.degraded) trace.degraded = true;
     if (used.result && (used.result as { story?: unknown }).story) {
       focused = true;
       const call: ToolCall = { id: "preload_story", type: "function", function: { name: "get_story", arguments: JSON.stringify(args) } };
@@ -573,6 +581,7 @@ async function answer(
       }
       const used = await callTool(call.id, call.function.name, args, emit, signal);
       steps.push(used.step);
+      if (used.degraded) trace.degraded = true;
       messages.push({ role: "tool", tool_call_id: call.id, content: used.content, result: used.result });
     }
     for (const call of calls.slice(4)) {

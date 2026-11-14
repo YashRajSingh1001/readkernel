@@ -51,7 +51,15 @@ async function Results({ searchParams }: { searchParams: PageProps<"/search">["s
   const { q } = await searchParams;
   const query = typeof q === "string" ? q.trim() : "";
   const [results, companyResults] =
-    query.length >= 2 ? await Promise.all([searchStories(query), searchCompanyPosts(query)]) : [[], []];
+    query.length >= 2
+      ? await Promise.all([
+          searchStories(query),
+          searchCompanyPosts(query).catch((err) => {
+            console.error("[search] company post search failed", err);
+            return [];
+          }),
+        ])
+      : [[], []];
 
   return (
     <>
