@@ -1,17 +1,3 @@
-"""Merge articles about the same event into one Story.
-
-How it works:
-1. Embed every article and compare all pairs (cosine similarity).
-2. Pairs above `sure` are merged straight away.
-3. Pairs in the grey zone between `maybe` and `sure` go to the AI, which
-   answers "same event or not?". Without AI, a grey pair from two different
-   sources merges only if their titles share 2+ rare words or numbers
-   (e.g. "RapidCanvas" and "29").
-4. Two groups only join if *every* article pair between them is at least
-   `maybe` similar. This stops chains like A~B~C~D pulling unrelated
-   stories into one card.
-"""
-
 from __future__ import annotations
 
 import json
@@ -33,9 +19,6 @@ class Thresholds:
     maybe: float
 
 
-# Tuned on real feed data (Oct 2026); the two backends score on different
-# scales. With bge-small, true duplicates reach down to ~0.82 while unrelated
-# look-alikes reach ~0.84, so that band needs a second opinion.
 THRESHOLDS = {
     "local": Thresholds(sure=0.90, maybe=0.78),
     "simple": Thresholds(sure=0.55, maybe=0.30),
@@ -84,7 +67,6 @@ def group_articles(
     if llm:
         confirmed, unanswered = _ask_same_event(articles, grey_pairs[:MAX_AI_PAIRS], llm)
         unanswered += grey_pairs[MAX_AI_PAIRS:]
-    # Pairs the AI didn't judge (no AI, failed call, over the cap) use the word rule.
     confirmed += _shared_rare_terms(articles, unanswered)
 
     groups = _Groups(n, sim, limits.maybe)
@@ -99,8 +81,6 @@ def group_articles(
 
 
 class _Groups:
-    """Union-find with a 'everyone must be similar' rule on every join."""
-
     def __init__(self, n: int, sim: np.ndarray, floor: float):
         self.parent = list(range(n))
         self.items = {i: [i] for i in range(n)}
@@ -132,7 +112,6 @@ class _Groups:
 def _ask_same_event(
     articles: list[Article], pairs: list[tuple[int, int]], llm: LLM
 ) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
-    """Return (pairs the AI says are the same event, pairs it gave no answer for)."""
     confirmed: list[tuple[int, int]] = []
     unanswered: list[tuple[int, int]] = []
     for start in range(0, len(pairs), AI_BATCH):
@@ -161,7 +140,6 @@ def _title_terms(title: str) -> set[str]:
         word = word.lower()
         if len(word) >= 3 and word not in STOPWORDS:
             terms.add(word)
-    # "$29M", "$29 Mn" and "29M" all become "29"
     terms.update(n for n in re.findall(r"\d[\d,\.]*", title) if len(n.replace(",", "")) >= 2)
     return {t.replace(",", "") for t in terms}
 

@@ -25,7 +25,7 @@ EDITION = {
 def test_render_escapes_html_and_links_unsubscribe():
     subject, html, text = render(EDITION, "https://readkernel.example", token="tok123")
     assert subject.startswith("Chipmaker <b>buys</b> rival & co")
-    assert "&lt;b&gt;buys&lt;/b&gt; rival &amp; co" in html  # no raw HTML from feeds
+    assert "&lt;b&gt;buys&lt;/b&gt; rival &amp; co" in html
     assert "<b>buys</b>" not in html
     assert "https://readkernel.example/unsubscribe?token=tok123" in html
     assert "https://readkernel.example/unsubscribe?token=tok123" in text
@@ -38,7 +38,7 @@ def test_message_has_one_click_unsubscribe_headers():
     assert msg.headers["List-Unsubscribe"] == "<https://readkernel.example/api/unsubscribe?token=tok123>"
     assert msg.headers["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"
     test_msg = message_for(EDITION, "a@b.co", None, "https://readkernel.example")
-    assert "List-Unsubscribe" not in test_msg.headers  # test sends have no real token
+    assert "List-Unsubscribe" not in test_msg.headers
 
 
 def test_preview_mailer_writes_a_valid_email(tmp_path):
@@ -61,7 +61,7 @@ def test_formats_change_what_the_email_contains():
     assert "https://img.example/a.jpg" in images_html and "Image: A" in images_html
     _, plain_html, _ = render(edition, "https://r.example", "t")
     assert "img.example" not in plain_html
-    assert "https://r.example/preferences?token=t" in plain_html  # manage link
+    assert "https://r.example/preferences?token=t" in plain_html
 
 
 def test_weekly_subject_and_label():
@@ -109,4 +109,4 @@ def test_company_reads_pick_best_new_post_per_company(tmp_path):
     ]
     (tmp_path / "company_posts.json").write_text(json.dumps(rows), encoding="utf-8")
     assert [r["title"] for r in load_company_reads(None, tmp_path, weekly=False)] == ["Best"]
-    assert [r["title"] for r in load_company_reads(None, tmp_path, weekly=True)] == ["Old", "Netflix"]  # one per company; depth 1 never
+    assert [r["title"] for r in load_company_reads(None, tmp_path, weekly=True)] == ["Old", "Netflix"]

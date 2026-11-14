@@ -1,10 +1,8 @@
-// Types and helpers shared by server pages and client components (no Node APIs here).
-
 export type Source = { name: string; title: string; url: string; published: string };
 
 export type Story = {
-  story_key?: string; // stable id for /story/<key>
-  brief_position?: number | null; // 1-10 if in the daily brief
+  story_key?: string;
+  brief_position?: number | null;
   headline: string;
   summary: string;
   why_it_matters: string;
@@ -14,13 +12,12 @@ export type Story = {
   published: string;
   sources: Source[];
   kind?: "news" | "model_release";
-  image_url?: string | null; // the publisher's own preview photo
+  image_url?: string | null;
   image_credit?: string | null;
-  thread_id?: string | null; // same id = same ongoing story across days
-  companies?: string[]; // local files only; the database keeps them in story_companies
+  thread_id?: string | null;
+  companies?: string[];
 };
 
-/** A company a story is about, and how many stories it shares with another. */
 export type CompanyTag = { slug: string; name: string };
 export type CompanyLink = CompanyTag & { stories: number };
 
@@ -33,7 +30,6 @@ const COMPANY_ALIASES: Record<string, string> = {
   "amazon-web-services": "aws",
 };
 
-/** Same as the pipeline's companies.slug(): "OpenAI Inc." -> "openai". Keep the two in step. */
 export function companySlug(name: string): string {
   const s = name
     .trim()
@@ -46,16 +42,15 @@ export function companySlug(name: string): string {
 
 export const COMPANY_SLUG_RE = /^[a-z0-9-]{1,60}$/;
 
-/** An engineering or data science post from a company blog (see /companies). */
 export type CompanyPost = {
-  url: string; // cleaned-up address, unique
-  link: string; // the address readers open
+  url: string;
+  link: string;
   title: string;
   company: string;
   published: string;
   summary: string;
   category: string;
-  depth: number | null; // 1 = announcement ... 5 = deep technical write-up
+  depth: number | null;
   score: number;
   image_url: string | null;
   hn_points: number | null;
@@ -63,7 +58,6 @@ export type CompanyPost = {
   added_at?: string;
 };
 
-// Same ids as pipeline/kernel/company_blogs.py CATEGORIES.
 export const COMPANY_CATEGORIES: Record<string, string> = {
   ai: "AI & LLMs",
   ml: "Machine learning",
@@ -88,9 +82,9 @@ export type Edition = {
   date: string;
   generated_at: string;
   ai: string | null;
-  stories: Story[]; // the daily brief, in brief order
-  feed: Story[]; // every story saved that day, best first
-  discussions: Discussion[]; // Top articles
+  stories: Story[];
+  feed: Story[];
+  discussions: Discussion[];
 };
 
 export type StoryWithDate = Story & { edition_date: string };
@@ -150,7 +144,6 @@ export const TOPIC_BLURBS: Record<string, string> = {
   design: "Product and interface design",
 };
 
-/** Small site icon for a source link (Google's public icon service). */
 export function faviconUrl(url: string): string {
   const host = domainOf(url);
   return host ? `https://www.google.com/s2/favicons?domain=${host}&sz=64` : "";

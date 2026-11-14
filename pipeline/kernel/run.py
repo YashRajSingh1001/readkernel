@@ -1,10 +1,3 @@
-"""Run the whole pipeline and print today's brief.
-
-    python -m kernel.run                 # full run with the configured AI
-    python -m kernel.run --no-ai         # free, offline-friendly run without AI
-    python -m kernel.run --top 15
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -122,7 +115,6 @@ def main() -> None:
             "feed": len(feed),
             "fact_check": checked,
         },
-        # "stories" is the brief (in brief order); "feed" is the whole day, by score.
         "stories": [story_to_dict(s, i) for i, s in enumerate(brief, 1)],
         "feed": [story_to_dict(s, brief_rank.get(id(s))) for s in feed],
         "discussions": [discussion_to_dict(d) for d in discussions],

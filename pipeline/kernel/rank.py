@@ -1,17 +1,3 @@
-"""Score stories and pick the brief.
-
-Base score (no AI needed):
-  coverage  more distinct sources = bigger story (log scale, so 2 -> 4
-            sources matters more than 10 -> 12)
-  trust     the best source weight in the group
-  fresh     decays with a 12-hour half-life from the newest article
-
-If AI is on, an editor rates the top candidates 1-5 for importance and
-that nudges the score up or down.
-
-Picking keeps the brief varied: at most `per_topic` stories per topic.
-"""
-
 from __future__ import annotations
 
 import json
@@ -88,7 +74,6 @@ def pick_brief(ranked: list[Story], count: int, per_topic: int = 3) -> list[Stor
         per_topic_count[topic] = per_topic_count.get(topic, 0) + 1
         if len(picked) == count:
             return picked
-    # Not enough variety today: fill the rest by score.
     for story in ranked:
         if len(picked) == count:
             break
@@ -98,10 +83,6 @@ def pick_brief(ranked: list[Story], count: int, per_topic: int = 3) -> list[Stor
 
 
 def pick_feed(ranked: list[Story], brief: list[Story], size: int, per_topic: int = 10) -> list[Story]:
-    """The day's full feed: every brief story plus the next best, by score.
-
-    Topics are capped so one busy topic can't fill the whole feed.
-    """
     feed = list(brief)
     taken = {id(s) for s in feed}
     per_topic_count: dict[str, int] = {}

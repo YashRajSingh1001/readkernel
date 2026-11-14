@@ -23,7 +23,6 @@ import {
 } from "@/lib/brief";
 import { siteUrl } from "@/lib/site";
 
-// Pre-build today's stories; older ones render on first visit.
 export async function generateStaticParams() {
   const edition = await getLatestEdition();
   const keys = edition?.feed.map((s) => s.story_key).filter((k): k is string => Boolean(k)) ?? [];

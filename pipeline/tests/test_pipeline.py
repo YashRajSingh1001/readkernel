@@ -60,7 +60,7 @@ def test_filter_drops_old_junk_and_dupes():
         art("Old story", "A", hours_ago=50),
         art("Best laptop deals today", "B"),
         art("Phone review: great", "A"),
-        art("Fresh story", "B"),  # same title from another feed
+        art("Fresh story", "B"),
     ]
     kept = filter_articles(articles, sources, ["deals"], max_age_hours=36, now=NOW)
     assert [a.title for a in kept] == ["Fresh story"]
@@ -126,7 +126,7 @@ def test_feed_keeps_brief_caps_topics_and_sorts_by_score():
     stories = [Story([art(f"S{i}", topic="ai" if i < 6 else "dev")]) for i in range(10)]
     for i, s in enumerate(stories):
         s.score = 100 - i
-    brief = [stories[9]]  # lowest score, but in the brief
+    brief = [stories[9]]
     feed = pick_feed(stories, brief, size=6, per_topic=3)
     assert stories[9] in feed
     assert sum(1 for s in feed if s.topic == "ai") <= 3

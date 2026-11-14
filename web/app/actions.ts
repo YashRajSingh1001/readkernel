@@ -23,7 +23,7 @@ export type FormState = { ok: boolean; message: string } | null;
 const SIGNUP_SENT = "Almost done: check your inbox and click the link to confirm. Not there? Check your spam folder.";
 
 function prefsFrom(form: FormData): Prefs | undefined {
-  if (!form.has("story_count")) return undefined; // plain sign-up box, no builder choices
+  if (!form.has("story_count")) return undefined;
   return parsePrefs(
     {
       topics: form.get("topics"),
@@ -37,7 +37,6 @@ function prefsFrom(form: FormData): Prefs | undefined {
 }
 
 export async function subscribeAction(_prev: FormState, form: FormData): Promise<FormState> {
-  // Bots fill every field; people never see this one.
   if (form.get("company")) return { ok: true, message: SIGNUP_SENT };
 
   const email = normaliseEmail(String(form.get("email") ?? ""));
@@ -68,7 +67,6 @@ export async function unsubscribeAction(_prev: FormState, form: FormData): Promi
     : { ok: false, message: "This link isn't valid. You may already be unsubscribed." };
 }
 
-/** From the link in every email: change topics, length, format, frequency. */
 export async function savePreferencesAction(_prev: FormState, form: FormData): Promise<FormState> {
   const prefs = prefsFrom(form);
   if (!prefs) return { ok: false, message: "Nothing to save." };
@@ -83,7 +81,6 @@ export async function savePreferencesAction(_prev: FormState, form: FormData): P
   }
 }
 
-/** Signed-in readers: their email is already verified, so this subscribes them directly. */
 export async function saveAccountPreferencesAction(_prev: FormState, form: FormData): Promise<FormState> {
   const user = await serverUser();
   if (!user?.email) return { ok: false, message: "Please sign in again." };
@@ -97,7 +94,6 @@ export async function saveAccountPreferencesAction(_prev: FormState, form: FormD
   }
 }
 
-/** Watch alerts: add one plain-English wish (from the settings page). */
 export async function addWatchAction(_prev: FormState, form: FormData): Promise<FormState> {
   try {
     const result = await addWatch(String(form.get("token") ?? ""), String(form.get("description") ?? ""));

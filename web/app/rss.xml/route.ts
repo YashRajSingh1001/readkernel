@@ -1,7 +1,6 @@
 import { getLatestEdition } from "@/lib/brief";
 import { siteUrl } from "@/lib/site";
 
-// RSS for feed readers: today's brief, one item per story.
 function xml(text: string): string {
   return text
     .replace(/&/g, "&amp;")

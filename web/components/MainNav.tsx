@@ -12,12 +12,10 @@ const NAV = [
   { href: "/how-it-works", label: "How it works" },
 ];
 
-// "/feed/ai" still counts as Feed; "/brief/2026-10-20" as Archive.
 function isActive(path: string, href: string): boolean {
   return path === href || path.startsWith(`${href}/`);
 }
 
-/** The main links, with the current page in bold and underlined so you can see where you are. */
 export function MainNav({ variant }: { variant: "desktop" | "phone" }) {
   const path = usePathname();
 

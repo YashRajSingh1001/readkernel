@@ -2,8 +2,6 @@
 
 import { useSyncExternalStore } from "react";
 
-// Light by default. The choice is stored per browser and applied before the
-// page paints by the small script in the root layout (no flash).
 export type Theme = "light" | "dark" | "system";
 const KEY = "readkernel:theme";
 const ORDER: Theme[] = ["light", "dark", "system"];
@@ -29,7 +27,6 @@ export function ThemeToggle() {
     try {
       localStorage.setItem(KEY, next);
     } catch {
-      // storage blocked: the choice lasts for this visit only
     }
   }
 
@@ -62,5 +59,4 @@ export function ThemeToggle() {
   );
 }
 
-// Runs in <head> before paint. Kept as a string so it can be inlined.
 export const THEME_SCRIPT = `try{var t=localStorage.getItem('${KEY}');document.documentElement.dataset.theme=(t==='dark'||t==='system')?t:'light'}catch(e){document.documentElement.dataset.theme='light'}`;

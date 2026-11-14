@@ -1,10 +1,4 @@
-// ReadKernel new tab: shows today's brief from https://readkernel.in/api/v1/today.
-//
-// The last brief is kept in chrome.storage, so a new tab draws instantly (and
-// works offline); a fresh copy is fetched when the saved one is over 30 minutes old.
-// All text is inserted as text, never as HTML.
-
-const API = new URLSearchParams(location.search).get("api") || "https://readkernel.in"; // ?api= only for local testing
+const API = new URLSearchParams(location.search).get("api") || "https://readkernel.in";
 const MAX_AGE_MS = 30 * 60 * 1000;
 const hasChrome = typeof chrome !== "undefined" && chrome.storage;
 
@@ -22,7 +16,6 @@ const store = {
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch {
-      // private window: just don't cache
     }
   },
 };
@@ -41,7 +34,6 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
-// Only ever link to web pages.
 function safeUrl(url) {
   try {
     const u = new URL(url);
@@ -158,7 +150,6 @@ async function load() {
   }
 }
 
-// Search: the web with the user's own search engine, or ReadKernel's archive.
 $("search").addEventListener("submit", (event) => {
   event.preventDefault();
   const text = $("q").value.trim();
@@ -171,7 +162,6 @@ $("search-news").addEventListener("click", () => {
   location.href = `https://readkernel.in/search${text ? `?q=${encodeURIComponent(text)}` : ""}`;
 });
 
-// Summaries on/off, remembered.
 const toggle = $("show-summaries");
 store.get("showSummaries").then((value) => {
   toggle.checked = value !== false;

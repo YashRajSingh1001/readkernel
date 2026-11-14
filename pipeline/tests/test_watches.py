@@ -26,8 +26,8 @@ class FakeLLM:
 def test_shortlist_puts_the_related_story_first():
     candidates, used = shortlist(WATCHES, ITEMS, "simple")
     assert used == "simple"
-    assert candidates["w-upi"][0][0] == 0  # the UPI story
-    assert candidates["w-gpu"][0][0] == 1  # the Nvidia story
+    assert candidates["w-upi"][0][0] == 0
+    assert candidates["w-gpu"][0][0] == 1
 
 
 def test_ai_confirms_only_items_it_was_offered():

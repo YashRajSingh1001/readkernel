@@ -2,8 +2,6 @@ import "server-only";
 
 import nodemailer from "nodemailer";
 
-// Same settings as the pipeline (EMAIL_TRANSPORT = preview | smtp | resend).
-// "preview" sends nothing and prints the email to the server log.
 
 export type Mail = { to: string; subject: string; html: string; text: string; headers?: Record<string, string> };
 
@@ -11,7 +9,6 @@ function transportName(): string {
   return (process.env.EMAIL_TRANSPORT || "preview").toLowerCase();
 }
 
-/** True when emails are only printed to the log, not actually delivered. */
 export function isPreviewTransport(): boolean {
   return transportName() === "preview";
 }
@@ -19,7 +16,6 @@ export function isPreviewTransport(): boolean {
 export async function sendMail(mail: Mail): Promise<void> {
   const transport = transportName();
   const from = process.env.EMAIL_FROM || "ReadKernel <preview@localhost>";
-  // Where replies go, e.g. a Gmail inbox when sending from an address that can't receive.
   const replyTo = process.env.EMAIL_REPLY_TO || undefined;
 
   if (transport === "preview") {

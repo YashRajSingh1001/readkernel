@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 
 import { COMPANY_CATEGORIES, faviconUrl, formatDate, type CompanyPost } from "@/lib/format";
@@ -5,14 +6,12 @@ import { StoryImage } from "./StoryImage";
 
 type Props = { post: CompanyPost; variant?: "standard" | "compact" };
 
-/** One company blog post. The title opens the company's own post. */
 export function CompanyPostCard({ post, variant = "standard" }: Props) {
   const category = COMPANY_CATEGORIES[post.category] ?? post.category;
 
   const meta = (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
       <Link href={`/companies?company=${encodeURIComponent(post.company)}`} className="flex items-center gap-1.5 font-medium text-ink hover:text-accent">
-        {/* eslint-disable-next-line @next/next/no-img-element -- favicons come from Google's favicon service */}
         <img src={faviconUrl(post.link)} alt="" width={16} height={16} loading="lazy" referrerPolicy="no-referrer" className="h-4 w-4 rounded" />
         {post.company}
       </Link>

@@ -5,8 +5,6 @@ import { useActionState } from "react";
 
 import type { FormState } from "@/app/actions";
 
-// A page with a button, not an automatic action on page load: email security
-// scanners open every link in an email, and must not confirm or unsubscribe anyone.
 type Props = {
   token: string;
   action: (prev: FormState, form: FormData) => Promise<FormState>;

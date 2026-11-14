@@ -1,11 +1,3 @@
-"""Send email through SMTP (e.g. Gmail), Resend, or a local preview folder.
-
-EMAIL_TRANSPORT
-  preview  (default) write each email to pipeline/data/outbox/ as .eml files; sends nothing
-  smtp     any SMTP server. Gmail works free with an app password (~500/day)
-  resend   Resend's API (free 3,000/month); needs a domain you own
-"""
-
 from __future__ import annotations
 
 import re
@@ -87,7 +79,7 @@ class SmtpMailer:
                 self._smtp.send_message(mime)
                 return
             except (smtplib.SMTPServerDisconnected, ConnectionError):
-                self._smtp = None  # reconnect once
+                self._smtp = None
                 if attempt:
                     raise
 

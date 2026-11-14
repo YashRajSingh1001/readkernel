@@ -1,14 +1,3 @@
-"""Pick each reader's stories from the day's feed ("make it yours").
-
-The website's live preview (web/lib/personal.ts) follows the same rules, so
-what a reader sees in the builder is what their email contains.
-
-Rules:
-- No topics picked: the daily brief, in brief order. Asking for 15 tops it up
-  with the next best feed stories.
-- Topics picked: the best stories in those topics, by score.
-"""
-
 from __future__ import annotations
 
 VALID_COUNTS = (5, 10, 15)
@@ -32,7 +21,6 @@ def select_stories(brief: list[dict], feed: list[dict], topics: list[str] | None
 
 
 def weekly_stories(rows: list[dict], count: int = 15) -> list[dict]:
-    """Best stories of the past week, one per ongoing story (thread)."""
     best: dict[str, dict] = {}
     for row in rows:
         thread = row.get("thread_id") or row.get("story_key") or row["headline"]

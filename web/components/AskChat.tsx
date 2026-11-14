@@ -1,10 +1,5 @@
 "use client";
 
-// The Ask ReadKernel chat. Everything it shows while an answer is on its way
-// comes from /api/ask's event stream (lib/ask-stream.ts): which tool is running
-// and what it found, OpenAI retries, and the answer text as it's written. No
-// status here is driven by a timer.
-
 import Link from "next/link";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
@@ -14,7 +9,6 @@ import { LINK_PATTERN, NDJSON, readEvents, type AskEvent, type AskStep, type Too
 export type FocusStory = { key: string; headline: string };
 
 type Activity = AskStep & { id: string; state: "running" | "done" | "failed" };
-// What the server is doing right now, when no tool is running and no text has arrived.
 type Phase = { kind: "sending" } | { kind: "thinking"; round: number } | { kind: "retry"; waitSeconds: number; reason: string };
 type Answer = {
   role: "assistant";
@@ -22,19 +16,19 @@ type Answer = {
   question: string;
   content: string;
   steps: Activity[];
-  notes: string[]; // the model's notes to the reader before it used tools
+  notes: string[];
   phase: Phase | null;
   state: "working" | "done" | "stopped" | "error";
-  startedAt: number; // when the question was sent
-  seconds?: number; // how long the answer took, from sending to the last event
-  cached?: string; // the edition date of a saved answer
+  startedAt: number;
+  seconds?: number;
+  cached?: string;
   truncated?: boolean;
   error?: string;
   retryable?: boolean;
 };
 type Turn = { role: "user"; content: string } | Answer;
 
-const IDLE_MS = 60_000; // no event from the server for this long: give up (the server gives up on OpenAI at 45s)
+const IDLE_MS = 60_000;
 const NEAR_BOTTOM_PX = 120;
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -44,7 +38,6 @@ function shortDate(date: string): string {
   return Number.isNaN(d.getTime()) ? date : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 }
 
-/** "10 stories, 2 blog posts" from what a tool really returned. */
 function found(c: ToolCounts | undefined, tool: string): string {
   if (!c) return "";
   if (c.empty) return "nothing found";
@@ -58,7 +51,6 @@ function found(c: ToolCounts | undefined, tool: string): string {
   return parts.join(", ") || "nothing found";
 }
 
-/** One tool call in words: what it's doing while it runs, what it did once finished. */
 function describe(step: Activity): string {
   const a = step.args;
   const running = step.state === "running";
@@ -103,7 +95,6 @@ function describe(step: Activity): string {
   return result ? `${what} · ${result}` : what;
 }
 
-/** What Ask is doing right now, from the latest event: a request in flight, a running tool, or answer text arriving. */
 function currentLabel(a: Answer): string {
   if (a.phase) return phaseText(a.phase, a.steps);
   const running = [...a.steps].reverse().find((s) => s.state === "running");
@@ -124,7 +115,6 @@ function phaseText(phase: Phase, steps: Activity[]): string {
   }
 }
 
-/** The finished questions and answers, sent back so follow-ups have context. Stopped and failed answers are left out. */
 function conversation(turns: Turn[]): { role: "user" | "assistant"; content: string }[] {
   const out: { role: "user" | "assistant"; content: string }[] = [];
   for (let i = 0; i < turns.length - 1; i++) {
@@ -137,7 +127,6 @@ function conversation(turns: Turn[]): { role: "user" | "assistant"; content: str
   return out;
 }
 
-/** The links in an answer, once each: by now every one was confirmed by the server. */
 function sourcesIn(text: string): { url: string; label: string; host: string }[] {
   const seen = new Map<string, { url: string; label: string; host: string }>();
   for (const m of text.matchAll(new RegExp(LINK_PATTERN, "g"))) {
@@ -146,7 +135,6 @@ function sourcesIn(text: string): { url: string; label: string; host: string }[]
     try {
       host = new URL(m[2]).hostname.replace(/^www\./, "");
     } catch {
-      // keep the URL
     }
     seen.set(m[2], { url: m[2], label: m[1], host });
   }
@@ -155,8 +143,6 @@ function sourcesIn(text: string): { url: string; label: string; host: string }[]
 
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-// A tiny, safe markdown renderer: paragraphs, "-" bullets, **bold** and
-// [text](https://links). Everything else stays plain text; no HTML is ever injected.
 function inline(text: string): ReactNode[] {
   const parts: ReactNode[] = [];
   const re = new RegExp(`${LINK_PATTERN}|\\*\\*([^*]+)\\*\\*`, "g");
@@ -182,9 +168,6 @@ function inline(text: string): ReactNode[] {
 const BULLET = /^\s*([-*•]|\d+\.)\s+/;
 
 function Markdown({ text }: { text: string }) {
-  // Blocks are split by blank lines; inside one, runs of bullet lines become a
-  // list and other lines a paragraph ("Intro:\n- a\n- b" is common).
-  // "## Title" lines become a heading, "### Label" a small section label.
   type Part = { kind: "p" | "list" | "h2" | "h3"; lines: string[] };
   const parts: Part[] = [];
   for (const block of text.split(/\n{2,}/)) {
@@ -251,12 +234,12 @@ export function AskChat({ story }: { story?: FocusStory }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [announce, setAnnounce] = useState("");
-  const [away, setAway] = useState(false); // the reader scrolled up from the newest text
+  const [away, setAway] = useState(false);
   const active = useRef<{ id: number; controller: AbortController } | null>(null);
   const turnsRef = useRef(turns);
   const nextId = useRef(1);
   const follow = useRef(true);
-  const autoY = useRef<number | null>(null); // where our last automatic scroll left the page
+  const autoY = useRef<number | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -266,12 +249,9 @@ export function AskChat({ story }: { story?: FocusStory }) {
     turnsRef.current = turns;
   }, [turns]);
 
-  // Leaving the page stops the answer, and with it the work on the server.
   useEffect(() => () => active.current?.controller.abort(), []);
 
-  // Follow new text only while the reader is at (or near) the bottom.
   useEffect(() => {
-    // "Bottom" is the end of the chat, not of the page (the site footer is below it).
     const onScroll = () => {
       const end = endRef.current;
       if (!end) return;
@@ -285,7 +265,6 @@ export function AskChat({ story }: { story?: FocusStory }) {
 
   useLayoutEffect(() => {
     if (!busy || !follow.current) return;
-    // The reader scrolled up since our last move, and its scroll event hasn't arrived yet.
     if (autoY.current !== null && window.scrollY < autoY.current - 4) {
       follow.current = false;
       setAway(true);
@@ -344,7 +323,6 @@ export function AskChat({ story }: { story?: FocusStory }) {
         update(id, () => ({ content: "" }));
         break;
       case "citation":
-        // The link arrives in the next delta; nothing to do until then.
         break;
       case "done":
         update(id, (a) => ({
@@ -353,7 +331,6 @@ export function AskChat({ story }: { story?: FocusStory }) {
           seconds: (Date.now() - a.startedAt) / 1000,
           content: e.answer,
           truncated: e.truncated,
-          // A saved answer's steps were recorded on an earlier run; a live one's are already here.
           steps: e.cached ? e.steps.map((s, i) => ({ ...s, id: `saved-${i}`, state: s.ok === false ? "failed" : "done" })) : a.steps,
         }));
         setAnnounce(e.truncated ? "Answer ready, but it was cut off." : "Answer ready.");
@@ -368,13 +345,11 @@ export function AskChat({ story }: { story?: FocusStory }) {
   async function ask(question: string, replacing?: number) {
     const q = question.trim();
     if (!q) return;
-    // A new question replaces one still being answered.
     if (active.current) stop();
 
     const id = nextId.current++;
     const controller = new AbortController();
     active.current = { id, controller };
-    // Asking again leaves out the answer being replaced, so the model doesn't see its own first try.
     const earlier = turnsRef.current.filter(
       (t, i, all) =>
         replacing === undefined ||
@@ -382,7 +357,6 @@ export function AskChat({ story }: { story?: FocusStory }) {
     );
     const history = [...conversation(earlier), { role: "user" as const, content: q }];
     setTurns((all) => {
-      // Asking again after a failure: the failed attempt makes way for the new one.
       const at = replacing === undefined ? -1 : all.findIndex((t) => t.role === "assistant" && t.id === replacing);
       const kept = at > 0 ? [...all.slice(0, at - 1), ...all.slice(at + 1)] : all;
       return [
@@ -398,15 +372,13 @@ export function AskChat({ story }: { story?: FocusStory }) {
     autoY.current = null;
     requestAnimationFrame(() => endRef.current?.scrollIntoView({ block: "end", behavior: "instant" }));
 
-    // Give up if the server goes quiet; every event resets the clock.
     let idle = setTimeout(() => controller.abort("timeout"), IDLE_MS);
     const alive = () => {
       clearTimeout(idle);
       idle = setTimeout(() => controller.abort("timeout"), IDLE_MS);
     };
-    let ended = false; // a done or error event arrived: this answer is settled
+    let ended = false;
     const fail = (message: string, retryable = true) => {
-      // Never for an answer that already ended, was replaced, or was stopped by the reader.
       if (ended || active.current?.id !== id) return;
       if (controller.signal.aborted && controller.signal.reason !== "timeout") return;
       update(id, () => ({ state: "error", phase: null, error: message, retryable }));
@@ -420,18 +392,16 @@ export function AskChat({ story }: { story?: FocusStory }) {
         body: JSON.stringify({ messages: history, story: focus?.key }),
         signal: controller.signal,
       });
-      // Bad request or rate limit: a plain JSON error, sent before any work started.
       if (!res.body || !(res.headers.get("content-type") ?? "").includes(NDJSON)) {
         const data = await res.json().catch(() => ({}));
         fail(data.error ?? "Something went wrong.", res.status !== 400);
         return;
       }
       for await (const e of readEvents(res.body)) {
-        if (active.current?.id !== id) break; // replaced or stopped
+        if (active.current?.id !== id) break;
         alive();
         apply(id, e);
         if (e.type === "done" || e.type === "error") {
-          // Settled: stop reading (the server may still be saving the answer) and stop the clock.
           ended = true;
           clearTimeout(idle);
           break;
@@ -472,12 +442,10 @@ export function AskChat({ story }: { story?: FocusStory }) {
         value={input}
         onChange={(e) => {
           setInput(e.target.value);
-          // Grow with the text, up to about eight lines.
           e.target.style.height = "auto";
           e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
         }}
         onKeyDown={(e) => {
-          // Enter asks, Shift+Enter starts a new line.
           if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
             ask(input);
@@ -529,14 +497,12 @@ export function AskChat({ story }: { story?: FocusStory }) {
     </p>
   );
 
-  // Announced to screen readers: the start and end of each answer, not every word.
   const liveRegion = (
     <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">
       {announce}
     </p>
   );
 
-  // Before the first question: a centred prompt, the question box, and suggestions under it.
   if (empty) {
     return (
       <div data-ask-app className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center pb-16">
@@ -568,8 +534,6 @@ export function AskChat({ story }: { story?: FocusStory }) {
   }
 
   return (
-    // Fills the page under the header (see [data-ask-app] in globals.css), so the question
-    // box sits at the bottom of the screen even when the conversation is short.
     <div data-ask-app className="mx-auto flex w-full max-w-2xl flex-1 flex-col">
       <h1 className="sr-only">Ask the news</h1>
       {focusChip}
@@ -587,17 +551,14 @@ export function AskChat({ story }: { story?: FocusStory }) {
             <AnswerView
               key={`a${t.id}`}
               answer={t}
-              // Re-asking a finished answer only makes sense for the latest one; later turns built on it.
               last={i === turns.length - 1}
               onRetry={() => ask(t.question, t.id)}
             />
           ),
         )}
-        {/* scroll-mb keeps the newest line clear of the sticky question box */}
         <div ref={endRef} className="scroll-mb-32" />
       </div>
 
-      {/* The question box stays at the bottom of the screen on a solid bar, so answers scroll behind it cleanly. */}
       <div className="sticky bottom-0 mt-8 bg-paper pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {busy && away && (
           <button
@@ -615,20 +576,19 @@ export function AskChat({ story }: { story?: FocusStory }) {
   );
 }
 
-/** Small line icons for the suggested questions, in the order of lib/ask.ts. */
 function SuggestionIcon({ index, story }: { index: number; story: boolean }) {
   const paths = story
     ? [
-        "M7 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm6 0a3 3 0 1 0 0-6M1.5 17c.6-3 2.8-5 5.5-5s4.9 2 5.5 5m1-5c2.4 0 4.3 1.8 4.9 5", // people: competitors
-        "M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.5-11.5-2 5-5 2 2-5 5-2Z", // compass: the wider space
-        "M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm0-12v4l3 2", // clock: how it developed
-        "M7.5 15h5M8 18h4M10 2a5.5 5.5 0 0 0-3.2 10c.5.4.7.9.7 1.5V14h5v-.5c0-.6.2-1.1.7-1.5A5.5 5.5 0 0 0 10 2Z", // bulb: why it matters
+        "M7 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm6 0a3 3 0 1 0 0-6M1.5 17c.6-3 2.8-5 5.5-5s4.9 2 5.5 5m1-5c2.4 0 4.3 1.8 4.9 5",
+        "M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.5-11.5-2 5-5 2 2-5 5-2Z",
+        "M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm0-12v4l3 2",
+        "M7.5 15h5M8 18h4M10 2a5.5 5.5 0 0 0-3.2 10c.5.4.7.9.7 1.5V14h5v-.5c0-.6.2-1.1.7-1.5A5.5 5.5 0 0 0 10 2Z",
       ]
     : [
-        "M11 2 4 11h5l-1 7 7-9h-5l1-7Z", // bolt: today's biggest news
-        "M3 18V5l6-3v16M9 8h8v10M12 11h2m-2 3h2M5.5 8h1m-1 3h1m-1 3h1M1 18h18", // building: a company
-        "M12.5 3.5a4 4 0 0 0-5 5L3 13a1.4 1.4 0 0 0 2 2l4.5-4.5a4 4 0 0 0 5-5l-2.3 2.3-2-2 2.3-2.3Z", // wrench: engineering
-        "M10 2 3 6v8l7 4 7-4V6l-7-4Zm0 0v0M3 6l7 4 7-4m-7 4v8", // cube: models
+        "M11 2 4 11h5l-1 7 7-9h-5l1-7Z",
+        "M3 18V5l6-3v16M9 8h8v10M12 11h2m-2 3h2M5.5 8h1m-1 3h1m-1 3h1M1 18h18",
+        "M12.5 3.5a4 4 0 0 0-5 5L3 13a1.4 1.4 0 0 0 2 2l4.5-4.5a4 4 0 0 0 5-5l-2.3 2.3-2-2 2.3-2.3Z",
+        "M10 2 3 6v8l7 4 7-4V6l-7-4Zm0 0v0M3 6l7 4 7-4m-7 4v8",
       ];
   return (
     <svg viewBox="0 0 20 20" className="size-5 shrink-0 text-accent" aria-hidden>
@@ -637,7 +597,6 @@ function SuggestionIcon({ index, story }: { index: number; story: boolean }) {
   );
 }
 
-/** "Worked for 12s · 3 ReadKernel lookups · 1 web search": what an answer took, in one line. */
 function summarize(a: Answer): string {
   const web = a.steps.filter((s) => s.tool === "web_search").length;
   const own = a.steps.length - web;
@@ -670,7 +629,6 @@ function AnswerView({ answer: a, last, onRetry }: { answer: Answer; last: boolea
       {a.steps.map((s) => (
         <li key={s.id} className={`rk-fade ${s.state === "failed" ? "text-accent" : ""}`}>
           {s.state === "running" ? "" : s.state === "failed" ? "✗ " : "✓ "}
-          {/* A step still running when the answer stopped or failed never finished. */}
           {s.state === "running" && !working ? `${describe(s).replace(/…$/, "")} (stopped)` : describe(s)}
         </li>
       ))}
@@ -680,7 +638,6 @@ function AnswerView({ answer: a, last, onRetry }: { answer: Answer; last: boolea
   return (
     <div className="[overflow-wrap:anywhere]">
       {working ? (
-        // While Ask works: one line saying what it's doing right now, which opens to every step so far.
         <div className="mb-3 text-[15px] text-muted">
           <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex items-center gap-1.5 hover:text-ink">
             <span key={currentLabel(a)} className="rk-fade">
@@ -692,7 +649,6 @@ function AnswerView({ answer: a, last, onRetry }: { answer: Answer; last: boolea
         </div>
       ) : (
         summarize(a) && (
-          // Afterwards: how long it took and what it looked up, folded into one line.
           <div className="mb-3 text-[15px] text-muted">
             <button
               type="button"
@@ -712,7 +668,6 @@ function AnswerView({ answer: a, last, onRetry }: { answer: Answer; last: boolea
           </div>
         )
       )}
-      {/* The model's latest "I'll check …" note while it works; all of them fold into the line above once it's done. */}
       {working && a.notes.length > 0 && (
         <p key={a.notes.length} className="rk-fade mb-3 text-[17px] leading-7">
           {a.notes.at(-1)}
@@ -789,7 +744,6 @@ function AnswerView({ answer: a, last, onRetry }: { answer: Answer; last: boolea
                 await navigator.clipboard.writeText(a.content);
                 setCopied(true);
               } catch {
-                // clipboard blocked; nothing to show
               }
             }}
             onBlur={() => setCopied(false)}

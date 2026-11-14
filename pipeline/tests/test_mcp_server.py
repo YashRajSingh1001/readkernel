@@ -73,7 +73,7 @@ def test_brief_defaults_to_the_latest_edition(data_dir):
     assert [s["headline"] for s in brief["stories"]] == ["Lab ships open model", "Chip export rules take effect"]
     assert brief["stories"][0]["sources"] == [
         {"name": "Src", "title": "Lab ships open model", "url": "https://news/model-launch-bbb"}]
-    assert "image_url" not in brief["stories"][0]  # layout fields are dropped
+    assert "image_url" not in brief["stories"][0]
 
 
 def test_feed_filters_by_topic_and_limit(data_dir):

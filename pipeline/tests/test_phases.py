@@ -42,7 +42,7 @@ def test_select_stories_follows_brief_or_topics():
     brief = [row("b1", "ai", 9, 1), row("b2", "tech", 8, 2)]
     feed = brief + [row("f1", "dev", 7), row("f2", "ai", 6), row("f3", "markets", 5)]
     assert [s["story_key"] for s in select_stories(brief, feed, [], 5)][:2] == ["b1", "b2"]
-    assert len(select_stories(brief, feed, [], 5)) == 5  # topped up from the feed
+    assert len(select_stories(brief, feed, [], 5)) == 5
     assert [s["story_key"] for s in select_stories(brief, feed, ["ai"], 10)] == ["b1", "f2"]
 
 

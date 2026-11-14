@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element -- source icons from Google's icon service */
+/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 
 import { CompanyPostCard } from "@/components/CompanyPostCard";
@@ -44,7 +44,6 @@ export default async function Home() {
 
   return (
     <>
-      {/* Hero */}
       <Container size="wide" className="pt-6 pb-14 text-center sm:pt-12">
         <h1 className="mx-auto max-w-4xl text-4xl leading-[1.05] font-extrabold tracking-tight text-balance sm:text-6xl">
           Today&apos;s tech and AI news, boiled down to ten stories.
@@ -70,7 +69,6 @@ export default async function Home() {
         </div>
       </Container>
 
-      {/* Sources */}
       <section className="border-y border-line bg-sunk py-6">
         <Container size="wide">
           <p className="text-center text-sm font-semibold text-muted">
@@ -92,7 +90,6 @@ export default async function Home() {
         </Container>
       </section>
 
-      {/* Today's brief preview */}
       {edition && first && (
         <Container className="py-14">
           <div className="flex items-end justify-between gap-4">
@@ -119,7 +116,6 @@ export default async function Home() {
         </Container>
       )}
 
-      {/* Company blogs */}
       {companyReads.length > 0 && (
         <Container className="pb-14">
           <div className="flex items-end justify-between gap-4">
@@ -142,7 +138,6 @@ export default async function Home() {
         </Container>
       )}
 
-      {/* ReadKernel everywhere: AI assistants (MCP), Chrome, Ask */}
       <Container className="pb-14">
         <Link
           href="/tools"
@@ -165,7 +160,6 @@ export default async function Home() {
         </Link>
       </Container>
 
-      {/* How it works */}
       <section className="border-t border-line bg-sunk py-14">
         <Container size="wide">
           <p className="text-center text-sm font-semibold text-label">How it works</p>
@@ -192,7 +186,6 @@ export default async function Home() {
         </Container>
       </section>
 
-      {/* Make it yours */}
       <Container size="wide" className="py-14">
         <div className="grid items-center gap-8 rounded-2xl border border-line bg-card p-6 sm:p-10 md:grid-cols-2">
           <div>
@@ -240,7 +233,6 @@ export default async function Home() {
         </div>
       </Container>
 
-      {/* Why ReadKernel */}
       <Container size="wide" className="pb-6">
         <h2 className="text-center text-3xl font-extrabold tracking-tight">Why ReadKernel</h2>
         <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

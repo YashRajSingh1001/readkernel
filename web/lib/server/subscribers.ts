@@ -25,7 +25,6 @@ type Subscriber = {
 export type ManagedSubscriber = Pick<Subscriber, "email" | "status"> & { prefs: Prefs };
 
 const COLUMNS = "id,email,status,token,confirm_sent_at,topics,story_count,format,frequency,company_read";
-// Don't send the same address another email from the sign-up form more often than this.
 const RESEND_COOLDOWN_MS = 10 * 60 * 1000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const TOKEN_RE = /^[A-Za-z0-9_-]{16,64}$/;
@@ -37,12 +36,6 @@ export function normaliseEmail(raw: string): string | null {
 
 const LOCAL_RE = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
 
-/**
- * The address to put in email links. SITE_URL normally; but if it still says
- * localhost while the request came in on a real address (a misconfigured
- * deployment), use the address the person actually signed up on, so a live
- * site never emails a link nobody can open.
- */
 async function siteUrl(): Promise<string> {
   const configured = (process.env.SITE_URL || "").replace(/\/$/, "");
   if (configured && !LOCAL_RE.test(configured)) return configured;
@@ -53,7 +46,6 @@ async function siteUrl(): Promise<string> {
       return `${h.get("x-forwarded-proto") ?? "https"}://${host}`;
     }
   } catch {
-    // not inside a request (scripts, tests)
   }
   return configured || "http://localhost:3000";
 }
@@ -80,12 +72,6 @@ async function update(id: string, fields: Record<string, unknown>) {
   await adminRest(`subscribers?id=eq.${id}`, { method: "PATCH", body: fields, prefer: "return=minimal" });
 }
 
-/**
- * Start (or restart) a subscription. Always resolves the same way whatever the
- * address's state, so the form can't be used to find out who is subscribed.
- * `prefs` (from the builder) apply once the person confirms by email; an
- * already-active reader is instead emailed a link to change their settings.
- */
 export async function subscribe(email: string, prefs?: Prefs): Promise<void> {
   const now = new Date();
   const existing = await findBy("email", email);
@@ -124,7 +110,6 @@ export async function confirm(token: string): Promise<ConfirmResult> {
   try {
     briefSent = await sendTodaysBrief(sub);
   } catch (err) {
-    // The subscription is confirmed either way; they'll get tomorrow's brief.
     console.error("[confirm] today's brief", err);
   }
   return { status: "confirmed", briefSent };
@@ -134,43 +119,32 @@ const STORY_COLUMNS =
   "story_key,brief_position,position,headline,summary,why_it_matters,topic,kind," +
   "score,importance,published,image_url,image_credit,thread_id,sources";
 
-/** Today's date where the pipeline runs (same TIMEZONE setting, same default). */
 function today(): string {
   const timeZone = process.env.TIMEZONE || "Asia/Kolkata";
   return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
 
-/**
- * Someone who confirms after today's brief is out would otherwise wait until
- * tomorrow. If today's edition exists and they haven't had it, email it now,
- * picked by their preferences, and log it in email_sends so the pipeline's
- * send step (which skips logged readers) never emails it twice. Weekly
- * readers wait for Sunday's digest. Returns whether an email went out.
- */
 async function sendTodaysBrief(sub: Subscriber): Promise<boolean> {
   if ((sub.frequency ?? "daily") !== "daily") return false;
   const day = today();
   const rows = await adminRest<{ date: string; stories: Story[] }[]>(
     `editions?select=date,stories(${STORY_COLUMNS})&stories.order=position.asc&date=eq.${day}`,
   );
-  if (!rows[0]) return false; // not built yet: the morning run will include them
+  if (!rows[0]) return false;
   const feed = rows[0].stories;
   const brief = feed
     .filter((s) => s.brief_position != null)
     .sort((a, b) => (a.brief_position ?? 0) - (b.brief_position ?? 0));
   if (brief.length === 0) return false;
   const stories = selectStories(brief, feed, sub.topics ?? [], sub.story_count ?? 10);
-  if (stories.length === 0) return false; // nothing in their topics today
+  if (stories.length === 0) return false;
 
   const email = renderBrief({ date: day, stories }, await siteUrl(), sub.token, sub.format);
   if (isPreviewTransport()) {
-    // Nothing is delivered in preview, so don't log it as sent.
     await sendMail({ to: sub.email, ...email });
     return false;
   }
 
-  // Claim the send first: if the row already exists (the pipeline sent it, or
-  // a second click got here first) nothing is inserted and we stop.
   const claimed = await adminRest<unknown[]>("email_sends?on_conflict=edition_date,subscriber_id,kind", {
     method: "POST",
     body: { edition_date: day, subscriber_id: sub.id, kind: "daily" },
@@ -180,7 +154,6 @@ async function sendTodaysBrief(sub: Subscriber): Promise<boolean> {
   try {
     await sendMail({ to: sub.email, ...email });
   } catch (err) {
-    // Release the claim so a retry (clicking confirm again) can send it.
     await adminRest(
       `email_sends?edition_date=eq.${day}&subscriber_id=eq.${sub.id}&kind=eq.daily`,
       { method: "DELETE", prefer: "return=minimal" },
@@ -199,7 +172,6 @@ export async function unsubscribe(token: string): Promise<"unsubscribed" | "inva
   return "unsubscribed";
 }
 
-/** For the preferences page reached from the link in every email. */
 export async function getByToken(token: string): Promise<ManagedSubscriber | null> {
   const sub = await findBy("token", token);
   if (!sub) return null;
@@ -219,15 +191,10 @@ export async function getByToken(token: string): Promise<ManagedSubscriber | nul
 export async function savePreferences(token: string, prefs: Prefs): Promise<boolean> {
   const sub = await findBy("token", token);
   if (!sub) return false;
-  // Saving preferences from a link in your inbox also re-subscribes you.
   await update(sub.id, { ...prefsColumns(prefs), status: "active", unsubscribed_at: null });
   return true;
 }
 
-/**
- * A signed-in reader (verified email) gets an active subscription linked to
- * their account, created if needed. Returns their manage token.
- */
 export async function ensureAccountSubscription(userId: string, email: string, prefs?: Prefs): Promise<string> {
   const existing = await findBy("email", email);
   if (existing) {
@@ -299,8 +266,6 @@ ${button(link, "Change my brief")}`,
   });
 }
 
-// --- Watch alerts (see pipeline/kernel/watches.py) ---------------------------
-
 export const MAX_WATCHES = 3;
 export type Watch = { id: string; description: string };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -329,7 +294,6 @@ export async function removeWatch(token: string, id: string): Promise<boolean> {
   if (!UUID_RE.test(id)) return false;
   const sub = await findBy("token", token);
   if (!sub) return false;
-  // Filtering on both ids means a token can only ever remove its own watches.
   await adminRest(`watches?id=eq.${id}&subscriber_id=eq.${sub.id}`, { method: "DELETE", prefer: "return=minimal" });
   return true;
 }

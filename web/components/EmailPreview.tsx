@@ -1,9 +1,8 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- publisher photos, as they appear in the email */
+/* eslint-disable @next/next/no-img-element */
 import { TOPICS, formatDate, readingMinutes, type Story } from "@/lib/format";
 
-/** A look at the email as it will arrive, built from today's real stories. */
 export function EmailPreview({ stories, format, date, weekly }: { stories: Story[]; format: string; date: string; weekly: boolean }) {
   const minutes = readingMinutes(format === "headlines" ? [] : stories);
   return (

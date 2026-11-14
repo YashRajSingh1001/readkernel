@@ -6,7 +6,6 @@ import { Container } from "@/components/Container";
 import { EditionView } from "@/components/EditionView";
 import { formatDate, getEdition, isValidDate, listEditions } from "@/lib/brief";
 
-// Pre-build the archive's days; newer days render on first visit.
 export async function generateStaticParams() {
   const editions = await listEditions(30);
   return editions.length ? editions.map((e) => ({ date: e.date })) : [{ date: "2026-01-01" }];

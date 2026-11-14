@@ -1,4 +1,2 @@
-# MCP server for AI assistants (kernel/mcp_server.py). Kept separate so the
-# daily pipeline job doesn't install it. Needs Python 3.10+.
 -r requirements.txt
 mcp>=2.3

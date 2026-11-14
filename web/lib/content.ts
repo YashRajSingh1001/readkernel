@@ -1,14 +1,3 @@
-// Blog posts, guides and newsletter reviews: Markdown files in web/content/<kind>/.
-// Each file starts with a small front-matter block:
-//
-//   ---
-//   title: How ReadKernel picks the day's ten stories
-//   description: One line for search results and cards
-//   date: 2026-10-18
-//   ---
-//
-// Reviews also carry: name, url, rating (1-5), frequency, price, verdict.
-
 import { promises as fs } from "fs";
 import { marked } from "marked";
 import { cacheLife } from "next/cache";
@@ -45,7 +34,6 @@ function parse(slug: string, raw: string): Entry {
     description: meta.description ?? "",
     date: meta.date ?? "",
     meta,
-    // Our own files only; never user input.
     html: marked.parse(body, { async: false }) as string,
   };
 }

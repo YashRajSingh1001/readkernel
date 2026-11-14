@@ -1,10 +1,3 @@
-"""Turn article text into vectors for similarity.
-
-"local" uses a small open embedding model through fastembed (runs on CPU,
-free, about 130 MB downloaded once). "simple" is a hashed word-count vector
-with no download; it is less accurate and is the fallback.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -33,13 +26,12 @@ def article_text(title: str, description: str) -> str:
 
 
 def embed(texts: list[str], backend: str = "local", cache_dir: Path | None = None) -> tuple[np.ndarray, str]:
-    """Return (unit-length vectors, backend actually used)."""
     if not texts:
         return np.zeros((0, 1)), backend
     if backend == "local":
         try:
             return _embed_local(texts, cache_dir), "local"
-        except Exception as exc:  # missing package or model download failed
+        except Exception as exc:
             print(f"[kernel] local embeddings unavailable ({exc}); using simple matching.")
     return _embed_simple(texts), "simple"
 
@@ -47,7 +39,6 @@ def embed(texts: list[str], backend: str = "local", cache_dir: Path | None = Non
 def _embed_local(texts: list[str], cache_dir: Path | None) -> np.ndarray:
     global _model
     if _model is None:
-        # Quiet the model hub's Windows symlink and progress-bar warnings.
         os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
         warnings.filterwarnings("ignore", module="huggingface_hub")
         from fastembed import TextEmbedding

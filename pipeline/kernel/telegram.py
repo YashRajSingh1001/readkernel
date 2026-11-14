@@ -1,13 +1,3 @@
-"""Post the day's brief to a Telegram channel (free).
-
-    python -m kernel.telegram              # post today's brief
-    python -m kernel.telegram --dry-run    # print the message instead
-
-Needs TELEGRAM_BOT_TOKEN (from @BotFather) and TELEGRAM_CHAT_ID (e.g.
-@readkernel, with the bot added to the channel as an admin). Without them
-it does nothing, so the daily job can always call it.
-"""
-
 from __future__ import annotations
 
 import argparse

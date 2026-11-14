@@ -2,7 +2,6 @@ import { ImageResponse } from "next/og";
 
 import { TOPICS, getStory } from "@/lib/brief";
 
-// The preview card shown when a story link is shared on X, LinkedIn, WhatsApp...
 export const alt = "ReadKernel story";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";

@@ -1,5 +1,3 @@
-// "Make it yours" rules. Mirrors pipeline/kernel/personal.py exactly, so the
-// builder's live preview shows what the reader's email will contain.
 import type { Story } from "./format";
 
 export const COUNTS = [5, 10, 15] as const;
@@ -13,7 +11,6 @@ export const FREQUENCIES = [
   { id: "weekly", label: "Once a week (Sunday)" },
 ] as const;
 
-// companyRead: end the email with one engineering post from a company blog (see /companies).
 export type Prefs = { topics: string[]; count: number; format: string; frequency: string; companyRead: boolean };
 export const DEFAULT_PREFS: Prefs = { topics: [], count: 10, format: "summaries", frequency: "daily", companyRead: true };
 
@@ -33,7 +30,6 @@ export function selectStories(brief: Story[], feed: Story[], topics: string[], c
   return byScore.filter((s) => wanted.has(s.topic)).slice(0, n);
 }
 
-/** Validate untrusted form input into Prefs. */
 export function parsePrefs(
   input: { topics?: unknown; count?: unknown; format?: unknown; frequency?: unknown; companyRead?: unknown },
   validTopics: string[],

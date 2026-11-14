@@ -40,7 +40,6 @@ export function EditionView({ edition, isLatest = false }: { edition: Edition; i
         </section>
       )}
 
-      {/* The rest in importance order, 2 to 10. Each card shows its own topic. */}
       {others.length > 0 && (
         <section className="mt-8" aria-labelledby="rest-of-brief">
           <h2 id="rest-of-brief" className="mb-1 text-sm font-semibold text-label">

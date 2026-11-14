@@ -13,7 +13,6 @@ export const metadata: Metadata = {
 export default function AskPage({ searchParams }: PageProps<"/ask">) {
   return (
     <Container className="flex flex-1 flex-col">
-      {/* AskChat draws the page heading: a centred prompt before the first question, like a chat app. */}
       <Suspense fallback={<AskChat />}>
         <AskForStory searchParams={searchParams} />
       </Suspense>
@@ -21,7 +20,6 @@ export default function AskPage({ searchParams }: PageProps<"/ask">) {
   );
 }
 
-// /ask?story=<key> (the "Ask about this story" button): the chat starts focused on that story.
 async function AskForStory({ searchParams }: { searchParams: PageProps<"/ask">["searchParams"] }) {
   const { story: key } = await searchParams;
   const story = typeof key === "string" ? await getStory(key) : null;

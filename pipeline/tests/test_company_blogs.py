@@ -26,7 +26,7 @@ def test_the_real_company_list_loads():
     assert len(companies) >= 25
     assert all(bool(c.feed) != bool(c.hn) for c in companies)
     assert any(c.name == "Uber" and c.hn for c in companies)
-    assert all(c.site and "/" not in c.site for c in companies)  # every company has a logo
+    assert all(c.site and "/" not in c.site for c in companies)
 
 
 def test_same_post_under_country_paths_has_one_key():
@@ -79,7 +79,6 @@ def test_describe_uses_ai_answers_and_rejects_bad_values():
                        "p1": {"summary": "", "category": "nonsense", "depth": 9}}}
     describe([a, b], FakeLLM(reply))
     assert (a.summary, a.category, a.depth) == ("Netflix rebuilt recs.", "ml", 4)
-    # bad answers fall back to the rules: first sentence, keyword category, no depth
     assert (b.summary, b.category, b.depth) == ("We cut Kafka costs.", "data", None)
     assert a.score > b.score
 

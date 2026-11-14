@@ -1,4 +1,3 @@
-// Page width wrapper. "read" for text pages, "wide" for the feed and homepage.
 export function Container({
   children,
   size = "read",

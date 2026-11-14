@@ -17,7 +17,6 @@ const REASONS = [
   { title: "Anything else", body: "Feedback, ideas, partnerships. We read everything.", subject: "Hello" },
 ];
 
-// Photos live in public/team/ (800 x 1000, metadata stripped). No photo yet: initials instead.
 const MAKERS: { name: string; initials: string; role: string; linkedin: string; photo?: string }[] = [
   {
     name: "Yash Raj Singh",

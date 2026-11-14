@@ -5,7 +5,6 @@ import { Suspense } from "react";
 import { FeedView } from "@/components/FeedView";
 import { TOPICS, TOPIC_BLURBS, getLatestEdition, previousEditionDate } from "@/lib/brief";
 
-// One page per topic, built ahead of time.
 export function generateStaticParams() {
   return Object.keys(TOPICS).map((topic) => ({ topic }));
 }

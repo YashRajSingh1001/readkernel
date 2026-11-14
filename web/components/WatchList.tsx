@@ -8,7 +8,6 @@ type Props = { token: string; watches: { id: string; description: string }[]; ma
 
 const EXAMPLES = ["UPI and digital payment rules in India", "Open-weight AI model releases", "Indian AI startups raising money"];
 
-/** Plain-English watch alerts: matches show up at the top of the reader's email. */
 export function WatchList({ token, watches, max }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const [state, addAction, pending] = useActionState<FormState, FormData>(async (prev, form) => {

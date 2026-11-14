@@ -13,10 +13,6 @@ type Props = {
   showImage?: boolean;
 };
 
-/**
- * One story. "lead" = big photo on top (story of the day), "standard" = photo
- * beside the text, "compact" = small thumbnail, headline and byline only.
- */
 export function StoryCard({ story, now, rank, variant = "standard", showImage = true }: Props) {
   const lead = story.sources[0];
   const href = story.story_key ? `/story/${story.story_key}` : lead?.url;

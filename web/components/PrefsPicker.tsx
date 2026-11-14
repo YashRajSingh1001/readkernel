@@ -10,7 +10,6 @@ const chip = (on: boolean) =>
     on ? "border-ink bg-ink text-paper" : "border-line bg-card hover:border-ink"
   }`;
 
-/** The choices behind "make it yours". Controlled: the parent keeps the value. */
 export function PrefsPicker({ value, onChange }: Props) {
   const toggleTopic = (t: string) =>
     onChange({

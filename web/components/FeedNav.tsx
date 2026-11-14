@@ -23,7 +23,6 @@ function Icon({ d }: { d: string }) {
   );
 }
 
-/** Desktop: a left menu. Phone: a bar fixed to the bottom of the screen. */
 export function FeedNav({ counts, total, discussions }: Props) {
   const path = usePathname();
   const item = (href: string, label: string, count?: number, d?: string) => {

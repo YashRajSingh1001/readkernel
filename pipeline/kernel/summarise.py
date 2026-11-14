@@ -1,10 +1,3 @@
-"""Write a headline + summary for each picked story, cached so we pay once.
-
-The cache key is the story's set of article URLs plus the model, so a story
-is only re-summarised when new coverage joins it. For now the cache is a
-local SQLite file; it moves to the database in step 2.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -40,10 +33,6 @@ SUMMARY_SYSTEM = (
 )
 
 
-# Bump when the prompt changes, so cached summaries are rewritten.
-# Not bumped when "companies" was added: rewriting every cached summary (and
-# fact-checking it again) would spend AI calls for tags alone. New stories
-# get tags; ones already summarised simply have none.
 PROMPT_VERSION = 3
 
 
@@ -52,7 +41,6 @@ class SummaryOut(BaseModel):
     summary: str = Field(min_length=30, max_length=900)
     why_it_matters: str = Field(default="", max_length=400)
     kind: str = Field(default="news", pattern="^(news|model_release)$")
-    # Cached summaries from before company tags have none; they validate as [].
     companies: list = Field(default_factory=list, max_length=8)
 
 
@@ -83,7 +71,6 @@ def cache_key(story: Story, model: str) -> str:
 
 
 def fallback_summary(story: Story) -> dict:
-    """No-AI summary: the lead article's own title and first sentences."""
     text = story.lead.description
     sentences = re.split(r"(?<=[.!?])\s+", text)
     summary = " ".join(sentences[:2]).strip()
@@ -97,7 +84,6 @@ _MODEL_RE = re.compile(
 
 
 def guess_kind(story: Story) -> str:
-    """No-AI fallback: spot model releases by their usual wording."""
     text = " ".join(a.title for a in story.articles)
     return "model_release" if story.topic == "ai" and _MODEL_RE.search(text) else "news"
 
@@ -105,7 +91,6 @@ def guess_kind(story: Story) -> str:
 def summarise(stories: list[Story], llm: LLM | None, cache: SummaryCache | None) -> None:
     for story in stories:
         result = None
-        # With no article text (e.g. bare Hacker News links) the AI can only pad.
         has_text = any(a.description for a in story.articles)
         if llm and has_text:
             key = cache_key(story, f"{llm.provider}:{llm.model}")
@@ -114,7 +99,7 @@ def summarise(stories: list[Story], llm: LLM | None, cache: SummaryCache | None)
                 result = _ask(story, llm)
                 if result and cache:
                     cache.put(key, result)
-        story.extra["summary_source"] = "ai" if result else "feed"  # the fact-checker reviews the AI's
+        story.extra["summary_source"] = "ai" if result else "feed"
         result = result or fallback_summary(story)
         story.headline = result["headline"]
         story.summary = result["summary"]

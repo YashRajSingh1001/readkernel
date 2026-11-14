@@ -1,11 +1,7 @@
-# Builds the day's brief and emails subscribers, every morning.
-# Runs on GitHub's free runners; settings come from the repo's Actions secrets
-# (Settings -> Secrets and variables -> Actions). See README "Deploy".
 name: Daily brief
 
 on:
   schedule:
-    # 00:30 UTC = 06:00 India time. GitHub may start scheduled runs a few minutes late.
     - cron: "30 0 * * *"
   workflow_dispatch:
     inputs:
@@ -14,7 +10,6 @@ on:
         type: boolean
         default: false
 
-# Never run two at once (e.g. a manual run during the scheduled one).
 concurrency:
   group: daily-brief
   cancel-in-progress: false
@@ -32,7 +27,6 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
       SITE_URL: ${{ secrets.SITE_URL }}
-      # Unset EMAIL_TRANSPORT means "preview": nothing is sent.
       EMAIL_TRANSPORT: ${{ secrets.EMAIL_TRANSPORT }}
       EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
       EMAIL_REPLY_TO: ${{ secrets.EMAIL_REPLY_TO }}
@@ -55,7 +49,6 @@ jobs:
       - name: Install
         run: pip install -r requirements.txt
 
-      # The embedding model (~70 MB) is downloaded once and reused.
       - name: Cache embedding model
         uses: actions/cache@v4
         with:
@@ -65,13 +58,10 @@ jobs:
       - name: Build today's brief
         run: python -m kernel.run
 
-      # New engineering and data science posts from company blogs. A failure
-      # here must never stop the brief going out.
       - name: Company blogs
         continue-on-error: true
         run: python -m kernel.company_blogs
 
-      # Readers' watch alerts: match today's news against what they asked to watch.
       - name: Watch alerts
         continue-on-error: true
         run: python -m kernel.watches
@@ -80,13 +70,11 @@ jobs:
         if: github.event_name == 'schedule' || inputs.send_email
         run: python -m kernel.send
 
-      # Sundays (India time): the weekly digest for readers who chose weekly.
       - name: Weekly digest
         if: github.event_name == 'schedule' || inputs.send_email
         run: |
           if [ "$(TZ=Asia/Kolkata date +%u)" = "7" ]; then python -m kernel.send --weekly; else echo "Not Sunday"; fi
 
-      # Does nothing until TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID secrets exist.
       - name: Post to Telegram
         if: github.event_name == 'schedule' || inputs.send_email
         run: python -m kernel.telegram

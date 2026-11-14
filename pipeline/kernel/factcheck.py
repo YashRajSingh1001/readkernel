@@ -1,18 +1,3 @@
-"""Fact-check agent: a second AI pass that checks every summary against its articles.
-
-The summariser is told to use only facts from the article snippets, but models
-still slip (a year from memory, a number from a different story). This agent
-reads each written headline, summary and "why it matters" next to the same
-snippets and lists any claim the snippets don't support.
-
-    ok    -> published as written
-    fix   -> the agent rewrites it from the snippets; the rewrite is checked
-             again, and if it still fails, the story falls back to the
-             publisher's own words (never published unchecked)
-
-Verdicts are cached, so a story is checked once even across runs.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -26,7 +11,7 @@ from .summarise import SummaryOut, fallback_summary
 
 CHECK_VERSION = 1
 BATCH = 5
-ROUNDS = 2  # check, rewrite, check the rewrite
+ROUNDS = 2
 
 SYSTEM = (
     "You are a fact-checker for a tech news brief. For each story id you get the article snippets and the "
@@ -43,7 +28,6 @@ SYSTEM = (
 
 
 def _snippets(story: Story) -> list[dict]:
-    # The same snippets the summariser saw.
     return [{"source": a.source, "title": a.title, "text": a.description[:500]} for a in story.articles[:5]]
 
 
@@ -64,7 +48,6 @@ def _ask(stories: list[Story], llm: LLM) -> dict[int, dict]:
 
 
 def _correction(answer: dict, story: Story) -> dict | None:
-    """The agent's rewrite, if it's well-formed."""
     try:
         fixed = SummaryOut(
             headline=answer.get("headline") or "",
@@ -83,14 +66,12 @@ def _apply(story: Story, text: dict, outcome: str) -> None:
 
 
 def fact_check(stories: list[Story], llm: LLM | None, cache=None) -> dict[str, int]:
-    """Check the AI-written stories in place. Returns counts: ok, fixed, fallback, unchecked."""
     counts = {"ok": 0, "fixed": 0, "fallback": 0, "unchecked": 0}
     todo = [s for s in stories if s.extra.get("summary_source") == "ai"]
     counts["unchecked"] = len(stories) - len(todo) if llm else len(stories)
     if not llm:
         return counts
 
-    # Verdicts we already know.
     pending: list[Story] = []
     for story in todo:
         known = cache.get(check_key(story)) if cache is not None else None
@@ -112,11 +93,10 @@ def fact_check(stories: list[Story], llm: LLM | None, cache=None) -> dict[str, i
                 answer = answers.get(i)
                 if answer is None:
                     if story.extra.get("fact_check") == "rewriting":
-                        # A rewrite is never published unchecked.
                         _apply(story, _publisher_words(story), "fallback")
                         counts["fallback"] += 1
                     else:
-                        counts["unchecked"] += 1  # the AI didn't answer; keep the summary as written
+                        counts["unchecked"] += 1
                     continue
                 if answer.get("verdict") == "ok":
                     outcome = "fixed" if story.extra.get("fact_check") == "rewriting" else "ok"
@@ -129,7 +109,7 @@ def fact_check(stories: list[Story], llm: LLM | None, cache=None) -> dict[str, i
                     story.extra["problems"] = [str(p)[:200] for p in answer.get("problems") or []][:5]
                     _apply(story, fixed, "rewriting")
                     print(f"    [fact-check] corrected \"{story.headline[:70]}\": {'; '.join(story.extra['problems']) or 'unsupported claims'}")
-                    retry.append(story)  # check the rewrite too
+                    retry.append(story)
                 else:
                     _apply(story, _publisher_words(story), "fallback")
                     _remember(cache, story, originals[i], "fallback")
@@ -144,7 +124,6 @@ def _publisher_words(story: Story) -> dict:
 
 
 def _remember(cache, story: Story, key: str, outcome: str) -> None:
-    """Cache the final text under the key of what the summariser first wrote."""
     story.extra["fact_check"] = outcome
     if cache is not None:
         cache.put(story.extra.pop("first_key", key), {"outcome": outcome, "text": _written(story)})

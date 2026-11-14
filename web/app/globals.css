@@ -1,10 +1,5 @@
 @import "tailwindcss";
 
-/*
- * ReadKernel palette. Light is the default; dark is opt-in via the header
- * toggle (data-theme="dark"), or follows the device when the reader picks
- * "system" (data-theme="system").
- */
 :root {
   --paper: #fbfaf7;
   --card: #ffffff;
@@ -12,10 +7,8 @@
   --ink: #17150f;
   --muted: #66625a;
   --line: #e6e3dc;
-  --accent: #c2410c; /* ember: actions and the brand dot */
-  --accent-soft: #fdeee6;
-  --label: #0f766e; /* teal: section labels like "Story of the day" */
-  --label-soft: #e6f4f2;
+  --accent: #c2410c;  --accent-soft: #fdeee6;
+  --label: #0f766e;  --label-soft: #e6f4f2;
   color-scheme: light;
 }
 
@@ -60,10 +53,8 @@
   --color-accent-soft: var(--accent-soft);
   --color-label: var(--label);
   --color-label-soft: var(--label-soft);
-  /* One typeface everywhere: Century Gothic if installed, else Jost (see layout.tsx). */
   --font-sans: "Century Gothic", CenturyGothic, var(--font-jost), "Segoe UI", sans-serif;
   --font-serif: "Century Gothic", CenturyGothic, var(--font-jost), "Segoe UI", sans-serif;
-  /* Only for real code (setup snippets on /tools). */
   --font-mono: ui-monospace, Consolas, "SF Mono", Menlo, monospace;
 }
 
@@ -76,7 +67,6 @@ body {
   background: var(--accent-soft);
 }
 
-/* Long-form pages (blog, guides, legal) */
 .prose-rk {
   line-height: 1.7;
 }
@@ -129,8 +119,6 @@ body {
   color: var(--muted);
 }
 
-/* Ask: status lines and confirmed citation links fade in as the server reports
-   them. Opacity only, no movement; nothing at all with reduced motion. */
 @keyframes rk-fade-in {
   from {
     opacity: 0;
@@ -148,9 +136,6 @@ body {
   }
 }
 
-/* Ask is a full-screen chat, like a chat app: no site footer, and the chat
-   fills the space under the header so its question box sits at the bottom of
-   the screen however short the conversation is (components/AskChat.tsx). */
 body:has([data-ask-app]) > footer {
   display: none;
 }

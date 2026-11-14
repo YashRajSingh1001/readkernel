@@ -1,5 +1,3 @@
-"""Download RSS/Atom feeds and turn entries into Articles."""
-
 from __future__ import annotations
 
 import html
@@ -18,18 +16,15 @@ MAX_DESCRIPTION = 700
 
 _TAG_RE = re.compile(r"<[^>]+>")
 _SPACE_RE = re.compile(r"\s+")
-# Boilerplate that feeds tack onto descriptions.
 _NOISE_RE = re.compile(
     r"(\[(?:\.\.\.|…)\]|(?:\.\.\.|…)\s*$|The post .{0,200}? appeared first on .{0,100}?\.?\s*$"
     r"|(?:Continue|Read more|Read the full).{0,40}$)",
     flags=re.IGNORECASE,
 )
-# Link aggregators (Hacker News) send only "Article URL / Comments URL / Points".
 _AGGREGATOR_RE = re.compile(r"^\s*Article URL:", flags=re.IGNORECASE)
 
 
 def clean_text(value: str) -> str:
-    """Strip HTML tags and entities, collapse whitespace."""
     text = _TAG_RE.sub(" ", value or "")
     text = html.unescape(text)
     return _SPACE_RE.sub(" ", text).strip()
@@ -46,7 +41,6 @@ _IMG_RE = re.compile(r"""<img[^>]+src=["']([^"']+)["']""", flags=re.IGNORECASE)
 
 
 def entry_image(entry) -> str:
-    """The photo a feed attaches to an entry (media tags, enclosure, or first <img>)."""
     candidates: list[str] = []
     for item in entry.get("media_content") or []:
         if item.get("medium") in (None, "image") or str(item.get("type", "")).startswith("image"):
@@ -62,7 +56,6 @@ def entry_image(entry) -> str:
             candidates.append(html.unescape(match.group(1)))
     for url in candidates:
         url = (url or "").strip()
-        # skip tracking pixels and tiny icons that some feeds embed
         if url.startswith("https://") and not re.search(r"(pixel|feedburner|gravatar|emoji|1x1)", url, re.I):
             return url
     return ""
@@ -107,13 +100,12 @@ def fetch_source(client: httpx.Client, source: Source) -> list[Article]:
     try:
         response = client.get(source.url)
     except httpx.TimeoutException:
-        response = client.get(source.url)  # slow feeds often answer the second time
+        response = client.get(source.url)
     response.raise_for_status()
     return parse_feed(response.content, source)
 
 
 def fetch_all(sources: list[Source], workers: int = 12) -> tuple[list[Article], dict[str, str]]:
-    """Fetch every source in parallel. Returns (articles, {source_name: error})."""
     articles: list[Article] = []
     errors: dict[str, str] = {}
     headers = {"User-Agent": USER_AGENT, "Accept": "application/rss+xml, application/atom+xml, */*"}
@@ -123,6 +115,6 @@ def fetch_all(sources: list[Source], workers: int = 12) -> tuple[list[Article], 
             for future, source in futures.items():
                 try:
                     articles.extend(future.result())
-                except Exception as exc:  # one bad feed must not stop the run
+                except Exception as exc:
                     errors[source.name] = f"{type(exc).__name__}: {exc}"[:200]
     return articles, errors

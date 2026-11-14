@@ -1,13 +1,3 @@
-// ReadKernel's MCP server: lets AI assistants (Claude, Cursor, ChatGPT and
-// others) read today's news, search the archive and follow story timelines.
-//
-// Connect any MCP client to https://readkernel.in/mcp (no key needed).
-//
-// It speaks MCP's "Streamable HTTP" transport in its simplest, stateless form:
-// every POST carries JSON-RPC messages and gets a plain JSON answer. There is
-// no session and no server-to-client stream, because every tool is a quick,
-// read-only lookup. The tools themselves live in lib/tools.ts.
-
 import { NEWS_TOOLS, runTool } from "@/lib/tools";
 
 const SUPPORTED_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
@@ -37,7 +27,6 @@ async function handle(msg: JsonRpcMessage) {
   if (!msg || typeof msg !== "object" || msg.jsonrpc !== "2.0" || typeof msg.method !== "string") {
     return failure(msg?.id, -32600, "Invalid request");
   }
-  // Notifications (no id) need no answer.
   if (msg.id === undefined) return null;
 
   switch (msg.method) {
@@ -99,7 +88,6 @@ export async function POST(request: Request) {
   return Response.json(batch ? answers : answers[0], { headers: CORS });
 }
 
-// No server-to-client stream: a GET just explains how to connect.
 export async function GET() {
   return Response.json(
     {

@@ -6,9 +6,7 @@ import { subscribeAction, type FormState } from "@/app/actions";
 import type { Prefs } from "@/lib/personal";
 
 type Props = {
-  /** Smaller card used inside the brief; the homepage uses the large hero form. */
   compact?: boolean;
-  /** "Make it yours" choices sent with the sign-up (builder page). */
   prefs?: Prefs;
   buttonLabel?: string;
 };
@@ -36,7 +34,6 @@ export function SignupForm({ compact = false, prefs, buttonLabel = "Get the dail
           compact ? "rounded-lg border border-line focus:border-ink" : "rounded-full border border-line focus:border-ink sm:border-0"
         }`}
       />
-      {/* Honeypot: hidden from people, filled in by bots */}
       <input type="text" name="company" tabIndex={-1} autoComplete="off" aria-hidden className="hidden" />
       {prefs && (
         <>

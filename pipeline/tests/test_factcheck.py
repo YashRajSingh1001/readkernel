@@ -16,8 +16,6 @@ def story(text="Acme raised $5 million from Big Fund.", headline="Acme raises $5
 
 
 class ScriptedLLM:
-    """Answers each fact-check call from a list of replies, in order."""
-
     def __init__(self, *replies):
         self.replies = list(replies)
         self.calls = 0
@@ -43,7 +41,6 @@ def test_ok_stories_are_left_alone_and_cached():
     counts = fact_check([s], ScriptedLLM({"stories": {"s0": {"verdict": "ok"}}}), cache)
     assert counts["ok"] == 1 and s.extra["fact_check"] == "ok"
     assert cache[key]["outcome"] == "ok"
-    # next run: answered from the cache, no AI call
     again, llm = story(), ScriptedLLM()
     fact_check([again], llm, cache)
     assert llm.calls == 0 and again.extra["fact_check"] == "ok"
@@ -56,7 +53,7 @@ def test_unsupported_claim_is_rewritten_and_the_rewrite_rechecked():
     counts = fact_check([s], llm, cache)
     assert llm.calls == 2 and counts["fixed"] == 1
     assert "2024" not in s.summary and s.extra["fact_check"] == "fixed"
-    assert cache[first]["text"]["summary"] == s.summary  # remembered under the original text
+    assert cache[first]["text"]["summary"] == s.summary
 
 
 def test_a_rewrite_that_fails_again_falls_back_to_the_publishers_words():

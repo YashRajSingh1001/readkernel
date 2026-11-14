@@ -6,9 +6,6 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { THEME_SCRIPT } from "@/components/ThemeToggle";
 import "./globals.css";
 
-// The site uses Century Gothic where the reader has it (most Windows and Mac machines
-// with Office). It is a licensed font we cannot serve, so everyone else gets Jost,
-// a free geometric sans from the same family of shapes.
 const jost = Jost({ variable: "--font-jost", subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -21,8 +18,6 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    // data-theme is set before paint by THEME_SCRIPT (light unless the reader chose otherwise).
-    // suppressHydrationWarning: that script and browser extensions change <html> attributes.
     <html
       lang="en"
       data-theme="light"

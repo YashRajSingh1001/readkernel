@@ -9,7 +9,6 @@ import { companySlug, formatDate, getCompanyNews, getLatestEdition, listRecentCo
 import { listCompanyPosts } from "@/lib/companies";
 import { siteUrl } from "@/lib/site";
 
-// Pre-build the most-covered companies; others render on first visit.
 export async function generateStaticParams() {
   const companies = await listRecentCompanies(30, 40);
   return companies.length ? companies.map((c) => ({ slug: c.slug })) : [{ slug: "placeholder" }];
@@ -38,7 +37,6 @@ async function CompanyView({ params }: { params: PageProps<"/company/[slug]">["p
   if (!news) notFound();
 
   const blog = posts.filter((p) => companySlug(p.company) === slug).slice(0, 3);
-  // "2 days ago" is measured from the latest edition, like the story page.
   const now = Date.parse(latest?.generated_at ?? news.stories[0].published);
   const oldest = news.stories.at(-1)?.edition_date;
 

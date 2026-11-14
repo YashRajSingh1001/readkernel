@@ -9,7 +9,6 @@ export const AUTH_ENABLED =
 
 let client: SupabaseClient | null = null;
 
-/** One shared client in the browser; null when sign-in is turned off. */
 export function supabaseBrowser(): SupabaseClient | null {
   if (!AUTH_ENABLED) return null;
   client ??= createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!);

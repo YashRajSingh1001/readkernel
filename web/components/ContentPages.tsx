@@ -4,7 +4,6 @@ import { formatDate } from "@/lib/format";
 import type { Entry } from "@/lib/content";
 import { Container } from "./Container";
 
-/** List page for blog posts, guides or reviews. */
 export function EntryList({
   label,
   title,
@@ -51,7 +50,6 @@ export function EntryList({
   );
 }
 
-/** One article. */
 export function EntryArticle({ entry, back, backLabel }: { entry: Entry; back: string; backLabel: string }) {
   const { meta } = entry;
   return (

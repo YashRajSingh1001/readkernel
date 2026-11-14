@@ -1,5 +1,3 @@
-"""Load and validate sources.yaml."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -12,7 +10,6 @@ TOPICS = {"ai", "tech", "dev", "startups", "security", "markets", "design"}
 
 
 def load_sources(path: Path) -> tuple[list[Source], list[str]]:
-    """Return (sources, global_exclude_words)."""
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     sources: list[Source] = []
     seen_urls: set[str] = set()
@@ -39,7 +36,6 @@ def load_sources(path: Path) -> tuple[list[Source], list[str]]:
 
 
 def export_for_web(sources: list[Source], path: Path) -> None:
-    """Write the public source list the website shows (name, topic, home page)."""
     import json
     from urllib.parse import urlsplit
 
@@ -53,7 +49,6 @@ def export_for_web(sources: list[Source], path: Path) -> None:
 
 
 if __name__ == "__main__":
-    # python -m kernel.sources  -> refresh web/lib/sources.json after editing sources.yaml
     from .config import PIPELINE_DIR, load_settings
 
     found, _ = load_sources(load_settings().sources_file)

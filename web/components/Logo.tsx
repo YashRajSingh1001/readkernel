@@ -1,8 +1,5 @@
 import Link from "next/link";
 
-// The logo: the square "rk." icon (the same one as the browser tab, phone and
-// extension icon, app/icon.svg, drawn by brand/make_icons.py) followed by the
-// wordmark, lowercase "readkernel" with an ember full stop.
 export function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2 text-xl tracking-tight" aria-label="ReadKernel home">
@@ -15,7 +12,6 @@ export function Logo() {
   );
 }
 
-/** app/icon.svg, inline so it shows at once and stays sharp. */
 function RkIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 64 64" className={className} aria-hidden="true">

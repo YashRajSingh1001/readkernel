@@ -8,7 +8,6 @@ import { EmailPreview } from "./EmailPreview";
 import { PrefsPicker } from "./PrefsPicker";
 import { SignupForm } from "./SignupForm";
 
-/** The "make it yours" page: choices on the left, today's real email on the right. */
 export function Builder({ edition }: { edition: Edition }) {
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const stories = selectStories(edition.stories, edition.feed, prefs.topics, prefs.count);

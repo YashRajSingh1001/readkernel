@@ -1,23 +1,4 @@
-# Company blogs: how real companies build things.
-#
-# Engineering and data science write-ups, kept apart from the daily news:
-# companies post a few times a month and each post has one source, so they
-# would never win a ranking built on "how many outlets covered this today".
-#
-# Each company:
-#   name     shown on the page
-#   feed     RSS or Atom feed
-#   hn       for companies with no feed: a piece of their blog's address. We
-#            find their posts through Hacker News search, which catches
-#            nearly every post someone shares there.
-#   weight   how much we trust it when ranking (1.0 = normal)
-#   site     the company's main website, for its logo on the website
-#
-# After editing, run: python -m kernel.company_blogs --dry-run
-# and refresh the website's logo list: python -m kernel.company_blogs --export-web
-
 companies:
-  # --- Big consumer tech -------------------------------------------------------
   - { name: Netflix, feed: "https://netflixtechblog.com/feed", weight: 1.3, site: "netflix.com" }
   - { name: Uber, hn: "uber.com/blog", weight: 1.3, site: "uber.com" }
   - { name: Meta, feed: "https://engineering.fb.com/feed/", weight: 1.3, site: "meta.com" }
@@ -33,7 +14,6 @@ companies:
   - { name: Etsy, feed: "https://www.etsy.com/codeascraft/rss", weight: 1.0, site: "etsy.com" }
   - { name: Grab, feed: "https://engineering.grab.com/feed.xml", weight: 1.0, site: "grab.com" }
 
-  # --- Developer and AI companies ----------------------------------------------
   - { name: Anthropic, hn: "anthropic.com/engineering", weight: 1.3, site: "anthropic.com" }
   - { name: GitHub, feed: "https://github.blog/engineering/feed/", weight: 1.1, site: "github.com" }
   - { name: Stripe, feed: "https://stripe.com/blog/feed.rss", weight: 1.1, site: "stripe.com" }
@@ -44,11 +24,9 @@ companies:
   - { name: Canva, feed: "https://www.canva.dev/blog/engineering/feed", weight: 0.9, site: "canva.com" }
   - { name: AWS Architecture, feed: "https://aws.amazon.com/blogs/architecture/feed/", weight: 0.9, site: "aws.amazon.com" }
 
-  # --- Research labs -----------------------------------------------------------
   - { name: Google Research, feed: "https://research.google/blog/rss/", weight: 1.2, site: "research.google" }
   - { name: Microsoft Research, feed: "https://www.microsoft.com/en-us/research/feed/", weight: 1.1, site: "microsoft.com" }
 
-  # --- India -------------------------------------------------------------------
   - { name: Hotstar, feed: "https://blog.hotstar.com/feed", weight: 1.0, site: "hotstar.com" }
   - { name: Razorpay, feed: "https://engineering.razorpay.com/feed", weight: 1.0, site: "razorpay.com" }
   - { name: Flipkart, feed: "https://blog.flipkart.tech/feed", weight: 1.0, site: "flipkart.com" }

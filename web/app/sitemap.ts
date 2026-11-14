@@ -4,7 +4,6 @@ import { TOPICS, getLatestEdition, listEditions, listRecentCompanies } from "@/l
 import { listEntries } from "@/lib/content";
 import { siteUrl } from "@/lib/site";
 
-// Tells search engines which pages exist.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const site = siteUrl();
   const [editions, latest, blog, guides, reviews, companies] = await Promise.all([

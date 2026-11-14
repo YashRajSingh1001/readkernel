@@ -1,5 +1,3 @@
-"""Settings read from environment variables (and .env files)."""
-
 from __future__ import annotations
 
 import os

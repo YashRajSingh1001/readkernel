@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element -- source icons from Google's icon service */
+/* eslint-disable @next/next/no-img-element */
 import type { Metadata } from "next";
 import Link from "next/link";
 

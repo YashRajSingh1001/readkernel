@@ -1,5 +1,3 @@
-// node --test lib/ask-stream.test.ts   (npm test)
-
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -7,7 +5,6 @@ import { AnswerGuard, countResult, readEvents, type AskEvent } from "./ask-strea
 
 const BLOOMBERG = "https://www.bloomberg.com/news/nvidia-1";
 
-/** Feed text in the given chunks; return every delta, the citations and the final text. */
 function run(chunks: string[], known = [BLOOMBERG]) {
   const guard = new AnswerGuard(known);
   const deltas: string[] = [];
@@ -23,7 +20,6 @@ function run(chunks: string[], known = [BLOOMBERG]) {
   return { guard, deltas, citations, text: guard.text };
 }
 
-/** Every way of splitting `s` into two chunks, plus one char at a time. */
 function splits(s: string): string[][] {
   const out = [[...s]];
   for (let i = 1; i < s.length; i++) out.push([s.slice(0, i), s.slice(i)]);
@@ -140,7 +136,6 @@ test("a very long bracketed run is released once and never taken back", () => {
   assert.ok(r.text.startsWith("[aaa"));
 });
 
-// Random model output, split at random points: whatever happens, the guarantees hold.
 test("fuzz: shown text only grows, never holds a blocker or an unchecked link", () => {
   const known = ["https://ok.test/a", "https://ok.test/b"];
   const pieces = ["[", "]", "(", ")", "https://ok.test/a", "https://bad.test/x", "【1】", "【", "】", "`", "``", "OFF", "_TOPIC", "O", "F", "T", " ", "\n", "word", "**", "label"];

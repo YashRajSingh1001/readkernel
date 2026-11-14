@@ -1,9 +1,3 @@
-// Reads briefs for the website.
-// With SUPABASE_URL + SUPABASE_PUBLISHABLE_KEY set it reads the database;
-// otherwise it reads the pipeline's JSON files (pipeline/data), so the site
-// works locally before any database exists. READ_LOCAL_DATA=1 forces local
-// files even when Supabase is configured (handy for testing a new pipeline run).
-
 import { promises as fs } from "fs";
 import { cacheLife } from "next/cache";
 import path from "path";
@@ -35,7 +29,7 @@ export function supabase() {
 export async function rest<T>(query: string): Promise<T> {
   const db = supabase()!;
   const headers: Record<string, string> = { apikey: db.key };
-  if (db.key.startsWith("eyJ")) headers.Authorization = `Bearer ${db.key}`; // legacy anon key
+  if (db.key.startsWith("eyJ")) headers.Authorization = `Bearer ${db.key}`;
   const res = await fetch(`${db.url}/rest/v1/${query}`, { headers });
   if (!res.ok) throw new Error(`Supabase ${res.status}: ${await res.text()}`);
   return res.json() as Promise<T>;
@@ -59,7 +53,6 @@ const EDITION_SELECT =
   `select=date,generated_at,ai,stories(${STORY_COLUMNS}),discussions(${DISCUSSION_COLUMNS})` +
   "&stories.order=position.asc&discussions.order=position.asc";
 
-// Split one day's rows into the brief and the full feed.
 function toEdition(row: EditionRow): Edition {
   const feed = row.stories;
   const stories = feed
@@ -69,14 +62,12 @@ function toEdition(row: EditionRow): Edition {
 }
 
 export function dataDir() {
-  // Ignore hint: this folder is read at runtime, not bundled into the build.
   return process.env.LOCAL_DATA_DIR || path.join(/*turbopackIgnore: true*/ process.cwd(), "..", "pipeline", "data");
 }
 
 async function readLocal(file: string): Promise<Edition | null> {
   try {
     const raw = JSON.parse(await fs.readFile(path.join(dataDir(), file), "utf-8"));
-    // Files from before the feed existed only have the brief.
     return {
       date: raw.date,
       generated_at: raw.generated_at,
@@ -92,7 +83,7 @@ async function readLocal(file: string): Promise<Edition | null> {
 
 export async function getLatestEdition(): Promise<Edition | null> {
   "use cache";
-  cacheLife("minutes"); // the pipeline publishes a few times a day
+  cacheLife("minutes");
   if (supabase()) {
     const rows = await rest<EditionRow[]>(`editions?${EDITION_SELECT}&order=date.desc&limit=1`);
     return rows[0] ? toEdition(rows[0]) : null;
@@ -103,7 +94,7 @@ export async function getLatestEdition(): Promise<Edition | null> {
 export async function getEdition(date: string): Promise<Edition | null> {
   "use cache";
   cacheLife("minutes");
-  if (!isValidDate(date)) return null; // also blocks path tricks in local mode
+  if (!isValidDate(date)) return null;
   if (supabase()) {
     const rows = await rest<EditionRow[]>(`editions?${EDITION_SELECT}&date=eq.${date}`);
     return rows[0] ? toEdition(rows[0]) : null;
@@ -127,13 +118,11 @@ export async function listEditions(limit = 90): Promise<EditionSummary[]> {
     .map((e) => ({ date: e.date, story_count: e.stories.length, lead: e.stories[0]?.headline }));
 }
 
-/** The day before `date` that has an edition, for "See older stories". */
 export async function previousEditionDate(date: string): Promise<string | null> {
   const editions = await listEditions(120);
   return editions.find((e) => e.date < date)?.date ?? null;
 }
 
-/** The most recent saved copy of one story, for its own page. */
 export async function getStory(key: string): Promise<StoryWithDate | null> {
   "use cache";
   cacheLife("minutes");
@@ -152,7 +141,6 @@ export async function getStory(key: string): Promise<StoryWithDate | null> {
   return null;
 }
 
-/** Every day's version of an ongoing story, newest first (one per day). */
 export async function getThread(threadId: string): Promise<StoryWithDate[]> {
   "use cache";
   cacheLife("minutes");
@@ -160,7 +148,6 @@ export async function getThread(threadId: string): Promise<StoryWithDate[]> {
   let rows: StoryWithDate[] = [];
   if (supabase()) {
     rows = await rest<StoryWithDate[]>(
-      // A thread is named after its first story, which may predate thread ids.
       `stories?select=edition_date,${STORY_COLUMNS}&or=(thread_id.eq.${threadId},story_key.eq.${threadId})` +
         `&order=edition_date.desc,score.desc&limit=60`,
     );
@@ -176,14 +163,12 @@ export async function getThread(threadId: string): Promise<StoryWithDate[]> {
   return [...perDay.values()];
 }
 
-/** Archive search over headlines and summaries. */
 export async function searchStories(query: string, limit = 40): Promise<StoryWithDate[]> {
   "use cache";
   cacheLife("minutes");
   const q = query.trim().slice(0, 100);
   if (q.length < 2) return [];
   if (supabase()) {
-    // websearch syntax: plain words, "quoted phrases", -excluded
     return rest<StoryWithDate[]>(
       `stories?select=edition_date,${STORY_COLUMNS}&search=wfts(english).${encodeURIComponent(q)}` +
         `&order=edition_date.desc,score.desc&limit=${limit}`,
@@ -215,10 +200,6 @@ async function localDates(): Promise<string[]> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Company tags (story_companies, from db/migrations/007). Until that has run,
-// these return nothing rather than failing, so only the company features wait.
-
 type TagRow = { edition_date: string; story_key: string; company: string; name: string };
 
 const COMPANY_STORY_LIMIT = 40;
@@ -227,7 +208,6 @@ function tagsOf(story: Story | undefined): CompanyTag[] {
   return (story?.companies ?? []).map((name) => ({ slug: companySlug(name), name }));
 }
 
-/** The companies one story is about (that day's copy of it). */
 export async function getStoryCompanies(storyKey: string, date: string): Promise<CompanyTag[]> {
   "use cache";
   cacheLife("minutes");
@@ -249,17 +229,16 @@ export async function getStoryCompanies(storyKey: string, date: string): Promise
 export type CompanyNews = {
   slug: string;
   name: string;
-  stories: StoryWithDate[]; // newest first, one copy per story
-  often: CompanyLink[]; // companies that share the most stories with this one
+  stories: StoryWithDate[];
+  often: CompanyLink[];
 };
 
-/** Every story about one company, and who it's most often in the news with. */
 export async function getCompanyNews(slug: string): Promise<CompanyNews | null> {
   "use cache";
   cacheLife("minutes");
   if (!COMPANY_SLUG_RE.test(slug)) return null;
   let stories: StoryWithDate[] = [];
-  let tags: TagRow[] = []; // all tags on those stories, this company's included
+  let tags: TagRow[] = [];
 
   if (supabase()) {
     try {
@@ -267,7 +246,6 @@ export async function getCompanyNews(slug: string): Promise<CompanyNews | null> 
         `story_companies?select=edition_date,story_key,company,name&company=eq.${slug}` +
           `&order=edition_date.desc&limit=${COMPANY_STORY_LIMIT * 2}`,
       );
-      // A story that ran on several days: keep its newest copy.
       const newest = new Map<string, string>();
       for (const r of mine) if (!newest.has(r.story_key)) newest.set(r.story_key, r.edition_date);
       const keys = [...newest.keys()].slice(0, COMPANY_STORY_LIMIT);
@@ -299,7 +277,6 @@ export async function getCompanyNews(slug: string): Promise<CompanyNews | null> 
     if (stories.length === 0) return null;
   }
 
-  // Display name: the spelling the news uses most.
   const spellings = new Map<string, number>();
   for (const t of tags) if (t.company === slug) spellings.set(t.name, (spellings.get(t.name) ?? 0) + 1);
   const name = [...spellings.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? slug;
@@ -319,7 +296,6 @@ export async function getCompanyNews(slug: string): Promise<CompanyNews | null> 
   return { slug, name, stories: stories.slice(0, COMPANY_STORY_LIMIT), often };
 }
 
-/** Companies tagged in the last `days` days, most-covered first (for the sitemap). */
 export async function listRecentCompanies(days = 30, limit = 200): Promise<CompanyLink[]> {
   "use cache";
   cacheLife("hours");

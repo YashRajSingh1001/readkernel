@@ -9,7 +9,7 @@ import { PrefsPicker } from "./PrefsPicker";
 type Props = {
   initial: Prefs;
   action: (prev: FormState, form: FormData) => Promise<FormState>;
-  token?: string; // email-link mode; signed-in mode has none
+  token?: string;
 };
 
 export function PreferencesForm({ initial, action, token }: Props) {

@@ -1,6 +1,3 @@
-// Today's brief as JSON, for the Chrome extension and anyone else who wants it.
-// Public data only; any site may read it (CORS open), and it's cached for 5 minutes.
-
 import { TOPICS, getLatestEdition } from "@/lib/brief";
 import { highlights, listCompanyPosts } from "@/lib/companies";
 import { COMPANY_CATEGORIES } from "@/lib/format";

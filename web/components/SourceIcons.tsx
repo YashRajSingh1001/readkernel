@@ -1,7 +1,6 @@
-/* eslint-disable @next/next/no-img-element -- tiny site icons from Google's icon service */
+/* eslint-disable @next/next/no-img-element */
 import { faviconUrl, type Source } from "@/lib/format";
 
-// Overlapping site icons + "Name · N sources", like a byline for the coverage.
 export function SourceIcons({ sources, max = 4 }: { sources: Source[]; max?: number }) {
   const unique = sources.filter((s, i) => sources.findIndex((x) => x.name === s.name) === i);
   if (unique.length === 0) return null;

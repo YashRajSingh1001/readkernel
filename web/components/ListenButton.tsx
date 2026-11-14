@@ -2,13 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-// Reads the brief aloud with the browser's built-in voice (free, works offline).
 export function ListenButton({ parts, label = "Listen" }: { parts: string[]; label?: string }) {
   const [supported, setSupported] = useState(false);
   const [speaking, setSpeaking] = useState(false);
 
   useEffect(() => {
-    // speechSynthesis only exists in the browser; check after mount to keep SSR and client in step.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSupported(typeof window !== "undefined" && "speechSynthesis" in window);
     return () => window.speechSynthesis?.cancel();

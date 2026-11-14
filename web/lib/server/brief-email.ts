@@ -1,9 +1,5 @@
 import "server-only";
 
-// The daily brief email (HTML + plain text). Mirrors pipeline/kernel/newsletter.py,
-// so a reader who gets today's brief on confirming sees the same email the
-// pipeline sends every morning. Change both together.
-
 import { TOPICS, type Story } from "@/lib/format";
 
 const PAPER = "#fbfaf6";
@@ -13,7 +9,7 @@ const LINE = "#e7e4dc";
 const ACCENT = "#c2410c";
 const SERIF = "Georgia, 'Times New Roman', serif";
 const SANS = "-apple-system, 'Segoe UI', Arial, sans-serif";
-const GOTHIC = "'Century Gothic', CenturyGothic, 'Trebuchet MS', Arial, sans-serif"; // the wordmark
+const GOTHIC = "'Century Gothic', CenturyGothic, 'Trebuchet MS', Arial, sans-serif";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -61,7 +57,6 @@ export function renderBrief(edition: BriefEdition, siteUrl: string, token: strin
   const showText = fmt !== "headlines";
   const preheader = stories.slice(1, 4).map((s) => s.headline).join(" · ");
 
-  // --- plain text ---------------------------------------------------------
   const lines = [`ReadKernel · Today's brief · ${longDate(edition.date)}`, `${stories.length} stories`, ""];
   stories.forEach((s, i) => {
     lines.push(`${i + 1}. ${s.headline}  [${topicLabel(s.topic)}]`);
@@ -77,7 +72,6 @@ export function renderBrief(edition: BriefEdition, siteUrl: string, token: strin
   );
   const text = lines.join("\n");
 
-  // --- html ---------------------------------------------------------------
   const cards = stories.map((s, i) => storyHtml(i + 1, s, fmt)).join("");
   const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -103,7 +97,6 @@ export function renderBrief(edition: BriefEdition, siteUrl: string, token: strin
   </td></tr>
 </table></td></tr></table></body></html>`;
 
-  // Lets Gmail/Outlook show their own "Unsubscribe" button (RFC 8058).
   const headers = {
     "List-Unsubscribe": `<${urls.oneClick}>`,
     "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",

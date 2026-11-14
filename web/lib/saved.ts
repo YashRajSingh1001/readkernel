@@ -1,10 +1,5 @@
 "use client";
 
-// Saved stories live in the reader's own browser (localStorage), so no account
-// is needed. A signed-in reader's list is also kept in Supabase (saved_stories,
-// visible only to them) and merged with the browser's list, so it follows
-// them across devices.
-
 import { useSyncExternalStore } from "react";
 
 import { supabaseBrowser } from "./supabase/browser";
@@ -13,7 +8,7 @@ export type SavedStory = {
   key: string;
   headline: string;
   topic: string;
-  url: string; // lead source
+  url: string;
   source: string;
   savedAt: string;
 };
@@ -30,7 +25,7 @@ function read(): SavedStory[] {
     const parsed = raw ? JSON.parse(raw) : [];
     cache = Array.isArray(parsed) ? parsed : [];
   } catch {
-    cache = []; // private mode or blocked storage: start empty
+    cache = [];
   }
   return cache;
 }
@@ -40,7 +35,6 @@ function write(next: SavedStory[]) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   } catch {
-    // storage full or blocked: keep it in memory for this visit
   }
   listeners.forEach((fn) => fn());
 }
@@ -49,7 +43,7 @@ function subscribe(fn: () => void) {
   listeners.add(fn);
   const onStorage = (e: StorageEvent) => {
     if (e.key === STORAGE_KEY) {
-      cache = null; // another tab changed it
+      cache = null;
       fn();
     }
   };
@@ -88,7 +82,6 @@ export function toggleSaved(story: Omit<SavedStory, "savedAt">) {
   const entry = { ...story, savedAt: new Date().toISOString() };
   write(removing ? current.filter((s) => s.key !== story.key) : [entry, ...current]);
 
-  // Mirror to the account in the background; the browser copy is already updated.
   void (async () => {
     const userId = await signedInUserId();
     const supabase = supabaseBrowser();
@@ -98,7 +91,6 @@ export function toggleSaved(story: Omit<SavedStory, "savedAt">) {
   })();
 }
 
-/** After sign-in: merge the browser's list and the account's list, both ways. */
 export async function syncSavedWithAccount(): Promise<void> {
   const userId = await signedInUserId();
   const supabase = supabaseBrowser();

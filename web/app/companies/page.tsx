@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -52,7 +53,6 @@ export default function CompaniesPage({ searchParams }: PageProps<"/companies">)
                 href={`/companies?company=${encodeURIComponent(c.name)}`}
                 className="flex items-center gap-2 text-sm font-medium hover:text-accent"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element -- favicons come from Google's favicon service */}
                 <img src={faviconUrl(c.site)} alt="" width={16} height={16} loading="lazy" referrerPolicy="no-referrer" className="h-4 w-4 rounded" />
                 {c.name}
               </Link>

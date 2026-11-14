@@ -43,11 +43,10 @@ def test_save_supabase_replaces_the_days_stories():
         ("POST", "/rest/v1/editions", None),
         ("DELETE", "/rest/v1/stories", "eq.2026-10-18"),
         ("POST", "/rest/v1/stories", None),
-        ("DELETE", "/rest/v1/story_companies", "eq.2026-10-18"),  # no tags, so nothing to insert
+        ("DELETE", "/rest/v1/story_companies", "eq.2026-10-18"),
     ]
     stories = json.loads(seen[2].content)
     assert [s["position"] for s in stories] == [1, 2]
-    # without a separate feed, the brief itself is saved
 
 
 def test_save_supabase_saves_whole_feed_with_brief_marked():
@@ -58,9 +57,9 @@ def test_save_supabase_saves_whole_feed_with_brief_marked():
     rows = json.loads(seen[2].content)
     assert [(r["position"], r["brief_position"], r["story_key"]) for r in rows] == [(1, 1, "k1"), (2, None, "k2")]
     edition = json.loads(seen[0].content)
-    assert edition["story_count"] == 1  # the brief size, not the feed size
+    assert edition["story_count"] == 1
     assert seen[0].headers["apikey"] == "sb_secret_test"
-    assert "authorization" not in seen[0].headers  # new-style keys go in apikey only
+    assert "authorization" not in seen[0].headers
 
 
 def test_supabase_cache_round_trip_and_tolerates_errors():
@@ -69,7 +68,7 @@ def test_supabase_cache_round_trip_and_tolerates_errors():
 
     broken, _ = fake_db(lambda r: httpx.Response(500))
     assert SupabaseCache(broken).get("k") is None
-    SupabaseCache(broken).put("k", {})  # logs, does not raise
+    SupabaseCache(broken).put("k", {})
 
 
 def test_save_files_writes_dated_and_latest(tmp_path):

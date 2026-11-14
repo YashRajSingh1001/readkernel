@@ -33,7 +33,6 @@ export function SiteHeader() {
           </Link>
         </div>
       </div>
-      {/* Phone: the main links in a scrollable row */}
       <MainNav variant="phone" />
     </header>
   );

@@ -1,11 +1,3 @@
-"""Where a finished brief goes.
-
-Always: JSON files in pipeline/data/ (handy locally, and the website can read
-them when no database is set up).
-When SUPABASE_URL and SUPABASE_SECRET_KEY are set: the editions/stories
-tables, written through Supabase's REST API, plus the summary cache.
-"""
-
 from __future__ import annotations
 
 import json
@@ -21,9 +13,8 @@ class Supabase:
     def __init__(self, url: str, key: str):
         self.base = url.rstrip("/") + "/rest/v1"
         headers = {"apikey": key, "Content-Type": "application/json"}
-        if key.startswith("eyJ"):  # legacy JWT-style service_role key
+        if key.startswith("eyJ"):
             headers["Authorization"] = f"Bearer {key}"
-        # retries: reconnect when the server drops an idle connection
         self.client = httpx.Client(
             headers=headers, timeout=30.0, transport=httpx.HTTPTransport(retries=3)
         )
@@ -44,7 +35,6 @@ class Supabase:
             response.raise_for_status()
 
     def insert_new(self, table: str, rows: list[dict], key: str) -> None:
-        """Insert rows, silently skipping any whose `key` column already exists."""
         if rows:
             response = self.client.post(
                 f"{self.base}/{table}",
@@ -64,7 +54,6 @@ class Supabase:
         response.raise_for_status()
 
     def select(self, table: str, params: dict[str, str], page_size: int = 1000) -> list[dict]:
-        """All rows matching PostgREST query params, fetched page by page."""
         rows: list[dict] = []
         while True:
             page = {**params, "limit": str(page_size), "offset": str(len(rows))}
@@ -84,8 +73,6 @@ class Supabase:
 
 
 class SupabaseCache:
-    """Same interface as summarise.SummaryCache, stored in summary_cache."""
-
     def __init__(self, db: Supabase):
         self.db = db
 
@@ -112,7 +99,6 @@ def save_files(output: dict, data_dir: Path) -> Path:
 
 
 def save_supabase(output: dict, db: Supabase) -> None:
-    """Replace today's edition (re-runs during the day overwrite it)."""
     date = output["date"]
     db.upsert(
         "editions",
@@ -130,7 +116,7 @@ def save_supabase(output: dict, db: Supabase) -> None:
         [
             {
                 "edition_date": date,
-                "position": i,  # rank in the day's feed
+                "position": i,
                 "brief_position": s.get("brief_position"),
                 "story_key": s.get("story_key"),
                 "headline": s["headline"],
@@ -141,7 +127,6 @@ def save_supabase(output: dict, db: Supabase) -> None:
                 "importance": s["importance"],
                 "published": s["published"],
                 "sources": s["sources"],
-                # Phase 1-5 fields; older outputs simply don't have them.
                 **{k: s[k] for k in ("image_url", "image_credit", "kind", "thread_id") if k in s},
             }
             for i, s in enumerate(output.get("feed") or output["stories"], 1)
@@ -170,8 +155,6 @@ def save_supabase(output: dict, db: Supabase) -> None:
 
 
 def save_story_companies(output: dict, db: Supabase) -> None:
-    """Company tags for today's stories. Optional: skipped (with a note) until
-    db/migrations/007 has created the table, so the rest of the save still works."""
     date = output["date"]
     rows = {
         (s["story_key"], slug(name)): {"edition_date": date, "story_key": s["story_key"], "company": slug(name), "name": name}
@@ -187,7 +170,6 @@ def save_story_companies(output: dict, db: Supabase) -> None:
 
 
 def prune_ask_answers(db: Supabase, today: str, keep_days: int = 3) -> None:
-    """Ask's cached answers are per day; drop old ones so the table stays small."""
     cutoff = (date.fromisoformat(today) - timedelta(days=keep_days)).isoformat()
     try:
         db.delete_before("ask_answers", "created_at", cutoff)
@@ -196,7 +178,6 @@ def prune_ask_answers(db: Supabase, today: str, keep_days: int = 3) -> None:
 
 
 def load_recent_stories(db: Supabase | None, data_dir: Path, today: str, days: int = 7) -> list[dict]:
-    """Stories from the past `days` days (not today), for linking ongoing stories."""
     start = (date.fromisoformat(today) - timedelta(days=days)).isoformat()
     if db:
         try:

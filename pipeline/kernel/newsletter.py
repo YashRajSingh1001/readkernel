@@ -1,19 +1,9 @@
-"""Turn a day's edition into the daily email (HTML + plain text).
-
-Email clients ignore most modern CSS, so the HTML uses tables and inline
-styles, and fonts fall back to Georgia/Arial.
-
-web/lib/server/brief-email.ts renders the same email for readers who confirm
-after the day's brief has gone out. Change both together.
-"""
-
 from __future__ import annotations
 
 from datetime import date
 from html import escape
 from urllib.parse import quote
 
-# Same ids as company_blogs.CATEGORIES (kept short here for the email's label).
 COMPANY_LABELS = {
     "ai": "AI & LLMs",
     "ml": "Machine learning",
@@ -42,7 +32,7 @@ LINE = "#e7e4dc"
 ACCENT = "#c2410c"
 SERIF = "Georgia, 'Times New Roman', serif"
 SANS = "-apple-system, 'Segoe UI', Arial, sans-serif"
-GOTHIC = "'Century Gothic', CenturyGothic, 'Trebuchet MS', Arial, sans-serif"  # the wordmark
+GOTHIC = "'Century Gothic', CenturyGothic, 'Trebuchet MS', Arial, sans-serif"
 
 
 def long_date(iso: str) -> str:
@@ -69,10 +59,6 @@ def subject_line(edition: dict) -> str:
 def render(
     edition: dict, site_url: str, token: str | None = None, fmt: str = "summaries"
 ) -> tuple[str, str, str]:
-    """Return (subject, html, text).
-
-    fmt: "summaries" (default), "headlines" (titles only) or "images" (summaries + photo).
-    """
     stories = edition["stories"]
     weekly = bool(edition.get("weekly"))
     urls = links(site_url, token)
@@ -82,7 +68,6 @@ def render(
     show_text = fmt != "headlines"
     preheader = " · ".join(s["headline"] for s in stories[1:4])
 
-    # --- plain text -------------------------------------------------------
     lines = [f"ReadKernel · {label} · {long_date(edition['date'])}", f"{len(stories)} stories", ""]
     alerts = edition.get("alerts") or []
     if alerts:
@@ -118,7 +103,6 @@ def render(
     ]
     text = "\n".join(lines)
 
-    # --- html -------------------------------------------------------------
     cards = _alerts_html(alerts) + "".join(_story_html(i, s, fmt) for i, s in enumerate(stories, 1))
     cards += _company_html(reads, site_url)
     html = f"""<!doctype html>
@@ -148,7 +132,6 @@ def render(
 
 
 def _alerts_html(alerts: list[dict]) -> str:
-    """The "Your watch alerts" block at the top: news matching what the reader asked to watch."""
     if not alerts:
         return ""
     items = "".join(
@@ -168,7 +151,6 @@ def _alerts_html(alerts: list[dict]) -> str:
 
 
 def _company_html(reads: list[dict], site_url: str) -> str:
-    """The closing "From company blogs" block: how real teams built something."""
     if not reads:
         return ""
     items = "".join(

@@ -1,5 +1,3 @@
-"""Core data shapes passed between pipeline steps."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -24,24 +22,22 @@ class Article:
     topic: str
     weight: float
     published: datetime
-    image_url: str = ""  # the publisher's own preview photo, if the feed gives one
+    image_url: str = ""
 
 
 @dataclass
 class Story:
-    """One real-world event, covered by one or more articles."""
-
     articles: list[Article]
     score: float = 0.0
-    importance: int | None = None  # 1-5 from the AI editor, if it ran
+    importance: int | None = None
     headline: str = ""
     summary: str = ""
     why_it_matters: str = ""
-    kind: str = "news"  # "news" or "model_release"
+    kind: str = "news"
     image_url: str = ""
-    image_credit: str = ""  # which source the photo comes from
-    thread_id: str = ""  # shared by the same ongoing story on different days
-    companies: list[str] = field(default_factory=list)  # names the articles mention (see companies.py)
+    image_credit: str = ""
+    thread_id: str = ""
+    companies: list[str] = field(default_factory=list)
     extra: dict = field(default_factory=dict)
 
     @property

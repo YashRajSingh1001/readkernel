@@ -1,20 +1,3 @@
-"""Watch alerts: check today's news against what each reader asked to watch.
-
-    python -m kernel.watches              # after kernel.run and kernel.company_blogs
-    python -m kernel.watches --dry-run    # show matches, save nothing
-
-Readers write wishes in plain English on their settings page ("UPI rules",
-"Indian AI startups raising money"). Each morning this agent:
-
-1. shortlists, for every wish, the few stories and company posts that look
-   related, using the local embedding model (free, no AI calls);
-2. asks the AI to confirm which shortlisted items really match that wish,
-   with a one-line reason (several wishes per call);
-3. saves the matches. A story is only ever alerted once per wish.
-
-kernel.send then puts each reader's matches at the top of their email.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -29,9 +12,9 @@ from .llm import LLM, make_llm
 from .usage import record_usage
 from .store import Supabase
 
-SHORTLIST = 6  # items per wish sent to the AI
-MIN_SIMILARITY = {"local": 0.45, "simple": 0.12}  # below this an item can't be a match
-NO_AI_SIMILARITY = {"local": 0.62, "simple": 0.35}  # without AI, only very close items count
+SHORTLIST = 6
+MIN_SIMILARITY = {"local": 0.45, "simple": 0.12}
+NO_AI_SIMILARITY = {"local": 0.62, "simple": 0.35}
 WATCH_BATCH = 4
 
 SYSTEM = (
@@ -44,7 +27,6 @@ SYSTEM = (
 
 
 def load_watches(db: Supabase) -> list[dict]:
-    """Every wish of every active subscriber."""
     return db.select(
         "watches",
         {"select": "id,description,subscriber_id,subscribers!inner(status)", "subscribers.status": "eq.active"},
@@ -52,7 +34,6 @@ def load_watches(db: Supabase) -> list[dict]:
 
 
 def load_items(db: Supabase, day: str, site_url: str) -> list[dict]:
-    """Today's stories plus the company posts added since yesterday's run."""
     items = [
         {"key": s["story_key"], "title": s["headline"], "summary": s["summary"], "url": f"{site_url}/story/{s['story_key']}"}
         for s in db.select("stories", {"select": "story_key,headline,summary", "edition_date": f"eq.{day}"})
@@ -61,7 +42,7 @@ def load_items(db: Supabase, day: str, site_url: str) -> list[dict]:
     since = (datetime.now(timezone.utc) - timedelta(hours=26)).isoformat()
     try:
         posts = db.select("company_posts", {"select": "url,link,title,summary,company,depth", "added_at": f"gte.{since}"})
-    except Exception:  # noqa: BLE001 - company posts are optional here
+    except Exception:  # noqa: BLE001
         posts = []
     items += [
         {"key": p["url"], "title": f"{p['company']}: {p['title']}", "summary": p["summary"], "url": p["link"]}
@@ -74,7 +55,6 @@ def load_items(db: Supabase, day: str, site_url: str) -> list[dict]:
 def shortlist(
     watches: list[dict], items: list[dict], backend: str, model_dir=None
 ) -> tuple[dict[str, list[tuple[int, float]]], str]:
-    """For each watch id: the most similar items as (index, similarity), best first; plus the backend used."""
     if not watches or not items:
         return {}, backend
     texts = [w["description"] for w in watches] + [f"{i['title']}. {i['summary']}" for i in items]
@@ -92,7 +72,6 @@ def shortlist(
 def confirm(
     watches: list[dict], items: list[dict], candidates: dict, llm: LLM | None, used: str = "local"
 ) -> list[dict]:
-    """The matches: [{watch_id, item, reason}]."""
     hits: list[dict] = []
     todo = [w for w in watches if candidates.get(w["id"])]
     if not llm:
@@ -116,7 +95,7 @@ def confirm(
         for n, w in enumerate(batch):
             offered = {f"c{j}": j for j, _ in candidates[w["id"]]}
             for m in matches.get(f"w{n}") or []:
-                if isinstance(m, dict) and m.get("id") in offered:  # only items we actually offered
+                if isinstance(m, dict) and m.get("id") in offered:
                     hits.append({"watch_id": w["id"], "item": items[offered[m["id"]]], "reason": str(m.get("reason") or "")[:200]})
     return hits
 

@@ -24,7 +24,6 @@ def test_slug_merges_spellings_of_one_company():
 
 def test_ground_keeps_only_names_the_articles_mention():
     s = story("OpenAI raises $11 billion", "Rival Anthropic is preparing an IPO.")
-    # Google is never mentioned: a remembered rival must not become a tag.
     assert ground(["OpenAI", "Anthropic", "Google"], s) == ["OpenAI", "Anthropic"]
 
 
@@ -67,7 +66,6 @@ def test_summarise_sets_grounded_companies():
 
 def test_cached_summaries_without_companies_still_work():
     s = story("Fireworks hires a CFO", "Fireworks hired a CFO.")
-    # Stored before company tags existed: no "companies" key.
     cache = MemoryCache({cache_key(s, "fake:fake-model"): {
         "headline": "Fireworks hires a CFO now", "summary": "Fireworks hired a CFO from a large company this week.",
         "why_it_matters": "", "kind": "news"}})

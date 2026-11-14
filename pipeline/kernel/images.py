@@ -1,11 +1,3 @@
-"""Pick a photo for each story.
-
-We only use the image a publisher itself offers for link previews: the photo
-in its RSS entry, or the og:image / twitter:image tag on the article page (the
-picture X, LinkedIn and Slack show when the link is shared). We never download
-or re-host it; the site shows it from the publisher, with a credit line.
-"""
-
 from __future__ import annotations
 
 import html
@@ -18,21 +10,19 @@ import httpx
 from .fetch import USER_AGENT
 from .models import Story
 
-PAGE_BYTES = 300_000  # preview tags live in <head>; no need for the whole page
+PAGE_BYTES = 300_000
 TIMEOUT = 8.0
-MAX_PAGES_PER_STORY = 3  # articles to try per story before giving up
+MAX_PAGES_PER_STORY = 3
 
 _META_RE = re.compile(
     r"""<meta[^>]+(?:property|name)=["'](?:og:image(?::secure_url)?|twitter:image(?::src)?)["'][^>]*>""",
     flags=re.IGNORECASE,
 )
 _CONTENT_RE = re.compile(r"""content=["']([^"']+)["']""", flags=re.IGNORECASE)
-# Sites whose links are discussions, not articles with photos.
 _SKIP_HOSTS = ("news.ycombinator.com", "twitter.com", "x.com", "github.com")
 
 
 def page_preview_image(html_text: str, page_url: str) -> str:
-    """The og:image / twitter:image a page declares, as an absolute https URL."""
     for tag in _META_RE.findall(html_text):
         match = _CONTENT_RE.search(tag)
         if match:
@@ -60,7 +50,6 @@ def _fetch_preview(client: httpx.Client, url: str) -> str:
 
 
 def attach_images(stories: list[Story], fetch_pages: bool = True, workers: int = 10) -> int:
-    """Set image_url + image_credit on each story. Returns how many got a photo."""
     need_page: list[Story] = []
     for story in stories:
         with_photo = next((a for a in story.articles if a.image_url), None)
@@ -81,7 +70,6 @@ def attach_images(stories: list[Story], fetch_pages: bool = True, workers: int =
 
 
 def _first_page_preview(client: httpx.Client, story: Story, tries: int = MAX_PAGES_PER_STORY) -> tuple[str, str] | None:
-    """Some publishers block automated visits; try the story's other coverage too."""
     for article in story.articles[:tries]:
         url = _fetch_preview(client, article.url)
         if url:

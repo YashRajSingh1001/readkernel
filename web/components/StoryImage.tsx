@@ -1,11 +1,10 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- photos come from many publisher domains */
+/* eslint-disable @next/next/no-img-element */
 import { useState } from "react";
 
 import { TOPICS, faviconUrl } from "@/lib/format";
 
-// Each topic gets its own fallback colour so a missing photo still looks designed.
 const TOPIC_TINT: Record<string, string> = {
   ai: "from-orange-500/25 to-rose-500/10",
   tech: "from-sky-500/25 to-indigo-500/10",
@@ -22,18 +21,11 @@ type Props = {
   topic: string;
   headline: string;
   size?: "lead" | "standard" | "thumb";
-  /** Text on the no-photo card; defaults to the topic name. */
   label?: string;
-  /** Lead source, shown on the no-photo card. */
   sourceName?: string;
   sourceUrl?: string;
 };
 
-/**
- * The publisher's own preview photo, shown from their site with a credit.
- * No photo (some publishers block automated visits), or it fails to load: a
- * compact branded card with the topic and the publisher instead.
- */
 export function StoryImage({ src, credit, topic, headline, size = "standard", sourceName, sourceUrl, label: labelText }: Props) {
   const [failed, setFailed] = useState(false);
   const ratio = size === "thumb" ? "aspect-square" : size === "lead" ? "aspect-[16/9]" : "aspect-[16/10]";
@@ -49,7 +41,6 @@ export function StoryImage({ src, credit, topic, headline, size = "standard", so
         </div>
       );
     }
-    // Shorter than a photo so a missing image doesn't leave a big empty box.
     return (
       <div
         className={`${size === "lead" ? "aspect-[3/1]" : "aspect-[16/10] sm:aspect-[16/10]"} ${radius} relative flex flex-col justify-between overflow-hidden border border-line bg-gradient-to-br ${tint} p-4`}

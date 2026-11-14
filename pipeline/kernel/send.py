@@ -1,18 +1,3 @@
-"""Email the brief to every confirmed subscriber, shaped by their preferences.
-
-    python -m kernel.send                      # today's daily brief to daily readers
-    python -m kernel.send --weekly             # the week's best stories to weekly readers
-    python -m kernel.send --dry-run            # show who would get what, send nothing
-    python -m kernel.send --to me@example.com  # one test email (not logged)
-    python -m kernel.send --date 2026-10-18
-
-Each reader gets their own picks (topics, 5/10/15 stories, summaries /
-headlines / images), plus the best new company blog post unless they turned
-that off, and at the top any matches for the things they asked to watch.
-Every successful send is logged in email_sends, so
-running it twice only reaches people who were missed.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -37,7 +22,6 @@ STORY_COLUMNS = (
 
 
 def load_edition(db: Supabase | None, data_dir, day: str) -> dict | None:
-    """The day's edition with both its brief ("stories") and its full feed."""
     if db:
         rows = db.select(
             "editions",
@@ -73,7 +57,6 @@ COMPANY_COLUMNS = "url,link,title,company,summary,category,depth,score,added_at"
 
 
 def load_company_reads(db: Supabase | None, data_dir, weekly: bool) -> list[dict]:
-    """Best company blog posts added since the last email: one for daily, three for weekly."""
     since = datetime.now(timezone.utc) - (timedelta(days=7) if weekly else timedelta(hours=26))
     try:
         if db:
@@ -86,7 +69,6 @@ def load_company_reads(db: Supabase | None, data_dir, weekly: bool) -> list[dict
             rows = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
             rows = [r for r in rows if datetime.fromisoformat(r.get("added_at", "1970-01-01T00:00:00+00:00")) >= since]
     except (httpx.HTTPError, ValueError) as exc:
-        # Never let this extra block the brief itself.
         print(f"[send] company posts unavailable: {exc}")
         return []
     good = sorted((r for r in rows if r.get("depth") is None or r["depth"] >= 3), key=lambda r: -r["score"])
@@ -99,7 +81,6 @@ def load_company_reads(db: Supabase | None, data_dir, weekly: bool) -> list[dict
 
 
 def load_alerts(db: Supabase | None, day: str, weekly: bool) -> dict[str, list[dict]]:
-    """Watch-alert matches (from kernel.watches) for each subscriber: today's, or the week's."""
     if not db:
         return {}
     start = (date.fromisoformat(day) - timedelta(days=6)).isoformat() if weekly else day
@@ -129,7 +110,6 @@ def message_for(
     headers = {}
     one_click = links(site_url, token)["one_click"]
     if one_click:
-        # Lets Gmail/Outlook show their own "Unsubscribe" button (RFC 8058).
         headers["List-Unsubscribe"] = f"<{one_click}>"
         headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
     return Message(to=email, subject=subject, html=html, text=text, headers=headers)
@@ -143,7 +123,6 @@ def personal_edition(
     company_reads: list[dict] | None = None,
     all_alerts: dict[str, list[dict]] | None = None,
 ) -> dict:
-    """The edition as this subscriber should see it."""
     topics = sub.get("topics") or []
     reads = company_reads if sub.get("company_read", True) is not False else []
     alerts = (all_alerts or {}).get(sub.get("id"), [])
@@ -196,7 +175,6 @@ def main() -> None:
     try:
         subscribers = db.select("subscribers", {"select": "id,email,token,topics,story_count,format,company_read", **filters})
     except httpx.HTTPStatusError:
-        # Database without migration 005 yet: no company_read column, everyone gets it.
         subscribers = db.select("subscribers", {"select": "id,email,token,topics,story_count,format", **filters})
     already = {
         r["subscriber_id"]
@@ -220,12 +198,12 @@ def main() -> None:
             try:
                 mine = personal_edition(edition, week, s, args.weekly, company_reads, alerts)
                 if not mine["stories"] and not mine["alerts"]:
-                    continue  # nothing in their topics this time
+                    continue
                 fmt = s.get("format") if s.get("format") in VALID_FORMATS else "summaries"
                 mailer.send(message_for(mine, s["email"], s["token"], settings.site_url, fmt))
                 db.insert("email_sends", [{"edition_date": day, "subscriber_id": s["id"], "kind": kind}])
                 sent += 1
-            except Exception as exc:  # one bad address must not stop the rest
+            except Exception as exc:
                 failed += 1
                 print(f"   ! {s['email']}: {type(exc).__name__}: {str(exc)[:150]}")
             time.sleep(gap)

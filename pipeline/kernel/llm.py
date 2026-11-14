@@ -1,9 +1,3 @@
-"""One small interface over Groq, Claude and OpenAI that returns parsed JSON.
-
-Groq is the default because its free tier covers this project. Claude and
-OpenAI are optional paid switches (LLM_PROVIDER=claude|openai).
-"""
-
 from __future__ import annotations
 
 import json
@@ -24,8 +18,6 @@ class LLM:
         self.api_key = api_key
         self.model = model
         self._client = httpx.Client(timeout=TIMEOUT)
-        # Token counts over every call this run, as the provider reported them
-        # (see usage.py). input includes cached and cache_write; output includes reasoning.
         self.usage = {
             "calls": 0, "calls_without_usage": 0, "input": 0, "cached_input": 0,
             "cache_write": 0, "output": 0, "reasoning": 0,
@@ -35,8 +27,6 @@ class LLM:
         return f"LLM({self.provider}:{self.model})"
 
     def json(self, system: str, user: str, max_tokens: int = 700) -> dict | None:
-        """Ask for a JSON object. Returns None if the call or parse fails."""
-        # Groq and OpenAI's JSON mode refuses prompts that never mention "json".
         system = f"{system}\nRespond with a single valid json object."
         for attempt in range(MAX_TRIES):
             try:
@@ -79,7 +69,6 @@ class LLM:
             blocks = data.get("content", [])
             return "".join(b.get("text", "") for b in blocks if b.get("type") == "text")
 
-        # Groq and OpenAI share the chat-completions format.
         url = (
             "https://api.groq.com/openai/v1/chat/completions"
             if self.provider == "groq"
@@ -97,11 +86,10 @@ class LLM:
             body["temperature"] = 0.2
             body["max_tokens"] = max_tokens
             if "gpt-oss" in self.model:
-                # Reasoning model: keep thinking short, and leave room for it in the token budget.
                 body["reasoning_effort"] = "low"
                 body["max_tokens"] = max_tokens * 2
         else:
-            body["max_completion_tokens"] = max_tokens * 4  # reasoning models need headroom
+            body["max_completion_tokens"] = max_tokens * 4
         response = self._client.post(
             url, headers={"Authorization": f"Bearer {self.api_key}"}, json=body
         )
@@ -111,14 +99,12 @@ class LLM:
         return data["choices"][0]["message"]["content"] or ""
 
     def _add_usage(self, usage: dict | None) -> None:
-        """Adds one reply's usage. Counted before the reply is parsed: a bad reply still costs."""
         u = self.usage
-        u["calls"] += 1  # replies only: refused (429) and failed requests aren't billed
+        u["calls"] += 1
         if not isinstance(usage, dict):
             u["calls_without_usage"] += 1
             return
         if self.provider == "claude":
-            # Anthropic counts cache reads and writes apart from input_tokens.
             read = usage.get("cache_read_input_tokens") or 0
             write = usage.get("cache_creation_input_tokens") or 0
             u["input"] += (usage.get("input_tokens") or 0) + read + write
@@ -126,7 +112,6 @@ class LLM:
             u["cache_write"] += write
             u["output"] += usage.get("output_tokens") or 0
             return
-        # Groq and OpenAI chat completions.
         u["input"] += usage.get("prompt_tokens") or 0
         u["output"] += usage.get("completion_tokens") or 0
         u["cached_input"] += (usage.get("prompt_tokens_details") or {}).get("cached_tokens") or 0
@@ -158,7 +143,6 @@ def parse_json_object(text: str) -> dict:
 
 
 def make_llm(settings: Settings) -> LLM | None:
-    """Build the configured client, or None to run without AI."""
     provider = settings.llm_provider
     options = {
         "groq": (settings.groq_api_key, settings.groq_model, "GROQ_API_KEY"),

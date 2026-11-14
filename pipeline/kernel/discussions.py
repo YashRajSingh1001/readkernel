@@ -1,11 +1,3 @@
-"""Top articles: the most-discussed developer posts of the day.
-
-Read from Hacker News (front page and Show HN) through its official search
-API (hn.algolia.com), with hnrss.org as a backup, ranked by points. Each gets a one-line summary written from the linked page's own
-description (one AI call for the whole list, or the description itself
-without AI).
-"""
-
 from __future__ import annotations
 
 import html
@@ -94,7 +86,7 @@ def parse_algolia(data: dict, source: str, min_points: int = 40) -> list[Discuss
         items.append(
             Discussion(
                 title=str(hit["title"]).removeprefix("Show HN: ").strip(),
-                url=hit.get("url") or comments_url,  # text posts have no external link
+                url=hit.get("url") or comments_url,
                 comments_url=comments_url,
                 source=source,
                 points=points,
@@ -121,7 +113,6 @@ def _page_description(client: httpx.Client, url: str) -> str:
 
 
 def page_description(html_text: str) -> str:
-    """The short description a page declares for link previews."""
     for tag in _DESC_RE.findall(html_text):
         match = _CONTENT_RE.search(tag)
         if match:
@@ -171,7 +162,6 @@ def collect_discussions(llm: LLM | None, max_age_hours: int = 36, limit: int = 2
 def _first_sentence(text: str) -> str:
     if not text:
         return ""
-    # split after a lower-case word's full stop, so "U.S." doesn't end the sentence
     sentence = re.split(r"(?<=[a-z0-9][.!?])\s+(?=[A-Z])", text)[0]
     return sentence if len(sentence) <= 200 else sentence[:197].rsplit(" ", 1)[0] + "…"
 

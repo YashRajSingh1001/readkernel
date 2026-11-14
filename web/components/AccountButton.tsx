@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import { syncSavedWithAccount } from "@/lib/saved";
 import { AUTH_ENABLED, supabaseBrowser } from "@/lib/supabase/browser";
 
-/** "Sign in" or the reader's initial. Hidden entirely while sign-in is turned off. */
 export function AccountButton() {
   const [email, setEmail] = useState<string | null>(null);
 

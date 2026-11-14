@@ -1,16 +1,3 @@
-"""Draw ReadKernel's "rk." icon at every size the site and extension need.
-
-    python brand/make_icons.py
-
-The mark is defined once below (on a 64 x 64 grid) and written out as:
-  web/app/icon.svg          browser tab icon (modern browsers)
-  web/app/favicon.ico       browser tab icon (older browsers; 16, 32, 48 px)
-  web/app/apple-icon.png    phone home-screen icon (180 px, square: iOS rounds it)
-  extension/icons/*.png     Chrome extension (16, 32, 48, 128 px)
-
-No image library needed: shapes are drawn with plain maths and saved as PNG.
-"""
-
 from __future__ import annotations
 
 import math
@@ -23,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 INK = (23, 21, 15)
 PAPER = (251, 250, 247)
 EMBER = (194, 65, 12)
-STROKE = 6.0  # letter stroke width, in grid units
+STROKE = 6.0
 
 
 def _bezier(p0, p1, p2, p3, steps=16):
@@ -35,13 +22,12 @@ def _bezier(p0, p1, p2, p3, steps=16):
     return pts
 
 
-# The letters as strokes (polylines) on the 64 grid: "r" then "k", plus the ember full stop.
 STROKES = [
-    [(13, 48), (13, 26)],  # r stem
-    _bezier((13, 32), (15, 27), (19, 25), (24, 26)),  # r shoulder
-    [(32, 48), (32, 14)],  # k stem
-    [(32, 37), (45, 26)],  # k arm
-    [(37, 33), (47, 48)],  # k leg
+    [(13, 48), (13, 26)],
+    _bezier((13, 32), (15, 27), (19, 25), (24, 26)),
+    [(32, 48), (32, 14)],
+    [(32, 37), (45, 26)],
+    [(37, 33), (47, 48)],
 ]
 DOT = ((53, 46), 4.5)
 
@@ -60,7 +46,6 @@ def _in_round_rect(x, y, size, r):
 
 
 def _colour_at(x, y, corner):
-    """Colour of one sample point on the 64 grid, or None outside the tile."""
     if not _in_round_rect(x, y, 64, corner):
         return None
     if math.hypot(x - DOT[0][0], y - DOT[0][1]) <= DOT[1]:
@@ -73,7 +58,6 @@ def _colour_at(x, y, corner):
 
 
 def render(size: int, corner: float = 14, samples: int = 4) -> bytes:
-    """RGBA PNG bytes of the tile at `size` px, anti-aliased by supersampling."""
     scale = 64 / size
     rows = []
     for py in range(size):
@@ -100,7 +84,6 @@ def _png(size: int, raw: bytes) -> bytes:
 
 
 def _ico(pngs: dict[int, bytes]) -> bytes:
-    """An .ico holding PNG images (supported by every browser since 2007)."""
     header = struct.pack("<HHH", 0, 1, len(pngs))
     entries, blobs, offset = b"", b"", 6 + 16 * len(pngs)
     for size, data in pngs.items():

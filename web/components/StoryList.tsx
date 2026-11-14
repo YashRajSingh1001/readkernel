@@ -5,7 +5,6 @@ import { useState } from "react";
 import type { Story } from "@/lib/format";
 import { StoryCard } from "./StoryCard";
 
-/** A feed of stories with a Top / Recent switch. The first story is shown large. */
 export function StoryList({ stories, now }: { stories: Story[]; now: number }) {
   const [order, setOrder] = useState<"top" | "recent">("top");
   const shown =

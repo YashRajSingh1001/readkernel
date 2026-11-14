@@ -1,5 +1,3 @@
-"""Drop old, duplicate and junk articles."""
-
 from __future__ import annotations
 
 import re
@@ -12,7 +10,6 @@ TRACKING_PARAMS = {"fbclid", "gclid", "mc_cid", "mc_eid", "ref", "ref_src", "cmp
 
 
 def canonical_url(url: str) -> str:
-    """Normalise a URL so the same page from two feeds compares equal."""
     parts = urlsplit(url.strip())
     query = [
         (k, v)
@@ -47,7 +44,6 @@ def filter_articles(
     kept: list[Article] = []
     seen_urls: set[str] = set()
     seen_titles: set[str] = set()
-    # Higher-weight sources first, so their copy wins when a URL repeats.
     for article in sorted(articles, key=lambda a: (-a.weight, a.published)):
         if article.published < cutoff or article.published > now + timedelta(hours=1):
             continue

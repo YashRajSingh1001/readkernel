@@ -1,42 +1,31 @@
 import "server-only";
 
-// What each Ask question costs: the AI's own token counts, added up over every
-// model call the question needed, saved to Supabase (ai_usage, from
-// db/migrations/008) and printed as one log line. Cost is worked out from
-// ai_prices when it's read (views ai_usage_costed and ai_cost_daily).
-// Until the migration has run, saving fails quietly and only the log line remains.
-
 import { adminConfigured, adminRest } from "./admin-db";
 
 export type AskOutcome = "answered" | "cached" | "truncated" | "off_topic" | "no_answer" | "failed" | "stopped";
 
-/** Filled in by askAgent while it works; read by the route when the question ends. */
 export class AskUsage {
   provider: "openai" | "groq" = "openai";
   model = process.env.ASK_MODEL || "gpt-6-luna";
-  fellBack = false; // OpenAI turned the question away and Groq answered it
+  fellBack = false;
   readonly started = Date.now();
   calls = 0;
-  reported = 0; // calls whose usage the AI reported
+  reported = 0;
   input = 0;
   cachedInput = 0;
   cacheWrite = 0;
   output = 0;
   reasoning = 0;
   webSearches = 0;
-  // Web search calls by kind (search, open_page, find_in_page, failed). All are
-  // counted as billed calls in webSearches; this keeps the split to check against OpenAI's bill.
   webActions: Record<string, number> = {};
   steps = 0;
 
-  /** Groq answers instead: as a fallback for OpenAI, or because it was set to (ASK_PROVIDER=groq). */
   switchTo(provider: "groq", model: string, fallback: boolean): void {
     this.provider = provider;
     this.model = model;
     this.fellBack = fallback;
   }
 
-  /** The AI accepted a model request. */
   startCall(): void {
     this.calls++;
   }
@@ -46,7 +35,6 @@ export class AskUsage {
     this.webActions[kind] = (this.webActions[kind] ?? 0) + 1;
   }
 
-  /** The `usage` object of an OpenAI Responses reply, or of a Chat Completions one (Groq). */
   add(usage: unknown): void {
     const u = usage as {
       input_tokens?: number;
@@ -75,15 +63,10 @@ export class AskUsage {
   }
 }
 
-/** Where this server runs, so local tests don't count as production spend. */
 function env(): string {
   return process.env.VERCEL_ENV || (process.env.NODE_ENV === "production" ? "production" : "local");
 }
 
-/**
- * Logs and saves one question. Never throws, and awaited by the caller, since
- * on Vercel work left running after the response may never finish.
- */
 export async function recordAskUsage(
   usage: AskUsage,
   outcome: AskOutcome,

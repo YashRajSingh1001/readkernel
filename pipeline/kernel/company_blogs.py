@@ -1,17 +1,3 @@
-"""Company blogs: engineering and data science posts from companies like Netflix and Uber.
-
-    python -m kernel.company_blogs              # add the last week's new posts
-    python -m kernel.company_blogs --days 30    # first run: fill in the last month
-    python -m kernel.company_blogs --dry-run    # list what's new, save nothing, no AI
-
-Runs once a day after the brief. It reads each company's feed (or, for
-companies without one, finds their posts through Hacker News search), drops
-every post already saved, and for the new ones the AI writes a short summary,
-picks a category (AI, machine learning, data science...) and rates how deep
-the post goes, so announcements and marketing sink below real write-ups.
-Each post is saved once, keyed by its address.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -39,7 +25,7 @@ from .store import Supabase
 COMPANIES_FILE = PIPELINE_DIR / "company_blogs.yaml"
 LOCAL_FILE = "company_posts.json"
 ALGOLIA = "https://hn.algolia.com/api/v1/search_by_date"
-MAX_NEW_PER_RUN = 150  # newest first; anything left over is picked up the next day
+MAX_NEW_PER_RUN = 150
 AI_BATCH = 8
 PAGE_BYTES = 300_000
 
@@ -53,7 +39,6 @@ CATEGORIES = {
     "engineering": "Engineering practice",
 }
 
-# Used when the AI is off: the first category whose words appear in the title.
 _KEYWORDS = [
     ("ai", r"\b(llm|llms|gpt|genai|generative|agent|agents|agentic|rag|prompt|copilot|claude|gemini|ai)\b"),
     ("ml", r"\b(machine learning|ml|model|models|recommend\w*|ranking|personali[sz]\w*|embedding\w*|forecast\w*|fraud)\b"),
@@ -89,13 +74,13 @@ class Company:
     name: str
     weight: float = 1.0
     feed: str = ""
-    hn: str = ""  # piece of the blog's address, for companies without a feed
-    site: str = ""  # main website, for the logo shown on the website
+    hn: str = ""
+    site: str = ""
 
 
 @dataclass
 class Post:
-    url: str  # canonical address: the key that stops a post being saved twice
+    url: str
     link: str
     title: str
     company: str
@@ -131,7 +116,6 @@ def load_companies(path: Path = COMPANIES_FILE) -> list[Company]:
     return companies
 
 
-# Some blogs serve the same post under several country paths (/us/en/blog/x, /in/en/blog/x).
 _LOCALE_PATH_RE = re.compile(r"/[a-z]{2}/[a-z]{2}(?:-[a-z]{2})?/blog/")
 
 
@@ -140,7 +124,6 @@ def post_key(link: str) -> str:
 
 
 def export_for_web(companies: list[Company], path: Path) -> None:
-    """Write the company list the website shows as a logo strip (name + website)."""
     rows = [{"name": c.name, "site": f"https://{c.site}"} for c in companies if c.site]
     path.write_text(json.dumps(rows, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
@@ -170,7 +153,6 @@ def parse_hn_hits(data: dict, company: Company) -> list[Post]:
     posts = []
     for hit in data.get("hits", []):
         link = hit.get("url") or ""
-        # Algolia matches loosely; keep only links really on the company's blog.
         if company.hn not in post_key(link) or not hit.get("title"):
             continue
         posts.append(
@@ -209,7 +191,6 @@ def fetch_hn_posts(companies: list[Company], since: datetime) -> tuple[list[Post
 
 
 def merge(posts: list[Post]) -> list[Post]:
-    """One post per address. A post shared on Hacker News several times keeps its best score."""
     merged: dict[str, Post] = {}
     for post in posts:
         seen = merged.get(post.url)
@@ -223,7 +204,6 @@ def merge(posts: list[Post]) -> list[Post]:
 
 
 def _page_meta(client: httpx.Client, url: str) -> tuple[str, str]:
-    """(description, image) from the post page's own preview tags."""
     try:
         with client.stream("GET", url) as response:
             if response.status_code != 200 or "html" not in response.headers.get("content-type", ""):
@@ -240,7 +220,6 @@ def _page_meta(client: httpx.Client, url: str) -> tuple[str, str]:
 
 
 def fill_from_pages(posts: list[Post], workers: int = 10) -> None:
-    """Posts found through Hacker News (and feeds with no photo) get text and a photo from their page."""
     need = [p for p in posts if not p.description or not p.image_url]
     if not need:
         return
@@ -262,7 +241,6 @@ def guess_category(title: str) -> str:
 
 
 def describe(posts: list[Post], llm: LLM | None) -> None:
-    """Summary, category and depth for each post: from the AI, or simple rules without it."""
     for start in range(0, len(posts), AI_BATCH):
         batch = posts[start : start + AI_BATCH]
         answers: dict = {}
@@ -285,7 +263,6 @@ def describe(posts: list[Post], llm: LLM | None) -> None:
 
 
 def score(post: Post) -> float:
-    """Deep posts from trusted blogs first; a big Hacker News discussion helps."""
     points = math.log2(1 + (post.hn_points or 0)) * 0.25
     return round((post.depth or 3) * post.weight + min(points, 2.5), 3)
 
@@ -315,7 +292,6 @@ def save(posts: list[Post], db: Supabase | None, data_dir: Path) -> None:
     if db:
         db.insert_new("company_posts", rows, key="url")
         return
-    # Without a database: one JSON file the website can read, newest first.
     now = datetime.now(timezone.utc).isoformat()
     existing = _read_local(data_dir)
     have = {r["url"] for r in existing}

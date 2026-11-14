@@ -1,38 +1,24 @@
--- What the AI costs to run: one row per Ask question and one per pipeline job run.
--- Safe to run more than once. Everything here is private: RLS on with no
--- policies, and the views use the caller's rights (security_invoker), so only
--- the secret key can read them.
---
--- Tokens are stored as the providers report them, and cost is worked out from
--- ai_prices when you read it, so fixing a price corrects past rows too.
-
 create table if not exists ai_usage (
   id bigint generated always as identity primary key,
   created_at timestamptz not null default now(),
-  -- 'ask', or the pipeline job: 'pipeline:run', 'pipeline:company_blogs', 'pipeline:watches'
   source text not null,
-  -- 'production' (Vercel production, GitHub Actions), 'preview' or 'local'
   env text not null,
   provider text not null,
   model text not null,
-  calls int not null default 0,                -- AI requests made
-  calls_without_usage int not null default 0,  -- stopped or failed before the AI reported usage: billed, not counted
-  input_tokens bigint not null default 0,      -- all input, including the two kinds below
+  calls int not null default 0,
+  calls_without_usage int not null default 0,
+  input_tokens bigint not null default 0,
   cached_input_tokens bigint not null default 0,
   cache_write_tokens bigint not null default 0,
-  output_tokens bigint not null default 0,     -- all output, including reasoning
+  output_tokens bigint not null default 0,
   reasoning_tokens bigint not null default 0,
   web_searches int not null default 0,
-  -- Ask: answered, cached, truncated, off_topic, no_answer, failed, stopped. Pipeline: null.
   outcome text,
-  -- Ask: story key, suggested or typed, steps, seconds. Never the question or the reader's IP.
   details jsonb not null default '{}'::jsonb
 );
 create index if not exists ai_usage_created on ai_usage (created_at desc);
 alter table ai_usage enable row level security;
 
--- Prices in US dollars per million tokens, and per web search. Edit these rows
--- when a price changes or you switch model. A model with no row has no cost (null).
 create table if not exists ai_prices (
   provider text not null,
   model text not null,
@@ -53,8 +39,6 @@ insert into ai_prices (provider, model, input_per_m, cached_input_per_m, cache_w
    'Free plan, so 0. On a paid plan: $0.15 input, $0.075 cached, $0.60 output per million (console.groq.com, checked 2026-11-14).')
 on conflict (provider, model) do nothing;
 
--- Each row with its estimated cost. Cached and cache-write tokens are part of
--- input_tokens, so they are taken out before the full input price applies.
 create or replace view ai_usage_costed with (security_invoker = true) as
 select
   u.*,
@@ -67,8 +51,6 @@ select
 from ai_usage u
 left join ai_prices p on p.provider = u.provider and p.model = u.model;
 
--- One line per day (India time), job and environment. For Ask, "requests" is
--- questions asked, and the averages include answers served from the cache.
 create or replace view ai_cost_daily with (security_invoker = true) as
 select
   (created_at at time zone 'Asia/Kolkata')::date as day,
