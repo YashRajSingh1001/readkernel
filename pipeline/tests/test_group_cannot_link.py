@@ -9,7 +9,6 @@ from kernel.models import Article
 
 NOW = datetime(2026, 11, 15, 9, 0, tzinfo=timezone.utc)
 
-# Titles share no words, so the rare-term fallback never confirms a pair on its own.
 TITLES = {
     "A": "Alpha rocket lifts off from northern pad",
     "B": "Bravo bank reports quarterly earnings jump",
@@ -77,13 +76,11 @@ def pair(x, y):
     return frozenset((x, y))
 
 
-# All three pairs sit in the backend's grey zone.
 GREY = {
     "local": {pair("A", "C"): 0.85, pair("B", "C"): 0.84, pair("A", "B"): 0.80},
     "simple": {pair("A", "C"): 0.45, pair("B", "C"): 0.44, pair("A", "B"): 0.35},
 }
 
-# A-C and C-B are sure; A-B is grey and goes to the AI.
 SURE_CHAIN = {
     "local": {pair("A", "C"): 0.95, pair("B", "C"): 0.94, pair("A", "B"): 0.85},
     "simple": {pair("A", "C"): 0.70, pair("B", "C"): 0.68, pair("A", "B"): 0.40},
@@ -94,7 +91,6 @@ def test_ai_no_blocks_merge_through_grey_chain(monkeypatch, backend):
     answers = {pair("A", "C"): True, pair("B", "C"): True, pair("A", "B"): False}
     groups, llm = run(monkeypatch, ["A", "B", "C"], GREY[backend], answers, backend)
     assert pair("A", "B") in llm.asked
-    # C goes with A (its stronger edge); B stays apart because the AI said A-B differ.
     assert groups == [["A", "C"], ["B"]]
 
 
@@ -139,7 +135,6 @@ def test_ai_no_blocks_join_between_existing_groups(monkeypatch, backend):
     answers = {pair("A", "B"): True, pair("C", "D"): True,
                pair("A", "C"): True, pair("B", "D"): False}
     groups, _ = run(monkeypatch, ["A", "B", "C", "D"], sims, answers, backend)
-    # B and D are neither the joining endpoints nor group roots when A-C is tried.
     assert groups == [["A", "B"], ["C", "D"]]
 
 
@@ -180,11 +175,9 @@ def test_rare_term_joins_respect_ai_no(monkeypatch, backend, answers, expected):
 
 
 def test_pair_budget_keeps_unasked_pairs_eligible_for_fallback(monkeypatch, backend):
-    # There are 91 grey pairs: 80 go to AI in six batches, 11 use the fallback.
     order = [f"article{i}" for i in range(14)]
     for key in order:
         monkeypatch.setitem(TITLES, key, key)
-    # Only the last, lowest-scoring pair shares enough rare terms to merge.
     for key in order[-2:]:
         monkeypatch.setitem(TITLES, key, TITLES[key] + " quasar nebula")
     floor = group.THRESHOLDS[backend].maybe
@@ -205,7 +198,6 @@ def test_pair_budget_keeps_unasked_pairs_eligible_for_fallback(monkeypatch, back
     (["B", "A", "C"], [["A"], ["B", "C"]]),
 ])
 def test_equal_scores_follow_input_pair_order(monkeypatch, backend, order, expected):
-    # Shared dyadic coordinates make all off-diagonal dot products exactly equal.
     vectors = np.zeros((3, 5))
     vectors[:, :2] = [0.75, 0.5] if backend == "local" else [0.5, 0.5]
     vectors[:, 2:] = np.eye(3) * np.sqrt(1 - (vectors[0, :2] ** 2).sum())
