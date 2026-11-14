@@ -5,7 +5,7 @@ to the agent or its prompt can be judged by before-and-after answers, not by
 trying a couple of chats.
 
 ```bash
-# start the site; Ask needs OPENAI_API_KEY in web/.env (the web app doesn't read the root .env)
+# start the site; Ask needs OPENAI_API_KEY in the repo's .env (readkernel/.env)
 cd web && npm run dev
 
 # in another terminal

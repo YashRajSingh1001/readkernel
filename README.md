@@ -61,7 +61,7 @@ as the summary and skips the AI checks.
 cd pipeline
 py -3.12 -m venv .venv
 .venv/Scripts/pip install -r requirements.txt      # macOS/Linux: .venv/bin/pip
-cp ../.env.example ../.env                         # add your free GROQ_API_KEY
+cp ../.env.example ../.env                         # one settings file for everything; add your free GROQ_API_KEY
 .venv/Scripts/python -m kernel.run                 # or: --no-ai, --top 15
 .venv/Scripts/python -m pytest -q
 ```
@@ -73,8 +73,8 @@ Output goes to `pipeline/data/latest.json` and `pipeline/data/brief-YYYY-MM-DD.j
 1. Create a free project at supabase.com.
 2. Open **SQL Editor** and run each file in `db/migrations/` in order (`001_init.sql` to `007_companies_and_ask_cache.sql`).
 3. From **Project Settings -> API**, copy:
-   - the project URL and **secret** key into `.env` (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`), for the pipeline
-   - the project URL and **publishable** key into `web/.env.local` (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`), for the website
+   - the project URL, **secret** key and **publishable** key into `.env` (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`,
+     `SUPABASE_PUBLISHABLE_KEY`). The pipeline and the website both read this one file.
 
 Anyone can read briefs; only the secret key can write (Row Level Security).
 Without these settings, both sides fall back to local JSON files.
@@ -119,7 +119,7 @@ cd pipeline
 .venv/Scripts/python -m kernel.send                        # send it
 ```
 
-Choose how mail goes out with `EMAIL_TRANSPORT` (in both `.env` and `web/.env.local`):
+Choose how mail goes out with `EMAIL_TRANSPORT` in `.env` (the pipeline and the website share it):
 
 | Value | What happens | Cost |
 | --- | --- | --- |
@@ -153,8 +153,10 @@ Manual runs build the brief without emailing unless you tick "send_email".
 
 1. vercel.com -> **Add New -> Project** -> import this GitHub repo.
 2. **Root Directory: `web`** (the framework is detected as Next.js).
-3. **Environment Variables**: paste the contents of `web/.env.local`, but set
-   `SITE_URL` to the Vercel address (or your domain).
+3. **Environment Variables**: add the website's settings from `.env`: `SUPABASE_URL`,
+   `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `OPENAI_API_KEY` and the email settings,
+   with `SITE_URL` set to the Vercel address (or your domain). The pipeline's keys (like
+   `GROQ_API_KEY`) aren't needed there.
 4. **Deploy.** Every push to `main` redeploys automatically.
 
 ### Custom domain
