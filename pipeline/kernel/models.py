@@ -41,6 +41,7 @@ class Story:
     image_url: str = ""
     image_credit: str = ""  # which source the photo comes from
     thread_id: str = ""  # shared by the same ongoing story on different days
+    companies: list[str] = field(default_factory=list)  # names the articles mention (see companies.py)
     extra: dict = field(default_factory=dict)
 
     @property

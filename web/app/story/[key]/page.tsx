@@ -10,7 +10,17 @@ import { ShareButtons } from "@/components/ShareButtons";
 import { SourceIcons } from "@/components/SourceIcons";
 import { StoryCard } from "@/components/StoryCard";
 import { StoryImage } from "@/components/StoryImage";
-import { TOPICS, domainOf, formatDate, getEdition, getLatestEdition, getStory, getThread, timeAgo } from "@/lib/brief";
+import {
+  TOPICS,
+  domainOf,
+  formatDate,
+  getEdition,
+  getLatestEdition,
+  getStory,
+  getStoryCompanies,
+  getThread,
+  timeAgo,
+} from "@/lib/brief";
 import { siteUrl } from "@/lib/site";
 
 // Pre-build today's stories; older ones render on first visit.
@@ -46,9 +56,10 @@ async function StoryView({ params }: { params: PageProps<"/story/[key]">["params
   const story = await getStory(key);
   if (!story) notFound();
 
-  const [edition, thread] = await Promise.all([
+  const [edition, thread, companies] = await Promise.all([
     getEdition(story.edition_date),
     story.thread_id ? getThread(story.thread_id) : Promise.resolve([]),
+    getStoryCompanies(key, story.edition_date),
   ]);
   const related = (edition?.feed ?? [])
     .filter((s) => s.topic === story.topic && s.story_key !== key)
@@ -104,6 +115,21 @@ async function StoryView({ params }: { params: PageProps<"/story/[key]">["params
           </p>
         )}
 
+        {companies.length > 0 && (
+          <p className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <span className="text-muted">Companies:</span>
+            {companies.map((c) => (
+              <Link
+                key={c.slug}
+                href={`/company/${c.slug}`}
+                className="rounded-full border border-line px-2.5 py-0.5 font-medium hover:border-ink"
+              >
+                {c.name}
+              </Link>
+            ))}
+          </p>
+        )}
+
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-y border-line py-3">
           <div className="flex flex-wrap items-center gap-2">
             <ListenButton parts={[story.headline, story.summary, story.why_it_matters].filter(Boolean)} />
@@ -113,6 +139,17 @@ async function StoryView({ params }: { params: PageProps<"/story/[key]">["params
             <SaveButton story={{ key, headline: story.headline, topic: story.topic, url: lead.url, source: lead.name }} />
           )}
         </div>
+
+        <Link
+          href={`/ask?story=${key}`}
+          className="group mt-6 flex items-center justify-between gap-4 rounded-xl border border-line bg-card px-4 py-3 hover:border-ink"
+        >
+          <span>
+            <span className="block font-semibold">Ask about this story</span>
+            <span className="text-sm text-muted">Competitors, the wider space, how it developed. Every answer is linked.</span>
+          </span>
+          <span className="shrink-0 text-sm font-semibold text-accent group-hover:underline">Ask →</span>
+        </Link>
 
         <section className="mt-8">
           <h2 className="text-xl font-bold">Read the coverage</h2>

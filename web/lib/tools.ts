@@ -4,7 +4,19 @@ import "server-only";
 // the MCP server (/mcp, for Claude, Cursor and other assistants) and the
 // Ask ReadKernel chat (/ask). Everything here is read-only public data.
 
-import { TOPICS, getEdition, getLatestEdition, getStory, getThread, isValidDate, searchStories, type Story } from "./brief";
+import {
+  TOPICS,
+  companySlug,
+  getCompanyNews,
+  getEdition,
+  getLatestEdition,
+  getStory,
+  getStoryCompanies,
+  getThread,
+  isValidDate,
+  searchStories,
+  type Story,
+} from "./brief";
 import { highlights, isWorthReading, listCompanyPosts, searchCompanyPosts } from "./companies";
 import { COMPANY_CATEGORIES, type CompanyPost } from "./format";
 import { siteUrl } from "./site";
@@ -41,6 +53,24 @@ function oneOf(args: Record<string, unknown>, key: string, allowed: string[]): s
 function count(args: Record<string, unknown>, key: string, fallback: number, max: number): number {
   const n = Number(args[key] ?? fallback);
   return Number.isFinite(n) ? Math.min(Math.max(1, Math.round(n)), max) : fallback;
+}
+
+const MAX_SEARCH_ATTEMPTS = 6;
+
+/**
+ * The query, then broader versions to try if it finds nothing: years and
+ * bare numbers removed (not names with digits, like GPT-6.1 or Arete-27B),
+ * then one word fewer from the end each time. Queries using "phrases" or
+ * -exclusions are taken as written.
+ */
+export function broaderQueries(query: string): string[] {
+  if (/["]|(^|\s)-\S/.test(query)) return [query];
+  const words = query.split(/\s+/).filter(Boolean);
+  const tries = [query];
+  let kept = words.filter((w) => !/^[$€£₹]?[\d.,%]+[kmbt]?$/i.test(w));
+  if (kept.length === 0) kept = words;
+  for (let n = kept.length; n >= 1; n--) tries.push(kept.slice(0, n).join(" "));
+  return [...new Set(tries)].slice(0, MAX_SEARCH_ATTEMPTS);
 }
 
 // Compact shapes: what an agent needs, with a link for every claim.
@@ -138,12 +168,19 @@ export const NEWS_TOOLS: NewsTool[] = [
       const query = text(args, "query", 100);
       if (!query || query.length < 2) throw new ToolInputError("query needs at least 2 characters");
       const limit = count(args, "limit", 10, 20);
-      const [stories, posts] = await Promise.all([searchStories(query, limit), searchCompanyPosts(query, 5)]);
-      return {
-        query,
-        stories: stories.slice(0, limit).map((s) => story(s)),
-        company_blog_posts: posts.map(companyPost),
-      };
+      // Every word must match, so one stray word ("2026", "competitors") can
+      // empty the results. If it does, retry with fewer words and say so.
+      for (const attempt of broaderQueries(query)) {
+        const [stories, posts] = await Promise.all([searchStories(attempt, limit), searchCompanyPosts(attempt, 5)]);
+        if (stories.length === 0 && posts.length === 0) continue;
+        return {
+          query,
+          ...(attempt !== query ? { note: `Nothing matched every word of "${query}"; these match "${attempt}".` } : {}),
+          stories: stories.slice(0, limit).map((s) => story(s)),
+          company_blog_posts: posts.map(companyPost),
+        };
+      }
+      return { query, stories: [], company_blog_posts: [] };
     },
   },
   {
@@ -162,12 +199,45 @@ export const NEWS_TOOLS: NewsTool[] = [
       const key = text(args, "story_key", 40) ?? "";
       const found = await getStory(key);
       if (!found) return { message: `No story with key ${key}.` };
-      const timeline = await getThread(found.thread_id || key);
+      const [timeline, companies] = await Promise.all([
+        getThread(found.thread_id || key),
+        getStoryCompanies(key, found.edition_date),
+      ]);
       return {
-        story: story(found),
+        story: { ...story(found), companies: companies.length ? companies.map((c) => c.name) : undefined },
         timeline: timeline
           .filter((t) => t.edition_date !== found.edition_date)
           .map((t) => ({ date: t.edition_date, headline: t.headline, summary: t.summary, story_key: t.story_key })),
+      };
+    },
+  },
+  {
+    name: "get_company_news",
+    title: "News about one company",
+    description:
+      "Every story ReadKernel has covered about one company, newest first, plus the companies that appear in " +
+      "the same stories most often (rivals, partners or deal counterparts; read the stories to tell which). " +
+      "Use the company's name, e.g. OpenAI or Nvidia.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        company: { type: "string", description: "Company name, e.g. OpenAI" },
+        limit: { type: "integer", minimum: 1, maximum: 20, description: "How many stories (default 8)" },
+      },
+      required: ["company"],
+      additionalProperties: false,
+    },
+    async run(args) {
+      const name = text(args, "company", 60);
+      if (!name || name.length < 2) throw new ToolInputError("company needs at least 2 characters");
+      const limit = count(args, "limit", 8, 20);
+      const news = await getCompanyNews(companySlug(name));
+      if (!news) return { company: name, stories: [], note: `No stories are tagged with ${name}. Try search_news.` };
+      return {
+        company: news.name,
+        page: `${siteUrl()}/company/${news.slug}`,
+        stories: news.stories.slice(0, limit).map((s) => story(s)),
+        often_in_the_news_with: news.often.map((c) => ({ company: c.name, shared_stories: c.stories })),
       };
     },
   },

@@ -101,12 +101,12 @@ flowchart TD
 | **Ask ReadKernel** | [readkernel.in/ask](https://readkernel.in/ask) | A chat. The AI decides which tools to use (search, open a story's timeline, read today's brief), loops until it can answer, and links every fact. |
 | **Fact-check agent** | Every morning | Checks, rewrites and re-checks summaries before anything is published. |
 | **Watch alerts agent** | Every morning, on the settings page | Matches each day's news against each reader's plain-English wishes. |
-| **MCP server** | `https://readkernel.in/mcp` | Lets Claude, Cursor and other AI assistants use ReadKernel's 6 news tools. |
+| **MCP server** | `https://readkernel.in/mcp` | Lets Claude, Cursor and other AI assistants use ReadKernel's 7 news tools. |
 | **Local MCP server** | `pipeline/kernel/mcp_server.py` | The same idea run on your own computer (works offline; by a collaborator). |
 | **Chrome extension** | `extension/` folder | Today's brief in every new tab, offline-ready. |
 | **Public API** | `/api/v1/today` | Today's brief as JSON (used by the extension). |
 
-All of them share **one set of six news tools** (`web/lib/tools.ts`), so the chat, the MCP server and future agents behave the same.
+All of them share **one set of seven news tools** (`web/lib/tools.ts`), so the chat, the MCP server and future agents behave the same.
 
 ---
 

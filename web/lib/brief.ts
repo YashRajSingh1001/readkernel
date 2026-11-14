@@ -9,7 +9,11 @@ import { cacheLife } from "next/cache";
 import path from "path";
 
 import {
+  COMPANY_SLUG_RE,
+  companySlug,
   isValidDate,
+  type CompanyLink,
+  type CompanyTag,
   type Discussion,
   type Edition,
   type EditionSummary,
@@ -209,4 +213,141 @@ async function localDates(): Promise<string[]> {
   } catch {
     return [];
   }
+}
+
+// ---------------------------------------------------------------------------
+// Company tags (story_companies, from db/migrations/007). Until that has run,
+// these return nothing rather than failing, so only the company features wait.
+
+type TagRow = { edition_date: string; story_key: string; company: string; name: string };
+
+const COMPANY_STORY_LIMIT = 40;
+
+function tagsOf(story: Story | undefined): CompanyTag[] {
+  return (story?.companies ?? []).map((name) => ({ slug: companySlug(name), name }));
+}
+
+/** The companies one story is about (that day's copy of it). */
+export async function getStoryCompanies(storyKey: string, date: string): Promise<CompanyTag[]> {
+  "use cache";
+  cacheLife("minutes");
+  if (!STORY_KEY_RE.test(storyKey) || !isValidDate(date)) return [];
+  if (supabase()) {
+    try {
+      const rows = await rest<TagRow[]>(
+        `story_companies?select=company,name&story_key=eq.${storyKey}&edition_date=eq.${date}`,
+      );
+      return rows.map((r) => ({ slug: r.company, name: r.name }));
+    } catch {
+      return [];
+    }
+  }
+  const edition = await readLocal(`brief-${date}.json`);
+  return tagsOf(edition?.feed.find((s) => s.story_key === storyKey));
+}
+
+export type CompanyNews = {
+  slug: string;
+  name: string;
+  stories: StoryWithDate[]; // newest first, one copy per story
+  often: CompanyLink[]; // companies that share the most stories with this one
+};
+
+/** Every story about one company, and who it's most often in the news with. */
+export async function getCompanyNews(slug: string): Promise<CompanyNews | null> {
+  "use cache";
+  cacheLife("minutes");
+  if (!COMPANY_SLUG_RE.test(slug)) return null;
+  let stories: StoryWithDate[] = [];
+  let tags: TagRow[] = []; // all tags on those stories, this company's included
+
+  if (supabase()) {
+    try {
+      const mine = await rest<TagRow[]>(
+        `story_companies?select=edition_date,story_key,company,name&company=eq.${slug}` +
+          `&order=edition_date.desc&limit=${COMPANY_STORY_LIMIT * 2}`,
+      );
+      // A story that ran on several days: keep its newest copy.
+      const newest = new Map<string, string>();
+      for (const r of mine) if (!newest.has(r.story_key)) newest.set(r.story_key, r.edition_date);
+      const keys = [...newest.keys()].slice(0, COMPANY_STORY_LIMIT);
+      if (keys.length === 0) return null;
+      const list = keys.join(",");
+      const [rows, others] = await Promise.all([
+        rest<StoryWithDate[]>(`stories?select=edition_date,${STORY_COLUMNS}&story_key=in.(${list})&order=edition_date.desc,score.desc`),
+        rest<TagRow[]>(`story_companies?select=edition_date,story_key,company,name&story_key=in.(${list})&company=neq.${slug}`),
+      ]);
+      const current = (r: { story_key?: string; edition_date: string }) => newest.get(r.story_key ?? "") === r.edition_date;
+      stories = rows.filter(current);
+      tags = [...mine, ...others].filter(current);
+    } catch {
+      return null;
+    }
+  } else {
+    const seen = new Set<string>();
+    for (const date of (await localDates()).slice(0, 60)) {
+      const edition = await readLocal(`brief-${date}.json`);
+      for (const s of edition?.feed ?? []) {
+        const own = tagsOf(s);
+        if (!s.story_key || seen.has(s.story_key) || !own.some((t) => t.slug === slug)) continue;
+        seen.add(s.story_key);
+        stories.push({ ...s, edition_date: date });
+        tags.push(...own.map((t) => ({ edition_date: date, story_key: s.story_key!, company: t.slug, name: t.name })));
+      }
+      if (stories.length >= COMPANY_STORY_LIMIT) break;
+    }
+    if (stories.length === 0) return null;
+  }
+
+  // Display name: the spelling the news uses most.
+  const spellings = new Map<string, number>();
+  for (const t of tags) if (t.company === slug) spellings.set(t.name, (spellings.get(t.name) ?? 0) + 1);
+  const name = [...spellings.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? slug;
+
+  const shared = new Map<string, { name: string; keys: Set<string> }>();
+  for (const t of tags) {
+    if (t.company === slug) continue;
+    const entry = shared.get(t.company) ?? { name: t.name, keys: new Set<string>() };
+    entry.keys.add(t.story_key);
+    shared.set(t.company, entry);
+  }
+  const often = [...shared.entries()]
+    .map(([s, e]) => ({ slug: s, name: e.name, stories: e.keys.size }))
+    .sort((a, b) => b.stories - a.stories || a.name.localeCompare(b.name))
+    .slice(0, 8);
+
+  return { slug, name, stories: stories.slice(0, COMPANY_STORY_LIMIT), often };
+}
+
+/** Companies tagged in the last `days` days, most-covered first (for the sitemap). */
+export async function listRecentCompanies(days = 30, limit = 200): Promise<CompanyLink[]> {
+  "use cache";
+  cacheLife("hours");
+  const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  let tags: TagRow[] = [];
+  if (supabase()) {
+    try {
+      tags = await rest<TagRow[]>(`story_companies?select=story_key,company,name&edition_date=gte.${since}&limit=5000`);
+    } catch {
+      return [];
+    }
+  } else {
+    for (const date of await localDates()) {
+      if (date < since) break;
+      const edition = await readLocal(`brief-${date}.json`);
+      for (const s of edition?.feed ?? []) {
+        for (const t of tagsOf(s)) tags.push({ edition_date: date, story_key: s.story_key ?? "", company: t.slug, name: t.name });
+      }
+    }
+  }
+  const counts = new Map<string, { name: string; keys: Set<string> }>();
+  for (const t of tags) {
+    const entry = counts.get(t.company) ?? { name: t.name, keys: new Set<string>() };
+    entry.keys.add(t.story_key);
+    counts.set(t.company, entry);
+  }
+  return [...counts.entries()]
+    .map(([slug, e]) => ({ slug, name: e.name, stories: e.keys.size }))
+    .sort((a, b) => b.stories - a.stories)
+    .slice(0, limit);
 }

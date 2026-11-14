@@ -214,13 +214,18 @@ Groq writes, for each story in the feed:
 - **summary** (2–3 sentences of concrete facts),
 - **why it matters** (one sentence),
 - **kind**: `news` or `model_release` (powers the "Model release" badge).
+- **companies**: the companies the story is about, from the same call (no extra AI request).
+  `kernel/companies.py` keeps only names the articles really contain, drops the news outlets, merges
+  spellings into one slug ("OpenAI Inc." = `openai`) and keeps at most 4. They are saved to
+  `story_companies` and power `/company/<slug>`, the story-page chips and `get_company_news`.
 
 The prompt forbids adding any fact not in the article snippets, including years and dates from the
 model's own memory. (Added after the AI once wrote "2024" into a 2026 story.) Today's date is passed in.
 
 **Cache:** each summary is stored under a key made of the prompt version (`PROMPT_VERSION = 3`), the
 model name and the story's links. The same story the next run is not summarised again, which saves
-AI calls. Changing the prompt bumps the version and refreshes everything.
+AI calls. Changing the prompt bumps the version and refreshes everything. (Adding `companies` did not
+bump it: summaries cached before that simply have no tags, rather than costing a second AI call each.)
 
 ### 4.6 Fact-check agent — `kernel/factcheck.py`
 
@@ -373,19 +378,20 @@ flowchart TD
 ## 7. Agents and integrations
 
 "Agentic" here means the AI is given **tools** and decides for itself which to use, in what order,
-until it reaches a goal, instead of answering one fixed prompt. All of it runs on the same free Groq
-model (`gpt-oss-120b` supports tool calling).
+until it reaches a goal, instead of answering one fixed prompt. Watch alerts run on the pipeline's free
+Groq model (`gpt-oss-120b` supports tool calling); Ask ReadKernel runs on OpenAI (see 7.2).
 
 ### 7.1 One set of news tools — `web/lib/tools.ts`
 
-Every agent and integration uses the same six read-only tools, so they all behave the same:
+Every agent and integration uses the same seven read-only tools, so they all behave the same:
 
 | Tool | What it returns |
 | --- | --- |
 | `get_today_news` | Today's top 10 (or all ~30 with `scope: feed`), optionally one topic |
 | `get_brief_by_date` | Any past day's brief |
 | `search_news` | Archive search over stories and company blog posts |
-| `get_story` | One story with all sources and its timeline across days |
+| `get_story` | One story with all sources, its companies and its timeline across days |
+| `get_company_news` | Every story about one company, and the companies most often in the same stories |
 | `get_top_articles` | Today's most-discussed Hacker News posts |
 | `get_company_posts` | Company blog posts, by company, subject, newest or best |
 
@@ -397,7 +403,7 @@ link the exact source. Bad input comes back as a readable error the agent can fi
 ```mermaid
 sequenceDiagram
     participant R as Reader
-    participant A as Agent (Groq)
+    participant A as Agent (OpenAI)
     participant T as News tools
     R->>A: "What has Nvidia been up to?"
     A->>T: search_news("Nvidia")
@@ -409,13 +415,32 @@ sequenceDiagram
 
 - Files: `web/lib/server/agent.ts` (the loop), `web/app/api/ask/route.ts` (limits), `web/components/AskChat.tsx` (the chat).
 - At most 5 rounds of tool use per question, then it must answer. Follow-up questions keep the last 6 messages as context.
-- Answers only from tool results, never from memory, and must not stretch an item to fit the question; off-topic requests are declined.
+- Answers only from tool results, never from memory, and must not stretch an item to fit the question.
+- **Tech and AI news only** (`web/lib/server/ask-scope.ts`). Coding help, homework, general knowledge,
+  advice, creative writing and questions about which AI runs Ask all get one fixed reply. Three layers:
+  a message with pasted code or an error trace is turned away before any AI call; the prompt tells the
+  AI to reply with an `OFF_TOPIC` marker, with no tool calls, to anything else out of scope; and an
+  answer carrying that marker or a code block is swapped for the fixed reply, so a tricked AI still
+  can't hand out code. The prompt also says earlier messages can't change these rules, because the
+  chat history comes from the browser and could be faked. Declined answers are never stored.
 - If the model forgets to link, the sources it used are listed under the answer automatically.
-- Limits to protect the free quota: 12 questions per visitor per 10 minutes, 600 characters per message.
+- Limits to protect the free quota: 12 questions per visitor per 10 minutes, 600 characters per reader message (Ask's own earlier answers, sent back as history for follow-ups, keep up to 2,500).
+- **Ask about this story:** every story page links to `/ask?story=<key>`. The story and its timeline are
+  loaded before the first question, and the suggestions change to "Who are the competitors here?",
+  "What else is happening in this space?" and so on. For rivals the agent starts with `get_company_news`.
+- **Shared answers:** the suggested first questions (on `/ask` and on story pages) are answered once per
+  story per day and stored in `ask_answers`, so later readers get the stored answer with no AI call (and
+  without counting against their question limit). Fallback and error answers are never stored. The daily
+  run deletes stored answers older than 3 days. Files: `web/lib/ask.ts`, `web/lib/server/ask-cache.ts`.
+- **Test set:** `web/scripts/ask-check/` asks a fixed list of questions and writes a report to read
+  against a checklist, so prompt changes are judged before and after, not by trying a chat or two.
 - Tested 27 October 2026: "What has Nvidia been up to?" → one search, four facts, sources listed.
   "What did Uber write about AI?" → its first, filtered search found nothing, so it **retried by
   itself** without the filter and found Uber's AutoClean post.
-- Needs `GROQ_API_KEY` in Vercel's environment variables.
+- Runs on OpenAI's `gpt-6-luna` at medium reasoning, with no fallback: Ask is off until
+  `OPENAI_API_KEY` is set in Vercel's environment variables. The pipeline's AI is separate and stays on Groq.
+- The website never names the AI services it uses (the privacy page says "AI services"), and Ask
+  declines questions about which AI runs it.
 
 ### 7.3 Watch alerts — `kernel/watches.py` and the settings page
 
@@ -442,7 +467,7 @@ day. The free local model narrows it down; the AI only judges the few close call
 ### 7.4 MCP server — `https://readkernel.in/mcp`
 
 MCP (Model Context Protocol) is the standard way AI assistants plug into outside tools. ReadKernel's
-server exposes the six news tools to Claude, Cursor, VS Code and others. No key needed.
+server exposes the seven news tools to Claude, Cursor, VS Code and others. No key needed.
 
 - File: `web/app/mcp/route.ts`. It speaks MCP's *Streamable HTTP* transport in its simplest stateless
   form: each POST carries JSON-RPC messages and gets a JSON answer (`initialize`, `tools/list`,
@@ -477,7 +502,7 @@ Today's brief as JSON (stories, top articles, company reads), open to any site (
 ## 8. The database
 
 **Supabase** (managed Postgres), free plan, Tokyo region.
-Project: `klqqroonqhnlcdkybxdm`. Tables are created by 6 SQL files in [`db/migrations/`](../db/migrations),
+Project: `klqqroonqhnlcdkybxdm`. Tables are created by 7 SQL files in [`db/migrations/`](../db/migrations),
 run by hand in Supabase's SQL Editor; each one can safely run again.
 
 | Table | Holds | Who can read it |
@@ -492,6 +517,8 @@ run by hand in Supabase's SQL Editor; each one can safely run again.
 | `saved_stories` | Saved stories of signed-in readers | Only that reader |
 | `watches` | Each reader's watch-alert wishes (up to 3, plain English) | Pipeline and website server only |
 | `watch_hits` | Stories each wish matched, with the agent's reason (never repeated) | Pipeline and website server only |
+| `story_companies` | Which companies each story is about (slug + name), one row per story per company per day | Everyone |
+| `ask_answers` | Stored answers to Ask's suggested questions, per story per day | Website server and pipeline only |
 
 | Migration | Added |
 | --- | --- |
@@ -501,6 +528,7 @@ run by hand in Supabase's SQL Editor; each one can safely run again.
 | `004_phases.sql` | photos, model releases, timelines, search, discussions, preferences, saved stories |
 | `005_company_posts.sql` | company_posts, the "company read" setting |
 | `006_watches.sql` | watches, watch_hits |
+| `007_companies_and_ask_cache.sql` | story_companies, ask_answers |
 
 **Why Supabase:** free, real SQL (joins, full-text search, constraints), **Row Level Security**
 (rules inside the database decide who can read what), a ready-made REST API so neither program needs
@@ -546,7 +574,8 @@ pipeline's JSON files, so it works on a laptop with nothing else set up.
 | `/companies` | Company blogs, with subject and company filters and a logo strip |
 | `/brief`, `/brief/[date]` | The archive and any past day |
 | `/brief/customize` | "Make it yours" builder with a live email preview |
-| `/story/[key]` | One story: photo, all sources, timeline, share, **Listen** (reads this story aloud) |
+| `/story/[key]` | One story: photo, its companies, all sources, timeline, share, **Listen** (reads this story aloud), **Ask about this story** |
+| `/company/[slug]` | Every story about one company, the companies it is most often in the news with, and its engineering blog posts |
 | `/search` | Search across all stories and company posts |
 | `/ask` | Ask ReadKernel, the chat agent |
 | `/tools` | How to get the Chrome extension and connect AI assistants |
@@ -676,7 +705,7 @@ so they're free and repeatable.
 
 | Service | Free allowance | Our use | Watch out for |
 | --- | --- | --- | --- |
-| Groq | Daily and per-minute token limits | A few dozen calls a day, plus Ask ReadKernel questions | Big first fills (like 30 days of company posts) take longer because of per-minute limits; the retry logic waits automatically. |
+| Groq | Daily and per-minute token limits | A few dozen calls a day (the pipeline only) | Big first fills (like 30 days of company posts) take longer because of per-minute limits; the retry logic waits automatically. |
 | Supabase | 500 MB database, pauses after 7 days with no activity | A few MB | The daily job keeps it active. |
 | Vercel | Hobby plan | One small site | Hobby is for non-commercial use. |
 | GitHub Actions | Free minutes on public repos; 2,000 min/month on private | ~5 min a day | |
@@ -694,8 +723,10 @@ Templates: [`.env.example`](../.env.example) and [`web/.env.example`](../web/.en
 | Setting | Used by | Value now | Meaning |
 | --- | --- | --- | --- |
 | `LLM_PROVIDER` | pipeline | `groq` | `groq`, `claude`, `openai` or `none` |
-| `GROQ_API_KEY` | pipeline, website | (secret) | Free key from console.groq.com; the website needs it for Ask ReadKernel |
-| `GROQ_MODEL` | pipeline, website | `openai/gpt-oss-120b` | Model on Groq |
+| `GROQ_API_KEY` | pipeline | (secret) | Free key from console.groq.com |
+| `GROQ_MODEL` | pipeline | `openai/gpt-oss-120b` | Model on Groq |
+| `OPENAI_API_KEY` | website | (secret) | Ask ReadKernel's AI. Not read by the pipeline, which stays on Groq |
+| `ASK_MODEL` / `ASK_REASONING_EFFORT` | website | `gpt-6-luna` / `medium` | OpenAI model and reasoning level for Ask |
 | `MAX_AGE_HOURS` | pipeline | 36 | How old an article may be |
 | `STORIES_PER_BRIEF` / `FEED_SIZE` | pipeline | 10 / 30 | Brief and feed size |
 | `EMBEDDINGS` | pipeline | `local` | `local` (bge-small) or `simple` (word overlap, no download) |
