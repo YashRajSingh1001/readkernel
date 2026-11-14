@@ -98,6 +98,7 @@ def test_valid_ratings_reorder_and_veto():
     stories, _, ranked = rank_with({"ratings": {"s0": 1, "s1": 5}})
     assert ranked[0] is stories[1]
     assert pick_brief(ranked, count=2) == [stories[1]]
+    assert pick_feed(ranked, [], size=2) == [stories[1]]
 
 
 def test_good_ratings_apply_when_others_are_bad():
@@ -112,6 +113,27 @@ def test_editor_exception_keeps_base_ranking(error, capsys):
     stories, base, ranked = rank_with(error=error)
     assert_base_ranking(stories, base, ranked)
     assert "editor failed" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "editor",
+    [
+        None,
+        FakeLLM(None),
+        FakeLLM({"ratings": [1, 5]}),
+        FakeLLM({"ratings": {"s0": True, "s1": 1.5}}),
+        FakeLLM(error=RuntimeError("boom")),
+    ],
+    ids=["no-editor", "no-reply", "malformed-ratings", "invalid-values", "editor-error"],
+)
+def test_reranking_clears_previous_ratings_on_fallback(editor):
+    stories, base, _ = rank_with({"ratings": {"s0": 1, "s1": 5}})
+
+    ranked = rank_stories(stories, editor, now=NOW)
+
+    assert_base_ranking(stories, base, ranked)
+    assert pick_brief(ranked, count=2) == stories
+    assert pick_feed(ranked, [], size=2) == stories
 
 
 def test_non_dict_ratings_are_logged(capsys):

@@ -36,6 +36,7 @@ def base_score(story: Story, now: datetime | None = None) -> float:
 def rank_stories(stories: list[Story], llm: LLM | None = None, now: datetime | None = None) -> list[Story]:
     for story in stories:
         story.score = base_score(story, now)
+        story.importance = None
     ranked = sorted(stories, key=lambda s: -s.score)
     if llm:
         candidates = ranked[:EDITOR_CANDIDATES]
