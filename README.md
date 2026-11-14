@@ -68,15 +68,20 @@ cp ../.env.example ../.env                         # one settings file for every
 
 Output goes to `pipeline/data/latest.json` and `pipeline/data/brief-YYYY-MM-DD.json`.
 
+The edition replacement integration tests use real PostgreSQL and PostgREST. With `initdb`, `pg_ctl`, `psql` and `postgrest` on `PATH`, run `READKERNEL_TEST_POSTGREST=1 ../.venv/bin/python -m pytest` from `pipeline/` (using a Python 3.12 venv at the repo root with `pipeline/requirements-mcp.txt` and `pytest` installed). They start and stop an isolated local database; without the flag, these integration tests are skipped.
+
 ## Database (Supabase)
 
 1. Create a free project at supabase.com.
-2. Open **SQL Editor** and run each file in `db/migrations/` in order (`001_init.sql` to `008_ai_usage.sql`).
+2. Open **SQL Editor** and run each file in `db/migrations/` in order, including `011_atomic_edition_replace.sql` before deploying the pipeline that calls `replace_edition`.
 3. From **Project Settings -> API**, copy:
    - the project URL, **secret** key and **publishable** key into `.env` (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`,
      `SUPABASE_PUBLISHABLE_KEY`). The pipeline and the website both read this one file.
 
 Anyone can read briefs; only the secret key can write (Row Level Security).
+
+Migration `011_atomic_edition_replace.sql` requires the edition, discussion and company-tag tables from migrations `001`–`008`. Apply it before deploying the pipeline code. It adds a service-role-only RPC that replaces an edition and its rows in one transaction; existing pipeline code still works after applying it. If the new code ships first, Supabase rejects the missing RPC and the pipeline fails without changing the published edition. Apply `011`, let PostgREST reload its schema cache, then rerun. Local JSON mode needs no migration.
+
 Without these settings, both sides fall back to local JSON files.
 
 ## Website

@@ -1,235 +1,271 @@
-import copy
-import json
+"""Real PostgreSQL/PostgREST tests: put their binaries on PATH and set
+READKERNEL_TEST_POSTGREST=1. Each run creates and destroys its own local cluster.
+"""
+import os
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+import shutil
+import socket
+import subprocess
+import tempfile
+import time
 
 import httpx
 import pytest
 
-from kernel.store import Supabase, save_files, save_supabase
+from kernel.store import Supabase, save_supabase
 
 DATE = "2026-11-15"
-
-UNIQUE = {
-    "editions": [("date",)],
-    "stories": [("id",), ("edition_date", "position")],
-    "discussions": [("edition_date", "position")],
-    "story_companies": [("edition_date", "story_key", "company")],
-}
-DEFAULTS = {"stories": {"image_url": None, "image_credit": None, "kind": "news", "thread_id": None}}
+MIGRATIONS = Path(__file__).resolve().parents[2] / "db" / "migrations"
 
 
-class Interrupted(httpx.ConnectError):
-    pass
+def free_port():
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
 
 
-class FakePostgrest:
-    def __init__(self):
-        self.tables = {name: [] for name in UNIQUE}
-        self.next_id = 1
-        self.fail_at = None
-        self.requests = 0
-        self.after_each = None
+class Database:
+    def __init__(self, uri, url):
+        self.uri, self.url = uri, url
+        self.db = Supabase(url, "sb_secret_test")
+        self.db.base = url
 
-    def handle(self, request: httpx.Request) -> httpx.Response:
-        self.requests += 1
-        if self.requests == self.fail_at:
-            raise Interrupted("connection lost", request=request)
-        table = request.url.path.rsplit("/", 1)[-1]
-        params = dict(request.url.params)
-        if request.method == "GET":
-            response = self.get(table, params)
-        elif request.method == "DELETE":
-            self.tables[table] = [r for r in self.tables[table] if not matches(r, params)]
-            response = httpx.Response(204)
-        else:
-            response = self.post(table, request, params)
-        if self.after_each and response.status_code < 300:
-            self.after_each(self)
-        return response
+    def sql(self, sql):
+        result = subprocess.run(
+            ["psql", self.uri, "-XAt", "-v", "ON_ERROR_STOP=1", "-c", sql],
+            capture_output=True, text=True, check=True,
+        )
+        return result.stdout.strip()
 
-    def get(self, table, params):
-        offset, limit = int(params.pop("offset", 0)), int(params.pop("limit", 1000))
-        cols = params.pop("select", "*").split(",")
-        rows = [r for r in self.tables[table] if matches(r, params)][offset:offset + limit]
-        return httpx.Response(200, json=[r if cols == ["*"] else {c: r.get(c) for c in cols} for r in rows])
+    def latest(self):
+        # Same nested read/filter used by web/lib/brief.ts; story_count is no guard.
+        response = httpx.get(self.url + "/editions", params={
+            "select": "*,stories(*),discussions(*)",
+            "stories.order": "position.asc", "discussions.order": "position.asc",
+            "order": "date.desc", "limit": "1",
+        })
+        response.raise_for_status()
+        rows = response.json()
+        for edition in rows:
+            for story in edition["stories"]:
+                story.pop("id")
+        return rows
 
-    def post(self, table, request, params):
-        body = json.loads(request.content)
-        rows = body if isinstance(body, list) else [body]
-        if len({tuple(sorted(r)) for r in rows}) > 1:
-            return httpx.Response(400, json={"code": "PGRST102", "message": "All object keys must match"})
-        prefer = request.headers.get("prefer", "")
-        merge = "merge-duplicates" in prefer
-        conflict = tuple(params["on_conflict"].split(",")) if "on_conflict" in params else UNIQUE[table][-1]
-        staged = copy.deepcopy(self.tables[table])
-        for row in rows:
-            found = next((r for r in staged if all(r.get(c) == row.get(c) for c in conflict)), None)
-            if found and merge:
-                found.update(row)
-                continue
-            new = {**DEFAULTS.get(table, {}), **row}
-            if table == "stories":
-                new["id"] = self.next_id
-                self.next_id += 1
-            for key in UNIQUE[table]:
-                if any(all(r.get(c) == new.get(c) for c in key) for r in staged):
-                    return httpx.Response(409, json={"code": "23505"})
-            staged.append(new)
-        self.tables[table] = staged
-        return httpx.Response(201)
-
-    def rows(self, table):
-        return sorted((r for r in self.tables[table] if r["edition_date"] == DATE), key=lambda r: r.get("position") or 0)
+    def tags(self):
+        return self.db.select("story_companies", {"order": "story_key,company"})
 
 
-def matches(row, params):
-    for col, expr in params.items():
-        op, value = expr.split(".", 1)
-        current = row.get(col)
-        if op == "eq" and str(current) != value:
-            return False
-        if op == "gt" and not (current is not None and current > int(value)):
-            return False
-        if op == "lt" and not (current is not None and str(current) < value):
-            return False
-    return True
+@pytest.fixture(scope="module")
+def server():
+    if os.environ.get("READKERNEL_TEST_POSTGREST") != "1":
+        pytest.skip("set READKERNEL_TEST_POSTGREST=1 to run real PostgreSQL/PostgREST tests")
+    for binary in ("initdb", "pg_ctl", "psql", "postgrest"):
+        assert shutil.which(binary), f"{binary} must be on PATH"
+    with tempfile.TemporaryDirectory(prefix="readkernel-pg-") as root:
+        data = Path(root) / "db"
+        subprocess.run(["initdb", "-D", str(data), "-A", "trust", "-U", "postgres", "--no-locale", "-E", "UTF8"],
+                       capture_output=True, check=True)
+        pg_port, rest_port = free_port(), free_port()
+        subprocess.run(["pg_ctl", "-D", str(data), "-l", str(Path(root) / "postgres.log"),
+                        "-o", f"-h 127.0.0.1 -p {pg_port} -k {root}", "-w", "start"],
+                       capture_output=True, check=True)
+        rest = None
+        database = Database(f"postgresql://postgres@127.0.0.1:{pg_port}/postgres", f"http://127.0.0.1:{rest_port}")
+        try:
+            database.sql("""
+                create role anon; create role authenticated; create role service_role bypassrls;
+                create schema auth; create table auth.users (id uuid primary key);
+                create function auth.uid() returns uuid language sql as 'select null::uuid';
+            """)
+            # 009 schedules production cron/GitHub dispatches; it does not change these tables.
+            for migration in sorted(MIGRATIONS.glob("*.sql")):
+                if not migration.name.startswith("009_"):
+                    database.sql(migration.read_text())
+            database.sql((MIGRATIONS / "011_atomic_edition_replace.sql").read_text())
+            database.sql("""
+                grant usage on schema public to service_role;
+                grant all on all tables in schema public to service_role;
+                grant usage on all sequences in schema public to service_role;
+            """)
+            config = Path(root) / "postgrest.conf"
+            config.write_text(f'''db-uri = "{database.uri}"
+db-schemas = "public"
+db-anon-role = "service_role"
+server-host = "127.0.0.1"
+server-port = {rest_port}
+''')
+            with (Path(root) / "postgrest.log").open("w") as log:
+                rest = subprocess.Popen(["postgrest", str(config)], stdout=log, stderr=log)
+                for _ in range(100):
+                    try:
+                        if httpx.get(database.url + "/").is_success:
+                            break
+                    except httpx.HTTPError:
+                        pass
+                    assert rest.poll() is None, (Path(root) / "postgrest.log").read_text()
+                    time.sleep(0.05)
+                else:
+                    pytest.fail("PostgREST did not start")
+                yield database
+        finally:
+            database.db.client.close()
+            if rest is not None:
+                rest.terminate()
+                rest.wait(timeout=10)
+            subprocess.run(["pg_ctl", "-D", str(data), "-m", "immediate", "-w", "stop"],
+                           capture_output=True, check=True)
 
 
-def story(n, run, **extra):
+@pytest.fixture
+def database(server):
+    server.sql("truncate editions cascade")
+    return server
+
+
+def edition(run, size):
+    feed = [{
+        "story_key": f"key{n:09d}", "brief_position": 1 if n == size else None,
+        "headline": f"{run} story {n}", "summary": "S", "why_it_matters": "", "topic": "ai",
+        "score": 10.0 - n, "importance": None, "published": "2026-11-15T01:00:00+00:00",
+        "sources": [], "companies": [f"{run} Company {n}"],
+    } for n in range(1, size + 1)]
     return {
-        "story_key": f"{run}-key-{n}", "brief_position": n if n <= 2 else None, "headline": f"{run} story {n}",
-        "summary": "S", "why_it_matters": "", "topic": "ai", "score": 1.0, "importance": None,
-        "published": "2026-11-15T01:00:00+00:00", "sources": [], "thread_id": f"{run}-thread-{n}",
-        "companies": [f"{run}co{n}"], **extra,
+        "date": DATE, "generated_at": f"2026-11-15T0{1 if run == 'old' else 2}:00:00+00:00",
+        "ai": None, "stats": {"feed": size}, "stories": feed[-1:], "feed": feed,
+        "discussions": [{"title": f"{run} talk {n}", "url": f"https://example.com/{n}", "source": "hn"}
+                        for n in range(1, size + 1)],
     }
 
 
-def edition(run, size, extra=None):
-    feed = [story(n, run, **(extra or {}).get(n, {})) for n in range(1, size + 1)]
-    discussions = [{"title": f"{run} talk {n}", "url": f"https://{run}/{n}", "source": "hn"} for n in range(1, size + 1)]
-    return {"date": DATE, "generated_at": f"{run}-time", "ai": None, "stats": {}, "stories": feed[:2], "feed": feed,
-            "discussions": discussions}
+@pytest.mark.parametrize("old_size,new_size", [(5, 1), (3, 5), (4, 4), (3, 0)])
+def test_rerun_replaces_complete_edition_and_tags(database, old_size, new_size):
+    old, new = edition("old", old_size), edition("new", new_size)
+    save_supabase(old, database.db)
+    # Move persistent keys between positions, including a swap of positions 1 and 3.
+    new["feed"].reverse()
+    save_supabase(new, database.db)
+    row, = database.latest()
+    assert [s["headline"] for s in row["stories"]] == [s["headline"] for s in new["feed"]]
+    assert [s["story_key"] for s in row["stories"]] == [s["story_key"] for s in new["feed"]]
+    assert len(row["discussions"]) == new_size
+    assert row["story_count"] == len(new["stories"])
+    assert row["stats"] == new["stats"]
+    assert {r["name"] for r in database.tags()} == {s["companies"][0] for s in new["feed"]}
 
 
-def connect(fake) -> Supabase:
-    db = Supabase("https://proj.supabase.co", "sb_secret_test")
-    db.client = httpx.Client(transport=httpx.MockTransport(fake.handle), headers=db.client.headers)
-    return db
+@pytest.mark.parametrize("table", ["stories", "discussions", "story_companies"])
+@pytest.mark.parametrize("first_run", [False, True])
+def test_cancelled_transaction_preserves_published_edition(database, table, first_run):
+    old = edition("old", 5)
+    if first_run:
+        old["date"] = "2026-11-14"
+    save_supabase(old, database.db)
+    before, tags = database.latest(), database.tags()
+    database.sql(f"""
+        create or replace function pause_replace() returns trigger language plpgsql as $$
+        begin perform pg_sleep(15); return new; end; $$;
+        create trigger pause_replace before insert on {table}
+        for each row execute function pause_replace();
+    """)
+    try:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            pending = pool.submit(save_supabase, edition("new", 1), database.db)
+            for _ in range(100):
+                if database.sql("select count(*) from pg_stat_activity where wait_event = 'PgSleep'") != "0":
+                    break
+                time.sleep(0.02)
+            else:
+                pytest.fail("RPC did not reach the pause after its delete")
+            assert database.latest() == before
+            assert database.tags() == tags
+            database.sql("select pg_cancel_backend(pid) from pg_stat_activity where wait_event = 'PgSleep'")
+            with pytest.raises(httpx.HTTPStatusError):
+                pending.result(timeout=10)
+        assert database.latest() == before
+        assert database.tags() == tags
+    finally:
+        database.sql(f"drop trigger pause_replace on {table}")
+    save_supabase(edition("new", 1), database.db)
+    assert database.latest()[0]["stories"][0]["headline"] == "new story 1"
 
 
-def snapshot(fake):
-    return {t: [{k: v for k, v in r.items() if k != "id"} for r in fake.rows(t)] for t in ("stories", "discussions", "story_companies")}
+def test_response_lost_after_commit_can_be_retried(database):
+    save_supabase(edition("old", 3), database.db)
+    real = database.db.client
+
+    def lose_response(request):
+        real.send(request).raise_for_status()
+        raise httpx.ReadError("response lost after commit", request=request)
+
+    database.db.client = httpx.Client(transport=httpx.MockTransport(lose_response))
+    try:
+        with pytest.raises(httpx.ReadError):
+            save_supabase(edition("new", 2), database.db)
+    finally:
+        database.db.client.close()
+        database.db.client = real
+    committed = database.latest(), database.tags()
+    save_supabase(edition("new", 2), database.db)
+    assert (database.latest(), database.tags()) == committed
 
 
-def check_edition(fake, old, new):
-    stories = [{k: v for k, v in r.items() if k != "id"} for r in fake.rows("stories")]
-    assert stories, "edition has no stories"
-    assert fake.rows("discussions"), "edition has no discussions"
-    briefs = [r["brief_position"] for r in stories if r["brief_position"] is not None]
-    assert len(briefs) == len(set(briefs)), f"duplicate brief positions {briefs}"
-    keys = [r["story_key"] for r in stories]
-    assert len(keys) == len(set(keys)), f"duplicate story keys {keys}"
-    by_old = {r["position"]: r for r in old["stories"]}
-    by_new = {r["position"]: r for r in new["stories"]}
-    all_old = all(by_old.get(r["position"]) == r for r in stories)
-    all_new = all(by_new.get(r["position"]) == r for r in stories)
-    assert all_old or all_new, f"stories mix two runs or leak old columns: {stories}"
+def test_request_lost_before_dispatch_keeps_old_brief_in_feed_tail(database):
+    save_supabase(edition("old", 5), database.db)
+    before, tags = database.latest(), database.tags()
+    real = database.db.client
+
+    def lose_request(request):
+        raise httpx.ConnectError("request not delivered", request=request)
+
+    database.db.client = httpx.Client(transport=httpx.MockTransport(lose_request))
+    try:
+        with pytest.raises(httpx.ConnectError):
+            save_supabase(edition("new", 1), database.db)
+    finally:
+        database.db.client.close()
+        database.db.client = real
+    assert database.latest() == before
+    assert database.tags() == tags
+    assert [s["headline"] for s in before[0]["stories"] if s["brief_position"]] == ["old story 5"]
 
 
-SHAPES = [(5, 3), (3, 5), (4, 4)]
-OLD_EXTRA = {n: {"image_url": f"https://img/{n}", "image_credit": "Old", "kind": "model_release"} for n in range(1, 6)}
+def test_replacement_clears_optional_columns_and_preserves_omitted_discussions(database):
+    old = edition("old", 3)
+    for story in old["feed"]:
+        story.update(image_url="https://example.com/old.jpg", image_credit="Old", kind="model_release", thread_id="oldthread")
+    old["discussions"][0].update(comments_url="https://example.com/comments", points=5, comments=2, summary="Old")
+    save_supabase(old, database.db)
+    old_discussions = database.latest()[0]["discussions"]
+    new = edition("new", 2)
+    new.pop("discussions")
+    save_supabase(new, database.db)
+    row, = database.latest()
+    assert row["discussions"] == old_discussions
+    for story in row["stories"]:
+        assert (story["image_url"], story["image_credit"], story["kind"], story["thread_id"]) == (None, None, "news", None)
+    new["discussions"] = edition("new", 1)["discussions"]
+    save_supabase(new, database.db)
+    discussion, = database.latest()[0]["discussions"]
+    assert (discussion["comments_url"], discussion["points"], discussion["comments"], discussion["summary"]) == (None, None, None, "")
+    new["discussions"] = []
+    save_supabase(new, database.db)
+    assert database.latest()[0]["discussions"] == []
 
 
-def expected(run, size, extra=None):
-    fake = FakePostgrest()
-    save_supabase(edition(run, size, extra), connect(fake))
-    return snapshot(fake)
+def test_concurrent_reruns_do_not_mix_editions(database):
+    outputs = [edition("old", 5), edition("new", 2)]
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(lambda output: save_supabase(output, database.db), outputs))
+    row, = database.latest()
+    run = row["stories"][0]["headline"].split()[0]
+    assert all(s["headline"].startswith(run) for s in row["stories"])
+    assert all(d["title"].startswith(run) for d in row["discussions"])
+    assert all(t["name"].startswith(run) for t in database.tags())
+    assert row["stats"]["feed"] == len(row["stories"]) == len(row["discussions"]) == len(database.tags())
 
 
-@pytest.mark.parametrize("old_size,new_size", SHAPES)
-def test_rerun_never_leaves_the_edition_empty_or_mixed(old_size, new_size):
-    old = expected("old", old_size, OLD_EXTRA)
-    new = expected("new", new_size)
-    fail_at, reached = 0, True
-    while reached:
-        fail_at += 1
-        fake = FakePostgrest()
-        db = connect(fake)
-        save_supabase(edition("old", old_size, OLD_EXTRA), db)
-        fake.requests, fake.fail_at = 0, fail_at
-        fake.after_each = lambda f: check_edition(f, old, new)
-        try:
-            save_supabase(edition("new", new_size), db)
-        except httpx.HTTPError:
-            pass
-        reached = fake.requests >= fail_at
-        check_edition(fake, old, new)
-
-        fake.fail_at = None
-        save_supabase(edition("new", new_size), db)
-        assert snapshot(fake) == new, f"rerun after failing at request {fail_at} did not converge"
-    assert fail_at > 10
-
-
-def test_crash_between_discussions_delete_and_upsert_keeps_old_discussions():
-    fake = FakePostgrest()
-    db = connect(fake)
-    save_supabase(edition("old", 5), db)
-    seen = []
-    original = fake.handle
-
-    def crash_on_discussions_post(request):
-        seen.append((request.method, request.url.path))
-        if request.method == "POST" and request.url.path.endswith("/discussions"):
-            raise Interrupted("connection lost", request=request)
-        return original(request)
-
-    db.client = httpx.Client(transport=httpx.MockTransport(crash_on_discussions_post), headers=db.client.headers)
-    with pytest.raises(httpx.HTTPError):
-        save_supabase(edition("new", 3), db)
-    assert ("DELETE", "/rest/v1/discussions") in seen
-    assert [r["title"] for r in fake.rows("discussions")] == ["old talk 1", "old talk 2", "old talk 3"]
-
-
-def test_rerun_clears_columns_the_new_story_does_not_have():
-    fake = FakePostgrest()
-    db = connect(fake)
-    save_supabase(edition("old", 3, OLD_EXTRA), db)
-    save_supabase(edition("new", 3), db)
-    for row in fake.rows("stories"):
-        assert (row["image_url"], row["image_credit"], row["kind"]) == (None, None, "news")
-
-
-def test_rerun_replaces_company_tags_and_keeps_them_during_the_swap():
-    fake = FakePostgrest()
-    db = connect(fake)
-    save_supabase(edition("old", 3), db)
-    fake.after_each = lambda f: f.rows("story_companies") or pytest.fail("company tags went empty")
-    save_supabase(edition("new", 2), db)
-    tags = {(r["story_key"], r["company"]) for r in fake.rows("story_companies")}
-    assert tags == {("new-key-1", "newco1"), ("new-key-2", "newco2")}
-
-
-def test_shorter_rerun_keeps_the_old_brief_until_the_new_rows_land():
-    fake = FakePostgrest()
-    db = connect(fake)
-    save_supabase(edition("old", 5), db)
-    fake.requests, fake.fail_at = 0, 3
-    with pytest.raises(httpx.HTTPError):
-        save_supabase(edition("new", 3), db)
-    rows = fake.rows("stories")
-    assert [r["headline"] for r in rows] == ["old story 1", "old story 2", "old story 3"]
-    assert [r["brief_position"] for r in rows if r["brief_position"]] == [1, 2]
-
-
-def test_interrupted_file_write_keeps_the_previous_latest(tmp_path, monkeypatch):
-    save_files({"date": "2026-11-14", "stories": ["old"]}, tmp_path)
-
-    def broken(self, target):
-        raise OSError("disk full")
-
-    monkeypatch.setattr(Path, "replace", broken)
-    with pytest.raises(OSError):
-        save_files({"date": DATE, "stories": ["new"]}, tmp_path)
-    assert json.loads((tmp_path / "latest.json").read_text())["stories"] == ["old"]
-    assert not (tmp_path / f"brief-{DATE}.json").exists()
+def test_rpc_is_only_executable_by_service_role(database):
+    signature = "public.replace_edition(jsonb,jsonb,jsonb,jsonb)"
+    for role, allowed in [("anon", "f"), ("authenticated", "f"), ("service_role", "t")]:
+        assert database.sql(f"select has_function_privilege('{role}', '{signature}', 'execute')") == allowed

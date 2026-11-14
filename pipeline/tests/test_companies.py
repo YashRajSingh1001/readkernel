@@ -1,10 +1,8 @@
 from datetime import datetime, timezone
 
-import httpx
-
 from kernel.companies import ground, slug
 from kernel.models import Article, Story
-from kernel.store import save_story_companies
+from kernel.store import story_company_rows
 from kernel.summarise import cache_key, summarise
 
 NOW = datetime(2026, 11, 8, tzinfo=timezone.utc)
@@ -73,34 +71,12 @@ def test_cached_summaries_without_companies_still_work():
     assert s.headline == "Fireworks hires a CFO now" and s.companies == []
 
 
-class FakeDB:
-    def __init__(self, fail=False):
-        self.calls, self.fail = [], fail
-
-    def upsert(self, table, rows, on_conflict=None):
-        self.calls.append(("upsert", table, rows))
-        if self.fail:
-            raise httpx.HTTPStatusError("relation story_companies does not exist", request=None, response=None)
-
-    def select(self, table, params):
-        self.calls.append(("select", table, params))
-        return []
-
-
 def test_story_companies_rows_are_slugged_and_deduped():
     output = {"date": "2026-11-08", "stories": [], "feed": [
         {"story_key": "abc123", "companies": ["OpenAI", "Open AI", "Anthropic"]},
         {"story_key": None, "companies": ["Ignored"]},
         {"story_key": "def456"},
     ]}
-    db = FakeDB()
-    save_story_companies(output, db)
-    assert db.calls[1] == ("select", "story_companies", {"select": "story_key,company", "edition_date": "eq.2026-11-08"})
-    rows = db.calls[0][2]
+    rows = story_company_rows(output)
     assert [(r["story_key"], r["company"]) for r in rows] == [("abc123", "openai"), ("abc123", "anthropic")]
-
-
-def test_missing_table_does_not_stop_the_save(capsys):
-    output = {"date": "2026-11-08", "stories": [{"story_key": "abc123", "companies": ["OpenAI"]}]}
-    save_story_companies(output, FakeDB(fail=True))
-    assert "007" in capsys.readouterr().out
+    assert {r["edition_date"] for r in rows} == {"2026-11-08"}
