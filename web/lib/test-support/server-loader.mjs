@@ -1,5 +1,3 @@
-// Run the real server modules under node --test without a Next.js runtime.
-// Only framework boundaries are stubbed; HTTP is mocked by each test.
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
