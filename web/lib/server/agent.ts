@@ -1,6 +1,6 @@
 import "server-only";
 
-import { AnswerGuard, countResult, urlsIn, type AskEvent, type AskStep } from "../ask-stream";
+import { AnswerGuard, countResult, type AskEvent, type AskStep } from "../ask-stream";
 import { packMessages } from "../tool-packing";
 import { NEWS_TOOLS, runTool } from "../tools";
 import type { AskUsage } from "./ai-usage";
@@ -493,7 +493,6 @@ async function answer(
 ): Promise<AgentAnswer> {
   if (looksLikeCode(history.at(-1)!.content)) return { answer: OFF_TOPIC_REPLY, steps: [], complete: false, truncated: false };
 
-  const historyUrls = history.filter((t) => t.role === "assistant").flatMap((t) => urlsIn(t.content));
   const webUrls = new Set<string>();
   let cites: string[] = [];
 
@@ -522,7 +521,7 @@ async function answer(
     const sendTo = (p: Provider) => {
       const sent = packMessages(messages, TOOL_BUDGET[p]);
       cites = sent.cites;
-      const guard = new AnswerGuard([...historyUrls, ...sent.urls, ...(p === "openai" ? webUrls : [])]);
+      const guard = new AnswerGuard([...sent.urls, ...(p === "openai" ? webUrls : [])]);
       return { messages: sent.messages, guard };
     };
     let { messages: sent, guard } = sendTo(provider);
