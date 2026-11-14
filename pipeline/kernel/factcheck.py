@@ -92,11 +92,9 @@ def fact_check(stories: list[Story], llm: LLM | None, cache=None) -> dict[str, i
             for i, story in enumerate(batch):
                 answer = answers.get(i)
                 if answer is None:
-                    if story.extra.get("fact_check") == "rewriting":
-                        _apply(story, _publisher_words(story), "fallback")
-                        counts["fallback"] += 1
-                    else:
-                        counts["unchecked"] += 1
+                    print(f"    [fact-check] no answer for \"{story.headline[:70]}\": using the publisher's words")
+                    _apply(story, _publisher_words(story), "fallback")
+                    counts["fallback"] += 1
                     continue
                 if answer.get("verdict") == "ok":
                     outcome = "fixed" if story.extra.get("fact_check") == "rewriting" else "ok"

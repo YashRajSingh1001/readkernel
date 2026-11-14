@@ -233,6 +233,7 @@ and lists any claim the snippets don't support (names, numbers, dates, years, ca
 ```mermaid
 flowchart LR
     A["AI summary"] --> B{"Every claim in<br/>the snippets?"}
+    B -- no answer --> FB
     B -- yes --> OK["Publish as written"]
     B -- no --> C["Agent rewrites it<br/>from the snippets"]
     C --> D{"Check the<br/>rewrite again"}
@@ -240,8 +241,11 @@ flowchart LR
     D -- no --> FB["Use the publisher's<br/>own words instead"]
 ```
 
-- Checks 5 stories per AI call. A rewrite is **never** published without being checked again.
-- Verdicts are cached, so each story is checked once, even across runs.
+- Checks 5 stories per AI call. No AI-written text, first draft or rewrite, is **ever** published
+  without a passing check.
+- If the checker gives no answer for a story (the AI call failed or skipped that story), the story uses
+  the publisher's own words. This is not cached, so the next run checks the AI summary again.
+- Verdicts are cached, so each story is checked once, even across runs (a check with no answer is not a verdict).
 - Stories that use the publisher's own text (no AI summary) are not checked.
 - Each run logs the result, for example `fact-check: 26 ok, 4 fixed, 0 replaced by the publisher's
   words`, plus a line for every correction saying what was unsupported.
@@ -700,7 +704,7 @@ The tests cover fetching and parsing, filtering, grouping, ranking, the summary 
 timelines, discussions, saving to the database (with a fake database), email rendering in all formats,
 personal picks, the weekly digest, reply-to, the company read, and company blogs (address cleaning,
 Hacker News filtering, no duplicates, categories, scoring), the fact-checker (ok, fix and re-check,
-fallback, never publishing an unchecked rewrite, caching) and watch alerts (shortlist, only offered
+fallback, never publishing an unchecked summary or rewrite, caching) and watch alerts (shortlist, only offered
 items confirmed, no repeats, alerts only in their reader's email). AI calls are replaced by fakes in tests,
 so they're free and repeatable.
 
