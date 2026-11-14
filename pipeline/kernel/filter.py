@@ -7,6 +7,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from .models import Article, Source
 
 TRACKING_PARAMS = {"fbclid", "gclid", "mc_cid", "mc_eid", "ref", "ref_src", "cmpid", "source"}
+_SHOPPING_PREFIX_RE = re.compile(r"^\s*(?:app\s+)?deals?\s*:", re.IGNORECASE)
 
 
 def canonical_url(url: str) -> str:
@@ -26,7 +27,7 @@ def _title_key(title: str) -> str:
 
 
 def _has_word(title: str, words: list[str] | tuple[str, ...]) -> bool:
-    lowered = title.lower()
+    lowered = title.lower().replace("\u2019", "'")
     return any(re.search(rf"(?<![a-z0-9]){re.escape(w)}(?![a-z0-9])", lowered) for w in words)
 
 
@@ -47,7 +48,7 @@ def filter_articles(
     for article in sorted(articles, key=lambda a: (-a.weight, a.published)):
         if article.published < cutoff or article.published > now + timedelta(hours=1):
             continue
-        if _has_word(article.title, global_exclude):
+        if _SHOPPING_PREFIX_RE.match(article.title) or _has_word(article.title, global_exclude):
             continue
         if _has_word(article.title, per_source_exclude.get(article.source, ())):
             continue
