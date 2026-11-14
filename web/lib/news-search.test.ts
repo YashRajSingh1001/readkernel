@@ -100,6 +100,17 @@ test("a search that works but finds nothing at all returns empty lists after eve
   assert.deepEqual(result, { query: QUERY, stories: [], company_blog_posts: [] });
 });
 
+test("a failure on a broader query stops further attempts on both sources", async () => {
+  const stories = fake(() => []);
+  const posts = fake((q) => q === QUERY ? [] : new Error("private diagnostic"));
+  const result = await quietly(() => searchArchive(QUERY, { stories: stories.search, posts: posts.search }, show));
+  assert.deepEqual(stories.calls, [QUERY, "nvidia blackwell"]);
+  assert.deepEqual(posts.calls, stories.calls);
+  assert.equal(result.matched_query, "nvidia blackwell");
+  assert.deepEqual(result.company_blog_posts, { unavailable: true });
+  assert.equal(countResult("search_news", result).empty, undefined);
+});
+
 test("answers given while a lookup was unavailable are not cached", () => {
   assert.equal(shouldCacheAnswer({ complete: true }), true);
   assert.equal(shouldCacheAnswer({ complete: true, degraded: false }), true);
