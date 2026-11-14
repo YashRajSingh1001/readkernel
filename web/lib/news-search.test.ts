@@ -37,7 +37,7 @@ test("a failed company post lookup is reported as unavailable, not as an empty l
   const result = await quietly(() => searchArchive(QUERY, { stories: stories.search, posts: posts.search }, show));
   assert.deepEqual(result.company_blog_posts, { unavailable: true });
   assert.deepEqual(result.stories, ["s1"]);
-  assert.match(String(result.note), /could not be searched/);
+  assert.match(String(result.note), /not searched/);
   assert.doesNotMatch(JSON.stringify(result), /Supabase|secret|500/);
 });
 

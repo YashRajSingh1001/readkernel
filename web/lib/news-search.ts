@@ -2,8 +2,7 @@ export const MAX_SEARCH_ATTEMPTS = 6;
 
 export const UNAVAILABLE = { unavailable: true } as const;
 
-const UNAVAILABLE_NOTE =
-  "Part of the archive could not be searched just now. Anything marked unavailable was not checked, so don't say it has nothing.";
+const UNAVAILABLE_NOTE = "Parts marked unavailable were not searched: their results are unknown, not empty.";
 
 export function broaderQueries(query: string): string[] {
   if (/["]|(^|\s)-\S/.test(query)) return [query];
