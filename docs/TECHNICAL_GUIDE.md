@@ -519,6 +519,7 @@ run by hand in Supabase's SQL Editor; each one can safely run again.
 | `watch_hits` | Stories each wish matched, with the agent's reason (never repeated) | Pipeline and website server only |
 | `story_companies` | Which companies each story is about (slug + name), one row per story per company per day | Everyone |
 | `ask_answers` | Stored answers to Ask's suggested questions, per story per day | Website server and pipeline only |
+| `ai_usage`, `ai_prices` | AI token counts (one row per Ask question and per pipeline job run) and the prices that turn them into cost | Website server and pipeline only |
 
 | Migration | Added |
 | --- | --- |
@@ -529,6 +530,7 @@ run by hand in Supabase's SQL Editor; each one can safely run again.
 | `005_company_posts.sql` | company_posts, the "company read" setting |
 | `006_watches.sql` | watches, watch_hits |
 | `007_companies_and_ask_cache.sql` | story_companies, ask_answers |
+| `008_ai_usage.sql` | ai_usage, ai_prices, and the views ai_usage_costed and ai_cost_daily |
 
 **Why Supabase:** free, real SQL (joins, full-text search, constraints), **Row Level Security**
 (rules inside the database decide who can read what), a ready-made REST API so neither program needs
@@ -712,6 +714,35 @@ so they're free and repeatable.
 | Resend | **3,000 emails/month, 100/day** | One per subscriber per day | **Past ~90 subscribers**, upgrade Resend or split sending. |
 | Domain | — | ₹899/year from year two | Turn on auto-renew in GoDaddy. |
 
+### What the AI costs
+
+Every Ask question, and every pipeline job that calls the AI, saves one row to `ai_usage` with the token
+counts the provider reported (input, cached input, output, reasoning, web searches). Ask also records how
+the question ended (`answered`, `cached`, `off_topic`, `failed`, `stopped`, …), never the question itself.
+Cost is worked out from `ai_prices` when you read it, so updating a price corrects old rows too; a model with
+no price row shows no cost. Runs on your own machine are saved as `env = 'local'`; set `AI_USAGE_LOG=off`
+to skip saving altogether. The same totals are printed as an `[ask-usage]` or `[usage]` log line.
+
+In Supabase's SQL Editor:
+
+```sql
+-- Day by day: questions, average tokens and cost per question, and the pipeline's runs
+select * from ai_cost_daily where env = 'production' order by day desc, source;
+
+-- Average per Ask question over the last 7 days, cached answers included
+select count(*) as questions, round(avg(input_tokens + output_tokens)) as avg_tokens,
+       round(avg(cost_usd), 5) as avg_cost_usd, sum(cost_usd) as total_usd
+from ai_usage_costed
+where source = 'ask' and env = 'production' and created_at > now() - interval '7 days';
+
+-- When a price changes
+update ai_prices set input_per_m = 0.10, cached_input_per_m = 0.01, output_per_m = 0.50
+where provider = 'openai' and model = 'gpt-6-luna';
+```
+
+A question stopped mid-answer may have been billed for a call that never reported its usage; those show
+in `calls_without_usage`, so the totals can be slightly low.
+
 ---
 
 ## 15. Settings reference
@@ -728,6 +759,7 @@ Template: [`.env.example`](../.env.example).
 | `GROQ_MODEL` | pipeline | `openai/gpt-oss-120b` | Model on Groq |
 | `OPENAI_API_KEY` | website | (secret) | Ask ReadKernel's AI. Not read by the pipeline, which stays on Groq |
 | `ASK_MODEL` / `ASK_REASONING_EFFORT` | website | `gpt-6-luna` / `medium` | OpenAI model and reasoning level for Ask |
+| `AI_USAGE_LOG` | both | not set (on) | `off` stops saving AI token counts to `ai_usage` |
 | `MAX_AGE_HOURS` | pipeline | 36 | How old an article may be |
 | `STORIES_PER_BRIEF` / `FEED_SIZE` | pipeline | 10 / 30 | Brief and feed size |
 | `EMBEDDINGS` | pipeline | `local` | `local` (bge-small) or `simple` (word overlap, no download) |

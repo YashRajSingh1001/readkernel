@@ -71,7 +71,7 @@ Output goes to `pipeline/data/latest.json` and `pipeline/data/brief-YYYY-MM-DD.j
 ## Database (Supabase)
 
 1. Create a free project at supabase.com.
-2. Open **SQL Editor** and run each file in `db/migrations/` in order (`001_init.sql` to `007_companies_and_ask_cache.sql`).
+2. Open **SQL Editor** and run each file in `db/migrations/` in order (`001_init.sql` to `008_ai_usage.sql`).
 3. From **Project Settings -> API**, copy:
    - the project URL, **secret** key and **publishable** key into `.env` (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`,
      `SUPABASE_PUBLISHABLE_KEY`). The pipeline and the website both read this one file.

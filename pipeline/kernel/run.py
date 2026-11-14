@@ -19,6 +19,7 @@ from .filter import filter_articles
 from .group import group_articles
 from .images import attach_images
 from .llm import make_llm
+from .usage import record_usage
 from .models import Story
 from .rank import pick_brief, pick_feed, rank_stories
 from .sources import load_sources
@@ -144,6 +145,7 @@ def main() -> None:
             print(f"      {story.summary}")
     print()
     _log(f"feed: {len(feed)} stories (brief: {len(brief)}); done in {time.time() - started:.0f}s -> {latest}")
+    record_usage(db, llm, "run")
 
 
 if __name__ == "__main__":

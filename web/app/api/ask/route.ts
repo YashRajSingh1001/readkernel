@@ -12,8 +12,10 @@
 import { isSharedQuestion } from "@/lib/ask";
 import { NDJSON, type AskEvent } from "@/lib/ask-stream";
 import { getLatestEdition } from "@/lib/brief";
-import { AgentTimeout, AgentUnavailable, askAgent, type ChatTurn } from "@/lib/server/agent";
+import { AgentTimeout, AgentUnavailable, askAgent, type AgentAnswer, type ChatTurn } from "@/lib/server/agent";
+import { AskUsage, recordAskUsage, type AskOutcome } from "@/lib/server/ai-usage";
 import { askCacheKey, readCachedAnswer, saveCachedAnswer } from "@/lib/server/ask-cache";
+import { OFF_TOPIC_REPLY } from "@/lib/server/ask-scope";
 
 const MAX_TURNS = 6; // the last few messages give follow-up questions their context
 const MAX_CHARS = 600; // a reader's message (the chat box stops at 600 too)
@@ -45,6 +47,13 @@ function failure(err: unknown): { message: string; retryable: boolean } {
   if (err instanceof AgentUnavailable) return { message: "Ask ReadKernel is resting right now. Please try again in a minute.", retryable: true };
   if (err instanceof AgentTimeout) return { message: "That took too long to answer. Try again, or ask something narrower.", retryable: true };
   return { message: "Something went wrong while answering. Please try again.", retryable: true };
+}
+
+/** How a finished answer is filed in ai_usage. */
+function outcomeOf(result: AgentAnswer): AskOutcome {
+  if (result.complete) return "answered";
+  if (result.truncated) return "truncated";
+  return result.answer === OFF_TOPIC_REPLY ? "off_topic" : "no_answer";
 }
 
 const STREAM_HEADERS = {
@@ -115,22 +124,33 @@ export async function POST(request: Request) {
   }
   if (!turns) return Response.json({ error: "Send a question." }, { status: 400 });
   const streaming = (request.headers.get("accept") ?? "").includes(NDJSON);
+  const suggested = turns.length === 1 && isSharedQuestion(turns[0].content, storyKey);
+  // Every question is logged with what it cost (lib/server/ai-usage.ts), cached ones too.
+  const usage = new AskUsage();
+  const logUsage = (outcome: AskOutcome, result?: AgentAnswer) => {
+    if (result) usage.steps = result.steps.length;
+    return recordAskUsage(usage, outcome, { story: storyKey, suggested });
+  };
 
   // A suggested first question: today's answer may already be stored. Checked
   // before the rate limit, because a stored answer costs no AI.
   let cacheKey: string | null = null;
-  if (turns.length === 1 && isSharedQuestion(turns[0].content, storyKey)) {
+  if (suggested) {
     try {
       const edition = await getLatestEdition();
       if (edition) {
         cacheKey = askCacheKey(edition.date, turns[0].content, storyKey);
         const hit = await readCachedAnswer(cacheKey);
         if (hit) {
-          if (!streaming) return Response.json({ ...hit, complete: true, cached: true });
+          if (!streaming) {
+            await logUsage("cached");
+            return Response.json({ ...hit, complete: true, cached: true });
+          }
           const date = edition.date;
           return eventStream(async (send) => {
             send({ type: "status", phase: "cached", date });
             send({ type: "done", answer: hit.answer, steps: hit.steps ?? [], complete: true, cached: true, truncated: false });
+            await logUsage("cached");
           });
         }
       }
@@ -154,11 +174,13 @@ export async function POST(request: Request) {
 
   if (!streaming) {
     try {
-      const result = await askAgent(turns, { storyKey, signal: request.signal });
+      const result = await askAgent(turns, { storyKey, signal: request.signal, usage });
       await save(result);
+      await logUsage(outcomeOf(result), result);
       return Response.json(result);
     } catch (err) {
       console.error("[ask]", err);
+      await logUsage(request.signal.aborted ? "stopped" : "failed");
       return Response.json({ error: failure(err).message }, { status: 503 });
     }
   }
@@ -171,6 +193,7 @@ export async function POST(request: Request) {
       const result = await askAgent(question, {
         storyKey,
         signal,
+        usage,
         onEvent: (e) => {
           if (e.type === "delta") partial = true;
           if (e.type === "discard") partial = false;
@@ -179,13 +202,16 @@ export async function POST(request: Request) {
       });
       send({ type: "done", answer: result.answer, steps: result.steps, complete: result.complete, cached: false, truncated: result.truncated });
       await save(result);
+      await logUsage(outcomeOf(result), result);
     } catch (err) {
       if (signal.aborted && !(err instanceof AgentTimeout)) {
         console.info("[ask] stopped: the reader left or asked something else");
+        await logUsage("stopped");
         return;
       }
       console.error("[ask]", err);
       send({ type: "error", ...failure(err), partial });
+      await logUsage("failed");
     }
   });
 }

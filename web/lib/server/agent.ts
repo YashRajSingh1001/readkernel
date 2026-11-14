@@ -14,6 +14,7 @@ import "server-only";
 
 import { AnswerGuard, countResult, urlsIn, type AskEvent, type AskStep } from "../ask-stream";
 import { NEWS_TOOLS, runTool } from "../tools";
+import type { AskUsage } from "./ai-usage";
 import { looksLikeCode, OFF_TOPIC_MARKER, OFF_TOPIC_REPLY } from "./ask-scope";
 
 const MAX_STEPS = 5;
@@ -26,7 +27,8 @@ export type AgentStep = AskStep;
 // complete: the model wrote a whole, real answer (not a "sorry" fallback, not cut
 // off), so it can be cached. truncated: the model ran out of room mid-answer.
 export type AgentAnswer = { answer: string; steps: AgentStep[]; complete: boolean; truncated: boolean };
-export type AgentOptions = { storyKey?: string; signal?: AbortSignal; onEvent?: (event: AskEvent) => void };
+// usage: filled in with the AI's token counts as the answer is worked out, even if it then fails.
+export type AgentOptions = { storyKey?: string; signal?: AbortSignal; onEvent?: (event: AskEvent) => void; usage?: AskUsage };
 
 type ToolCall = { id: string; type: "function"; function: { name: string; arguments: string } };
 type Message =
@@ -231,6 +233,7 @@ async function callModel(
   signal: AbortSignal,
   emit: (e: AskEvent) => void,
   learnWeb: (urls: string[]) => void,
+  usage?: AskUsage,
 ): Promise<ModelReply> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new AgentUnavailable("OPENAI_API_KEY is not set");
@@ -265,6 +268,7 @@ async function callModel(
       callSignal,
       emit,
     );
+    usage?.startCall(); // only now: a refused request (429, no credit) isn't billed
     alive();
 
     // A web search finished: its pages may now be linked, and the reader sees what it searched.
@@ -283,6 +287,7 @@ async function callModel(
       const counts = action.sources ? { pages: action.sources.length } : undefined;
       emit({ type: "tool", id: item.id ?? "web", state: "finished", ok, args, counts, ...(ok ? {} : { error: "the search failed" }) });
       webSteps.push({ tool: "web_search", args, ok, counts });
+      usage?.webSearch(ok ? (action.type ?? "search") : "failed");
     };
 
     const answerItems = new Set<string>();
@@ -315,8 +320,10 @@ async function callModel(
         case "response.completed":
         case "response.incomplete":
           finished = event.response as Finished;
+          usage?.add((event.response as { usage?: unknown })?.usage);
           break;
         case "response.failed": {
+          usage?.add((event.response as { usage?: unknown })?.usage);
           const error = (event.response as { error?: { message?: string } })?.error;
           throw new Error(`AI reply failed: ${error?.message ?? "no reason given"}`);
         }
@@ -408,7 +415,7 @@ async function callTool(
 export async function askAgent(history: ChatTurn[], options: AgentOptions = {}): Promise<AgentAnswer> {
   const signal = AbortSignal.any([...(options.signal ? [options.signal] : []), AbortSignal.timeout(TOTAL_MS)]);
   try {
-    return await answer(history, options.storyKey, signal, options.onEvent ?? (() => {}));
+    return await answer(history, options.storyKey, signal, options.onEvent ?? (() => {}), options.usage);
   } catch (err) {
     if (signal.aborted && (signal.reason as Error)?.name === "TimeoutError") {
       throw new AgentTimeout(`No answer within ${TOTAL_MS / 1000}s`);
@@ -417,7 +424,13 @@ export async function askAgent(history: ChatTurn[], options: AgentOptions = {}):
   }
 }
 
-async function answer(history: ChatTurn[], storyKey: string | undefined, signal: AbortSignal, emit: (e: AskEvent) => void): Promise<AgentAnswer> {
+async function answer(
+  history: ChatTurn[],
+  storyKey: string | undefined,
+  signal: AbortSignal,
+  emit: (e: AskEvent) => void,
+  usage?: AskUsage,
+): Promise<AgentAnswer> {
   // Pasted code or an error trace: not a news question, and no need to ask the AI.
   if (looksLikeCode(history.at(-1)!.content)) return { answer: OFF_TOPIC_REPLY, steps: [], complete: false, truncated: false };
 
@@ -463,7 +476,7 @@ async function answer(history: ChatTurn[], storyKey: string | undefined, signal:
     const last = step === MAX_STEPS - 1;
     emit({ type: "status", phase: "thinking", round: step + 1 });
     const guard = new AnswerGuard(known);
-    const reply = await callModel(messages, !last, guard, signal, emit, (urls) => urls.forEach((u) => known.add(u)));
+    const reply = await callModel(messages, !last, guard, signal, emit, (urls) => urls.forEach((u) => known.add(u)), usage);
     steps.push(...reply.webSteps);
     const calls = reply.tool_calls;
 
