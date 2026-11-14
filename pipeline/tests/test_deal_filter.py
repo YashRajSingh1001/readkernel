@@ -38,6 +38,13 @@ def test_sources_used_here_exist():
         "Activision deal: what happens next for Xbox",
         "OpenAI signs chip deals with AMD and Broadcom",
         "Nvidia strikes licensing deal with Groq",
+        "Microsoft signs $10B AI DEAL",
+        "Adobe’s Figma deal collapses",
+        "EU approves Broadcom–VMware deal",
+        "Google signs app deals with Android developers",
+        "Google app deals: what the antitrust ruling means",
+        "Apple shares trade 30% off their peak",
+        "Arm deal values shares 30% off the previous offer",
     ],
 )
 @pytest.mark.parametrize("source", ["TechCrunch", "Bloomberg Technology"])
@@ -50,9 +57,16 @@ def test_deal_news_passes(title, source):
     [
         "Best Black Friday deals on AirPods",
         "Deal: 40% off Kindle",
+        "Deal: AirPods Pro for $169",
+        "DEALS: AirPods Pro, Kindle and more",
+        "Deal: Get 40%-off Kindle today",
+        "App deals: Save on a password manager",
+        "  Deals\u00a0: AirPods Pro for $169",
+        "Deal alerts: AirPods Pro for $169",
         "Today's best deals",
         "Today’s best deals",
         "Today's deals: Pixel 10, Galaxy Buds",
+        "Today’s deals: Pixel 10, Galaxy Buds",
         "Today’s best Android game and app deals",
         "Cyber Monday: Kindle Paperwhite drops to $99",
         "Deal of the day: Anker power bank",
@@ -63,11 +77,12 @@ def test_shopping_posts_dropped_without_per_source_exclude(title, source):
     assert not kept(title, source)
 
 
-def test_cnet_still_drops_plural_and_singular_deal():
-    assert not kept("Grab these deals before they're gone", "CNET")
-    assert not kept("Deal: AirPods Pro for $169", "CNET")
-    # Known trade-off: CNET's per-source "deal" also drops real deal news.
-    assert not kept("Microsoft signs $10B AI deal", "CNET")
+@pytest.mark.parametrize("source", ["CNET", "Gizmodo", "Tom's Hardware", "ZDNET"])
+def test_source_excludes_still_drop_plural_and_singular_deal(source):
+    assert not kept("Grab these deals before they're gone", source)
+    assert not kept("AirPods Pro deal ends tonight", source)
+    # Known trade-off: these sources' per-source "deal" also drops real deal news.
+    assert not kept("Microsoft signs $10B AI deal", source)
 
 
 def test_has_word_does_not_match_plural():
@@ -75,9 +90,10 @@ def test_has_word_does_not_match_plural():
     assert _has_word("Grab these deals", ["deals"])
 
 
-def test_symbol_edged_phrase_matches_after_digit():
-    assert _has_word("Deal: 40% off Kindle", ["% off"])
-    assert not _has_word("Kindle 40% offline sync", ["% off"])
+def test_phrase_symbols_are_literal():
+    assert _has_word("SAVE $20 on Kindle", ["save $20"])
+    assert not _has_word("Save 20 on Kindle", ["save $20"])
+    assert not _has_word("Save $200 on Kindle", ["save $20"])
 
 
 def test_alpha_word_boundaries_unchanged():

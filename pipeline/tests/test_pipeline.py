@@ -29,6 +29,7 @@ def test_sources_file_is_valid():
     sources, exclude = load_sources(PIPELINE_DIR / "sources.yaml")
     assert len(sources) >= 25
     assert "best deals" in exclude and "deal" not in exclude
+    assert "deals" not in exclude
 
 
 def test_clean_text_strips_html():
