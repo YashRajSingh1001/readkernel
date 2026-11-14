@@ -37,9 +37,6 @@ Each morning it turns a few hundred articles into **10 stories** (the brief) plu
 adds **Top articles** from Hacker News and **Company blogs** from 30 engineering teams, and emails
 each subscriber their own version.
 
-It is a **clean-room rebuild** of the *ideas* behind an open-source project called Trace. No code,
-files or prompts were copied; everything here was written from scratch.
-
 Four rules shaped every decision:
 
 | Rule | What it means in practice |
@@ -814,7 +811,6 @@ In the order they happened (October 2026):
 
 | What happened | What we did |
 | --- | --- |
-| Clean-room rebuild of Trace's ideas chosen | Wrote everything from scratch; no Trace files or prompts used. |
 | `create-next-app` left a hidden `.git` inside `web/`, so GitHub showed an empty folder | Removed the inner `.git` and re-added the folder. |
 | Vercel built the project as Python | Set Framework = Next.js and Root Directory = `web`. |
 | Next.js 16 rejected old-style caching settings | Switched to `"use cache"` + `cacheLife`, wrapped URL-reading pages in `Suspense`. |

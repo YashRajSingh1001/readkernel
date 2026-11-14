@@ -43,3 +43,5 @@ next-env.d.ts
 
 # Ask check reports (scripts/ask-check)
 /.ask-runs/
+
+/AGENTS.md
