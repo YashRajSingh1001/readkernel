@@ -8,7 +8,6 @@ export type CachedAnswer = { answer: string; steps: AskStep[] };
 const mode = () => process.env.ASK_CACHE ?? "on";
 
 export function askCacheKey(editionDate: string, question: string, storyKey?: string): string {
-  // Older entries may have been written after a lookup silently failed.
   return `v2|${editionDate}|${storyKey ?? "-"}|${question}`;
 }
 
