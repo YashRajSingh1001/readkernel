@@ -1,13 +1,13 @@
 import "server-only";
 
-import { AnswerGuard, countResult, urlsIn, type AskEvent, type AskStep } from "../ask-stream";
+import { AnswerGuard, countResult, type AskEvent, type AskStep } from "../ask-stream";
+import { packMessages } from "../tool-packing";
 import { NEWS_TOOLS, runTool } from "../tools";
 import type { AskUsage } from "./ai-usage";
 import { looksLikeCode, OFF_TOPIC_MARKER, OFF_TOPIC_REPLY } from "./ask-scope";
 
 const MAX_STEPS = 5;
-const MAX_TOOL_RESULT = 12_000;
-const GROQ_TOOL_RESULT = 4_000;
+const TOOL_BUDGET = { openai: 12_000, groq: 4_000 };
 const MAX_WAIT_S = { openai: 8, groq: 30 };
 const IDLE_MS = 45_000;
 const TOTAL_MS = 120_000;
@@ -21,7 +21,7 @@ type ToolCall = { id: string; type: "function"; function: { name: string; argume
 type Message =
   | { role: "system" | "user"; content: string }
   | { role: "assistant"; content: string | null; tool_calls?: ToolCall[]; items?: unknown[] }
-  | { role: "tool"; tool_call_id: string; content: string };
+  | { role: "tool"; tool_call_id: string; content: string; result?: unknown };
 
 export class AgentUnavailable extends Error {}
 export class AgentTimeout extends Error {}
@@ -353,7 +353,7 @@ const GROQ_TOOLS = NEWS_TOOLS.map((t) => ({
 function toChatMessages(messages: Message[]): unknown[] {
   return messages.map((m) => {
     if (m.role === "assistant") return { role: "assistant", content: m.content ?? "", ...(m.tool_calls?.length ? { tool_calls: m.tool_calls } : {}) };
-    if (m.role === "tool") return { ...m, content: m.content.slice(0, GROQ_TOOL_RESULT) };
+    if (m.role === "tool") return { role: "tool", tool_call_id: m.tool_call_id, content: m.content };
     return m;
   });
 }
@@ -439,16 +439,6 @@ function flush(out: { delta: string; citations: { url: string; label: string }[]
   if (out.delta) emit({ type: "delta", text: out.delta });
 }
 
-function collectCites(value: unknown, into: string[]): void {
-  if (Array.isArray(value)) value.forEach((v) => collectCites(v, into));
-  else if (value && typeof value === "object") {
-    for (const [k, v] of Object.entries(value)) {
-      if (k === "cite" && typeof v === "string") into.push(v);
-      else collectCites(v, into);
-    }
-  }
-}
-
 export function withSources(answer: string, cites: string[]): string {
   if (/\]\(https?:\/\//.test(answer) || cites.length === 0) return answer;
   return `${answer}\n\nSources: ${[...new Set(cites)].slice(0, 5).join(" · ")}`;
@@ -479,11 +469,7 @@ async function callTool(
   }
   const counts = countResult(name, outcome.result);
   emit({ type: "tool", id, state: "finished", ok: true, counts });
-  return {
-    step: { tool: name, args, ok: true, counts },
-    result: outcome.result,
-    content: JSON.stringify(outcome.result).slice(0, MAX_TOOL_RESULT),
-  };
+  return { step: { tool: name, args, ok: true, counts }, result: outcome.result, content: "" };
 }
 
 export async function askAgent(history: ChatTurn[], options: AgentOptions = {}): Promise<AgentAnswer> {
@@ -507,16 +493,8 @@ async function answer(
 ): Promise<AgentAnswer> {
   if (looksLikeCode(history.at(-1)!.content)) return { answer: OFF_TOPIC_REPLY, steps: [], complete: false, truncated: false };
 
-  const known = new Set<string>(history.filter((t) => t.role === "assistant").flatMap((t) => urlsIn(t.content)));
-  const cites: string[] = [];
-  const learn = (content: string, result: unknown) => {
-    const urls = urlsIn(content);
-    urls.forEach((u) => known.add(u));
-    const given = new Set(urls);
-    const found: string[] = [];
-    collectCites(result, found);
-    cites.push(...found.filter((c) => urlsIn(c).every((u) => given.has(u))));
-  };
+  const webUrls = new Set<string>();
+  let cites: string[] = [];
 
   const steps: AgentStep[] = [];
   const messages: Message[] = [];
@@ -528,8 +506,7 @@ async function answer(
     if (used.result && (used.result as { story?: unknown }).story) {
       focused = true;
       const call: ToolCall = { id: "preload_story", type: "function", function: { name: "get_story", arguments: JSON.stringify(args) } };
-      messages.push({ role: "assistant", content: null, tool_calls: [call] }, { role: "tool", tool_call_id: call.id, content: used.content });
-      learn(used.content, used.result);
+      messages.push({ role: "assistant", content: null, tool_calls: [call] }, { role: "tool", tool_call_id: call.id, content: "", result: used.result });
     }
   }
   let provider = firstProvider();
@@ -541,22 +518,28 @@ async function answer(
     signal.throwIfAborted();
     const last = step === MAX_STEPS - 1;
     emit({ type: "status", phase: "thinking", round: step + 1 });
-    let guard = new AnswerGuard(known);
+    const sendTo = (p: Provider) => {
+      const sent = packMessages(messages, TOOL_BUDGET[p]);
+      cites = sent.cites;
+      const guard = new AnswerGuard([...sent.urls, ...(p === "openai" ? webUrls : [])]);
+      return { messages: sent.messages, guard };
+    };
+    let { messages: sent, guard } = sendTo(provider);
     let reply: ModelReply;
     if (provider === "openai") {
       try {
-        reply = await callModel(messages, !last, guard, signal, emit, (urls) => urls.forEach((u) => known.add(u)), usage);
+        reply = await callModel(sent, !last, guard, signal, emit, (urls) => urls.forEach((u) => webUrls.add(u)), usage);
       } catch (err) {
         if (!(err instanceof AgentUnavailable) || signal.aborted || !process.env.GROQ_API_KEY) throw err;
         console.warn(`[ask] OpenAI unavailable (${err.message}); answering with Groq`);
         provider = "groq";
         usage?.switchTo("groq", groqModel(), true);
         messages[0] = { role: "system", content: prompt() };
-        guard = new AnswerGuard(known);
-        reply = await callGroq(messages, !last, guard, signal, emit, usage);
+        ({ messages: sent, guard } = sendTo(provider));
+        reply = await callGroq(sent, !last, guard, signal, emit, usage);
       }
     } else {
-      reply = await callGroq(messages, !last, guard, signal, emit, usage);
+      reply = await callGroq(sent, !last, guard, signal, emit, usage);
     }
     steps.push(...reply.webSteps);
     const calls = reply.tool_calls;
@@ -590,8 +573,7 @@ async function answer(
       }
       const used = await callTool(call.id, call.function.name, args, emit, signal);
       steps.push(used.step);
-      if (used.result !== undefined) learn(used.content, used.result);
-      messages.push({ role: "tool", tool_call_id: call.id, content: used.content });
+      messages.push({ role: "tool", tool_call_id: call.id, content: used.content, result: used.result });
     }
     for (const call of calls.slice(4)) {
       messages.push({ role: "tool", tool_call_id: call.id, content: '{"error":"Too many tools at once; use fewer."}' });
