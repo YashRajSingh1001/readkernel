@@ -1,6 +1,3 @@
-"""Real PostgreSQL/PostgREST tests: put their binaries on PATH and set
-READKERNEL_TEST_POSTGREST=1. Each run creates and destroys its own local cluster.
-"""
 import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
