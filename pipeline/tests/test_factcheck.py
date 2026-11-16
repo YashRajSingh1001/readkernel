@@ -57,10 +57,13 @@ def test_unsupported_claim_is_rewritten_and_the_rewrite_rechecked():
 
 
 def test_a_rewrite_that_fails_again_falls_back_to_the_publishers_words():
-    s = story()
-    counts = fact_check([s], ScriptedLLM({"stories": {"s0": FIX}}, {"stories": {"s0": FIX}}), MemoryCache())
+    s, cache = story(), MemoryCache()
+    counts = fact_check([s], ScriptedLLM({"stories": {"s0": FIX}}, {"stories": {"s0": FIX}}), cache)
     assert counts["fallback"] == 1
     assert s.summary == "Acme raised $5 million from Big Fund." and s.why_it_matters == ""
+    again, llm = story(), ScriptedLLM()
+    assert fact_check([again], llm, cache)["fallback"] == 1
+    assert llm.calls == 0 and again.summary == s.summary
 
 
 def test_a_rewrite_is_never_published_unchecked():
@@ -73,6 +76,7 @@ def test_feed_text_and_no_ai_are_not_checked():
     feed_only = story()
     feed_only.extra["summary_source"] = "feed"
     counts = fact_check([feed_only, story()], None, None)
-    assert counts == {"ok": 0, "fixed": 0, "fallback": 0, "unchecked": 2}
+    assert counts == {"ok": 0, "fixed": 0, "fallback": 1, "unchecked": 1}
+    assert feed_only.extra["fact_check"] == "unchecked"
     llm = ScriptedLLM({"stories": {"s0": {"verdict": "ok"}}})
     assert fact_check([feed_only, story()], llm, None)["unchecked"] == 1
