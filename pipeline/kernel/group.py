@@ -52,7 +52,7 @@ def group_articles(
     n = len(articles)
     upper = np.triu_indices(n, k=1)
     scores = sim[upper]
-    order = np.argsort(-scores)
+    order = np.argsort(-scores, kind="stable")
     sure_pairs: list[tuple[int, int]] = []
     grey_pairs: list[tuple[int, int]] = []
     for idx in order:
@@ -63,13 +63,14 @@ def group_articles(
         (sure_pairs if score >= limits.sure else grey_pairs).append(pair)
 
     confirmed: list[tuple[int, int]] = []
+    rejected: list[tuple[int, int]] = []
     unanswered = grey_pairs
     if llm:
-        confirmed, unanswered = _ask_same_event(articles, grey_pairs[:MAX_AI_PAIRS], llm)
+        confirmed, rejected, unanswered = _ask_same_event(articles, grey_pairs[:MAX_AI_PAIRS], llm)
         unanswered += grey_pairs[MAX_AI_PAIRS:]
     confirmed += _shared_rare_terms(articles, unanswered)
 
-    groups = _Groups(n, sim, limits.maybe)
+    groups = _Groups(n, sim, limits.maybe, rejected)
     for i, j in sure_pairs + confirmed:
         groups.join(i, j)
 
@@ -81,11 +82,12 @@ def group_articles(
 
 
 class _Groups:
-    def __init__(self, n: int, sim: np.ndarray, floor: float):
+    def __init__(self, n: int, sim: np.ndarray, floor: float, cannot_link: list[tuple[int, int]] = ()):
         self.parent = list(range(n))
         self.items = {i: [i] for i in range(n)}
         self.sim = sim
         self.floor = floor
+        self.cannot_link = list(cannot_link)
 
     def find(self, i: int) -> int:
         while self.parent[i] != i:
@@ -100,6 +102,9 @@ class _Groups:
         left, right = self.items[a], self.items[b]
         if self.sim[np.ix_(left, right)].min() < self.floor:
             return
+        for x, y in self.cannot_link:
+            if {self.find(x), self.find(y)} == {a, b}:
+                return
         if len(left) < len(right):
             a, b = b, a
         self.parent[b] = a
@@ -111,8 +116,9 @@ class _Groups:
 
 def _ask_same_event(
     articles: list[Article], pairs: list[tuple[int, int]], llm: LLM
-) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
+) -> tuple[list[tuple[int, int]], list[tuple[int, int]], list[tuple[int, int]]]:
     confirmed: list[tuple[int, int]] = []
+    rejected: list[tuple[int, int]] = []
     unanswered: list[tuple[int, int]] = []
     for start in range(0, len(pairs), AI_BATCH):
         batch = pairs[start : start + AI_BATCH]
@@ -129,9 +135,11 @@ def _ask_same_event(
             answer = answers.get(f"p{k}") if isinstance(answers, dict) else None
             if answer is True:
                 confirmed.append(pair)
-            elif answer is not False:
+            elif answer is False:
+                rejected.append(pair)
+            else:
                 unanswered.append(pair)
-    return confirmed, unanswered
+    return confirmed, rejected, unanswered
 
 
 def _title_terms(title: str) -> set[str]:
