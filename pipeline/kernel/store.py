@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import date, timedelta
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import httpx
 
@@ -24,6 +25,12 @@ class Supabase:
             f"{self.base}/{table}",
             json=rows,
             headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
+        )
+        response.raise_for_status()
+
+    def rpc(self, function: str, params: dict) -> None:
+        response = self.client.post(
+            f"{self.base}/rpc/{function}", json=params, headers={"Prefer": "return=minimal"}
         )
         response.raise_for_status()
 
@@ -94,67 +101,72 @@ def save_files(output: dict, data_dir: Path) -> Path:
     data_dir.mkdir(parents=True, exist_ok=True)
     text = json.dumps(output, indent=2, ensure_ascii=False)
     for name in (f"brief-{output['date']}.json", "latest.json"):
-        (data_dir / name).write_text(text, encoding="utf-8")
+        with NamedTemporaryFile(dir=data_dir, prefix=f".{name}.", suffix=".tmp", delete=False) as file:
+            tmp = Path(file.name)
+        try:
+            tmp.write_text(text, encoding="utf-8")
+            tmp.replace(data_dir / name)
+        finally:
+            tmp.unlink(missing_ok=True)
     return data_dir / "latest.json"
 
 
 def save_supabase(output: dict, db: Supabase) -> None:
     date = output["date"]
-    db.upsert(
-        "editions",
+    edition = {
+        "date": date,
+        "generated_at": output["generated_at"],
+        "ai": output["ai"],
+        "story_count": len(output["stories"]),
+        "stats": output["stats"],
+    }
+    stories = [
         {
-            "date": date,
-            "generated_at": output["generated_at"],
-            "ai": output["ai"],
-            "story_count": len(output["stories"]),
-            "stats": output["stats"],
-        },
-    )
-    db.delete("stories", edition_date=date)
-    db.insert(
-        "stories",
-        [
+            "edition_date": date,
+            "position": i,
+            "brief_position": s.get("brief_position"),
+            "story_key": s.get("story_key"),
+            "headline": s["headline"],
+            "summary": s["summary"],
+            "why_it_matters": s["why_it_matters"],
+            "topic": s["topic"],
+            "score": s["score"],
+            "importance": s["importance"],
+            "published": s["published"],
+            "sources": s["sources"],
+            "image_url": s.get("image_url"),
+            "image_credit": s.get("image_credit"),
+            "kind": s.get("kind") or "news",
+            "thread_id": s.get("thread_id"),
+        }
+        for i, s in enumerate(output.get("feed") or output["stories"], 1)
+    ]
+    discussions = None
+    if "discussions" in output:
+        discussions = [
             {
                 "edition_date": date,
                 "position": i,
-                "brief_position": s.get("brief_position"),
-                "story_key": s.get("story_key"),
-                "headline": s["headline"],
-                "summary": s["summary"],
-                "why_it_matters": s["why_it_matters"],
-                "topic": s["topic"],
-                "score": s["score"],
-                "importance": s["importance"],
-                "published": s["published"],
-                "sources": s["sources"],
-                **{k: s[k] for k in ("image_url", "image_credit", "kind", "thread_id") if k in s},
+                "title": d["title"],
+                "url": d["url"],
+                "comments_url": d.get("comments_url") or None,
+                "source": d["source"],
+                "points": d.get("points"),
+                "comments": d.get("comments"),
+                "summary": d.get("summary") or "",
             }
-            for i, s in enumerate(output.get("feed") or output["stories"], 1)
-        ],
-    )
-    save_story_companies(output, db)
-    if "discussions" in output:
-        db.delete("discussions", edition_date=date)
-        db.insert(
-            "discussions",
-            [
-                {
-                    "edition_date": date,
-                    "position": i,
-                    "title": d["title"],
-                    "url": d["url"],
-                    "comments_url": d.get("comments_url") or None,
-                    "source": d["source"],
-                    "points": d.get("points"),
-                    "comments": d.get("comments"),
-                    "summary": d.get("summary") or "",
-                }
-                for i, d in enumerate(output["discussions"], 1)
-            ],
-        )
+            for i, d in enumerate(output["discussions"], 1)
+        ]
+    companies = story_company_rows(output)
+    db.rpc("replace_edition", {
+        "p_edition": edition,
+        "p_stories": stories,
+        "p_discussions": discussions,
+        "p_companies": companies,
+    })
 
 
-def save_story_companies(output: dict, db: Supabase) -> None:
+def story_company_rows(output: dict) -> list[dict]:
     date = output["date"]
     rows = {
         (s["story_key"], slug(name)): {"edition_date": date, "story_key": s["story_key"], "company": slug(name), "name": name}
@@ -162,11 +174,7 @@ def save_story_companies(output: dict, db: Supabase) -> None:
         if s.get("story_key")
         for name in s.get("companies") or []
     }
-    try:
-        db.delete("story_companies", edition_date=date)
-        db.insert("story_companies", list(rows.values()))
-    except httpx.HTTPError as exc:
-        print(f"    [store] company tags not saved (run db/migrations/007?): {exc}")
+    return list(rows.values())
 
 
 def prune_ask_answers(db: Supabase, today: str, keep_days: int = 3) -> None:

@@ -52,8 +52,8 @@ def test_run_persists_each_story_outcome_and_counts(tmp_path, monkeypatch, capsy
     assert output["feed"][1]["summary"] == ""
     assert json.loads((tmp_path / f"brief-{output['date']}.json").read_text()) == output
 
-    edition = next(json.loads(r.content) for r in requests if r.method == "POST" and r.url.path.endswith("/editions"))
-    saved = next(json.loads(r.content) for r in requests if r.method == "POST" and r.url.path.endswith("/stories"))
+    replaced = next(json.loads(r.content) for r in requests if r.method == "POST" and r.url.path.endswith("/rpc/replace_edition"))
+    edition, saved = replaced["p_edition"], replaced["p_stories"]
     assert edition["stats"] == output["stats"]
     assert edition["stats"]["fact_check_by_story"] == expected
     assert [s["summary"] for s in saved] == [s["summary"] for s in output["feed"]]
