@@ -15,6 +15,7 @@ import {
 } from "./brief";
 import { highlights, isWorthReading, listCompanyPosts, searchCompanyPosts } from "./companies";
 import { COMPANY_CATEGORIES, type CompanyPost } from "./format";
+import { searchArchive } from "./news-search";
 import { siteUrl } from "./site";
 
 type JsonSchema = { type: "object"; properties: Record<string, unknown>; required?: string[]; additionalProperties: false };
@@ -48,18 +49,6 @@ function oneOf(args: Record<string, unknown>, key: string, allowed: string[]): s
 function count(args: Record<string, unknown>, key: string, fallback: number, max: number): number {
   const n = Number(args[key] ?? fallback);
   return Number.isFinite(n) ? Math.min(Math.max(1, Math.round(n)), max) : fallback;
-}
-
-const MAX_SEARCH_ATTEMPTS = 6;
-
-export function broaderQueries(query: string): string[] {
-  if (/["]|(^|\s)-\S/.test(query)) return [query];
-  const words = query.split(/\s+/).filter(Boolean);
-  const tries = [query];
-  let kept = words.filter((w) => !/^[$€£₹]?[\d.,%]+[kmbt]?$/i.test(w));
-  if (kept.length === 0) kept = words;
-  for (let n = kept.length; n >= 1; n--) tries.push(kept.slice(0, n).join(" "));
-  return [...new Set(tries)].slice(0, MAX_SEARCH_ATTEMPTS);
 }
 
 function story(s: Story & { edition_date?: string }, rank?: number) {
@@ -155,19 +144,14 @@ export const NEWS_TOOLS: NewsTool[] = [
       const query = text(args, "query", 100);
       if (!query || query.length < 2) throw new ToolInputError("query needs at least 2 characters");
       const limit = count(args, "limit", 10, 20);
-      for (const attempt of broaderQueries(query)) {
-        const [stories, posts] = await Promise.all([searchStories(attempt, limit), searchCompanyPosts(attempt, 5)]);
-        if (stories.length === 0 && posts.length === 0) continue;
-        return {
-          query,
-          ...(attempt !== query
-            ? { matched_query: attempt, note: `Nothing matched every word of "${query}"; these match "${attempt}".` }
-            : {}),
-          stories: stories.slice(0, limit).map((s) => story(s)),
-          company_blog_posts: posts.map(companyPost),
-        };
-      }
-      return { query, stories: [], company_blog_posts: [] };
+      return searchArchive(
+        query,
+        {
+          stories: async (q) => (await searchStories(q, limit)).slice(0, limit),
+          posts: (q) => searchCompanyPosts(q, 5),
+        },
+        { story: (s) => story(s), post: companyPost },
+      );
     },
   },
   {
@@ -282,7 +266,9 @@ export const NEWS_TOOLS: NewsTool[] = [
 
 export const TOOLS_BY_NAME = new Map(NEWS_TOOLS.map((t) => [t.name, t]));
 
-export async function runTool(name: string, args: unknown): Promise<{ ok: true; result: unknown } | { ok: false; error: string }> {
+export type ToolOutcome = { ok: true; result: unknown } | { ok: false; error: string; unavailable?: true };
+
+export async function runTool(name: string, args: unknown): Promise<ToolOutcome> {
   const tool = TOOLS_BY_NAME.get(name);
   if (!tool) return { ok: false, error: `Unknown tool ${name}` };
   try {
@@ -291,6 +277,6 @@ export async function runTool(name: string, args: unknown): Promise<{ ok: true; 
   } catch (err) {
     if (err instanceof ToolInputError) return { ok: false, error: err.message };
     console.error(`[tools] ${name}`, err);
-    return { ok: false, error: "The news database could not be reached. Try again shortly." };
+    return { ok: false, error: "The news database could not be reached. Try again shortly.", unavailable: true };
   }
 }

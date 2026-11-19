@@ -51,20 +51,33 @@ async function Results({ searchParams }: { searchParams: PageProps<"/search">["s
   const { q } = await searchParams;
   const query = typeof q === "string" ? q.trim() : "";
   const [results, companyResults] =
-    query.length >= 2 ? await Promise.all([searchStories(query), searchCompanyPosts(query)]) : [[], []];
+    query.length >= 2
+      ? await Promise.all([
+          searchStories(query).catch((err) => {
+            console.error("[search] story search failed", err);
+            return null;
+          }),
+          searchCompanyPosts(query).catch((err) => {
+            console.error("[search] company post search failed", err);
+            return null;
+          }),
+        ])
+      : [[], []];
 
   return (
     <>
       <SearchBox q={query} />
       {query.length >= 2 && (
         <p className="mt-6 text-sm text-muted">
-          {results.length === 0
-            ? `No stories match "${query}". Try fewer or different words.`
-            : `${results.length} ${results.length === 1 ? "story" : "stories"} match "${query}", newest first.`}
+          {results === null
+            ? "Story search is unavailable right now. Please try again shortly."
+            : results.length === 0
+              ? `No stories match "${query}". Try fewer or different words.`
+              : `${results.length} ${results.length === 1 ? "story" : "stories"} match "${query}", newest first.`}
         </p>
       )}
       <ul className="mt-4 divide-y divide-line">
-        {results.map((s) => (
+        {results?.map((s) => (
           <li key={`${s.edition_date}-${s.story_key}`} className="py-4">
             <p className="text-xs text-muted">
               {formatDate(s.edition_date)} · {TOPICS[s.topic] ?? s.topic}
@@ -76,7 +89,10 @@ async function Results({ searchParams }: { searchParams: PageProps<"/search">["s
           </li>
         ))}
       </ul>
-      {companyResults.length > 0 && (
+      {companyResults === null && (
+        <p className="mt-6 text-sm text-muted">Company blog search is unavailable right now. Please try again shortly.</p>
+      )}
+      {companyResults !== null && companyResults.length > 0 && (
         <section className="mt-10">
           <h2 className="text-sm font-semibold text-label">From company blogs</h2>
           {companyResults.map((p) => (

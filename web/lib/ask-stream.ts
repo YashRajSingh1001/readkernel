@@ -6,6 +6,7 @@ export type ToolCounts = {
   date?: string;
   matched_query?: string;
   empty?: boolean;
+  unavailable?: boolean;
   pages?: number;
 };
 
@@ -67,9 +68,10 @@ export function countResult(tool: string, result: unknown): ToolCounts {
   if (len(r.timeline) !== undefined) counts.timeline = len(r.timeline);
   if (typeof r.date === "string" && tool !== "search_news") counts.date = r.date;
   if (typeof r.matched_query === "string") counts.matched_query = r.matched_query;
+  if (Object.values(r).some((v) => (v as { unavailable?: unknown } | null)?.unavailable === true)) counts.unavailable = true;
   const found = (counts.stories ?? 0) + (counts.posts ?? 0) + (counts.articles ?? 0);
   if (r.story) counts.stories = 1;
-  else if (found === 0 && (typeof r.message === "string" || counts.stories !== undefined || counts.posts !== undefined)) {
+  else if (found === 0 && !counts.unavailable && (typeof r.message === "string" || counts.stories !== undefined || counts.posts !== undefined)) {
     counts.empty = true;
   }
   return counts;

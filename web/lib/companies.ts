@@ -12,6 +12,11 @@ export const COMPANIES: CompanyInfo[] = list;
 
 const COLUMNS ="url,link,title,company,published,summary,category,depth,score,image_url,hn_points,found_via,added_at";
 
+async function readLocalPosts(): Promise<CompanyPost[]> {
+  const raw = await fs.readFile(path.join(dataDir(), "company_posts.json"), "utf-8");
+  return JSON.parse(raw) as CompanyPost[];
+}
+
 export async function listCompanyPosts(limit = 400): Promise<CompanyPost[]> {
   "use cache";
   cacheLife("minutes");
@@ -19,8 +24,7 @@ export async function listCompanyPosts(limit = 400): Promise<CompanyPost[]> {
     if (supabase()) {
       return await rest<CompanyPost[]>(`company_posts?select=${COLUMNS}&order=published.desc&limit=${limit}`);
     }
-    const raw = await fs.readFile(path.join(dataDir(), "company_posts.json"), "utf-8");
-    return (JSON.parse(raw) as CompanyPost[]).slice(0, limit);
+    return (await readLocalPosts()).slice(0, limit);
   } catch (err) {
     console.error("[companies]", err instanceof Error ? err.message : err);
     return [];
@@ -54,16 +58,12 @@ export async function searchCompanyPosts(query: string, limit = 20): Promise<Com
   const q = query.trim().slice(0, 100);
   if (q.length < 2) return [];
   if (supabase()) {
-    try {
-      return await rest<CompanyPost[]>(
-        `company_posts?select=${COLUMNS}&search=wfts(english).${encodeURIComponent(q)}&order=published.desc&limit=${limit}`,
-      );
-    } catch {
-      return [];
-    }
+    return rest<CompanyPost[]>(
+      `company_posts?select=${COLUMNS}&search=wfts(english).${encodeURIComponent(q)}&order=published.desc&limit=${limit}`,
+    );
   }
   const words = q.toLowerCase().split(/\s+/);
-  return (await listCompanyPosts())
+  return (await readLocalPosts()).slice(0, 400)
     .filter((p) => words.every((w) => `${p.title} ${p.summary} ${p.company}`.toLowerCase().includes(w)))
     .slice(0, limit);
 }
