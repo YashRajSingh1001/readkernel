@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/next";
 import type { Metadata } from "next";
 import { Jost } from "next/font/google";
 
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <SiteHeader />
         <main className="flex-1 py-8 sm:py-10">{children}</main>
         <SiteFooter />
+        <Analytics />
       </body>
     </html>
   );
