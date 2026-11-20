@@ -167,6 +167,9 @@ async function StoryView({ params }: { params: PageProps<"/story/[key]">["params
               </li>
             ))}
           </ul>
+          <Link href={`/feedback?story=${key}`} className="mt-2 inline-block text-sm text-muted hover:text-ink">
+            Report a mistake
+          </Link>
         </section>
 
         {earlier.length > 1 && (
