@@ -2,8 +2,9 @@
 
 import { useActionState } from "react";
 
-import { subscribeAction, type FormState } from "@/app/actions";
+import { subscribeAction } from "@/app/actions";
 import type { Prefs } from "@/lib/personal";
+import type { SignupState } from "@/lib/signup";
 
 type Props = {
   compact?: boolean;
@@ -12,12 +13,25 @@ type Props = {
 };
 
 export function SignupForm({ compact = false, prefs, buttonLabel = "Get the daily brief" }: Props) {
-  const [state, action, pending] = useActionState<FormState, FormData>(subscribeAction, null);
+  const [state, action, pending] = useActionState<SignupState, FormData>(subscribeAction, null);
 
   const form = state?.ok ? (
-    <p role="status" className="text-sm font-medium text-label">
-      {state.message}
-    </p>
+    <div className="text-sm text-label">
+      <div role="status">
+        <p className="font-medium">{state.message}</p>
+        {state.notice && <p className="mt-1 text-muted">{state.notice}</p>}
+      </div>
+      <form action={action} className="mt-2">
+        <input type="hidden" name="email" value={state.email} />
+        <button
+          type="submit"
+          disabled={pending}
+          className="font-semibold underline underline-offset-2 hover:opacity-80 disabled:opacity-60"
+        >
+          {pending ? "Sending…" : "Resend the email"}
+        </button>
+      </form>
+    </div>
   ) : (
     <form action={action} className={`flex flex-col gap-2 ${compact ? "sm:flex-row" : "sm:flex-row sm:rounded-full sm:border sm:border-line sm:bg-card sm:p-1.5 sm:shadow-sm"}`}>
       <label htmlFor={compact ? "signup-email-c" : "signup-email"} className="sr-only">

@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 
 import type { Story } from "@/lib/format";
 import { DEFAULT_PREFS, selectStories, type Prefs } from "@/lib/personal";
+import { CONFIRM_SUBJECT } from "@/lib/signup";
 import { adminRest } from "./admin-db";
 import { renderBrief } from "./brief-email";
 import { isPreviewTransport, sendMail } from "./mailer";
@@ -72,21 +73,23 @@ async function update(id: string, fields: Record<string, unknown>) {
   await adminRest(`subscribers?id=eq.${id}`, { method: "PATCH", body: fields, prefer: "return=minimal" });
 }
 
-export async function subscribe(email: string, prefs?: Prefs): Promise<void> {
+export type SubscribeResult = "sent" | "cooldown" | "already_active";
+
+export async function subscribe(email: string, prefs?: Prefs): Promise<SubscribeResult> {
   const now = new Date();
   const existing = await findBy("email", email);
 
   if (existing) {
     const last = existing.confirm_sent_at ? Date.parse(existing.confirm_sent_at) : 0;
-    if (now.getTime() - last < RESEND_COOLDOWN_MS) return;
+    if (now.getTime() - last < RESEND_COOLDOWN_MS) return "cooldown";
     await update(existing.id, { confirm_sent_at: now.toISOString() });
     if (existing.status === "active") {
       await sendManageLink(email, existing.token);
-      return;
+      return "already_active";
     }
     if (prefs) await update(existing.id, prefsColumns(prefs));
     await sendConfirmation(email, existing.token);
-    return;
+    return "sent";
   }
 
   const token = randomBytes(24).toString("base64url");
@@ -96,6 +99,7 @@ export async function subscribe(email: string, prefs?: Prefs): Promise<void> {
     prefer: "return=minimal",
   });
   await sendConfirmation(email, token);
+  return "sent";
 }
 
 export type ConfirmResult = { status: "confirmed"; briefSent: boolean } | { status: "invalid" };
@@ -239,16 +243,16 @@ function button(href: string, label: string) {
 
 async function sendConfirmation(email: string, token: string) {
   const link = `${await siteUrl()}/confirm?token=${encodeURIComponent(token)}`;
+  const about = "You signed up for the ReadKernel brief, a short email with the most important tech and AI stories.";
+  const ignore = "If you didn't sign up, ignore this email.";
   await sendMail({
     to: email,
-    subject: "Confirm your ReadKernel subscription",
-    text:
-      `Hi! Please confirm you'd like the ReadKernel brief:\n\n${link}\n\n` +
-      `If you didn't sign up, ignore this email and you won't hear from us again.`,
+    subject: CONFIRM_SUBJECT,
+    text: `${about}\n\nConfirm your email address with this link:\n${link}\n\n${ignore}\n`,
     html: shell(
-      `<tr><td style="padding-top:20px;font-size:16px;line-height:1.5;">One click and the day's most important tech and AI stories arrive in your inbox.</td></tr>
-${button(link, "Confirm subscription")}
-<tr><td style="padding-top:24px;font-size:13px;color:#66625a;line-height:1.5;">If you didn't sign up, ignore this email and you won't hear from us again.</td></tr>`,
+      `<tr><td style="padding-top:20px;font-size:16px;line-height:1.5;">${about}</td></tr>
+${button(link, "Confirm my email")}
+<tr><td style="padding-top:24px;font-size:13px;color:#66625a;line-height:1.5;">${ignore}</td></tr>`,
     ),
   });
 }

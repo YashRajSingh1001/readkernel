@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { TOPICS } from "@/lib/format";
 import { parsePrefs, type Prefs } from "@/lib/personal";
+import { signupState, type SignupState } from "@/lib/signup";
 import { adminConfigured } from "@/lib/server/admin-db";
 import { serverUser } from "@/lib/supabase/server";
 import {
@@ -20,8 +21,6 @@ import {
 
 export type FormState = { ok: boolean; message: string } | null;
 
-const SIGNUP_SENT = "Almost done: check your inbox and click the link to confirm. Not there? Check your spam folder.";
-
 function prefsFrom(form: FormData): Prefs | undefined {
   if (!form.has("story_count")) return undefined;
   return parsePrefs(
@@ -36,16 +35,17 @@ function prefsFrom(form: FormData): Prefs | undefined {
   );
 }
 
-export async function subscribeAction(_prev: FormState, form: FormData): Promise<FormState> {
-  if (form.get("company")) return { ok: true, message: SIGNUP_SENT };
+export async function subscribeAction(prev: SignupState, form: FormData): Promise<SignupState> {
+  const raw = String(form.get("email") ?? "");
+  const resend = Boolean(prev?.ok);
+  if (form.get("company")) return signupState(raw.trim(), "sent", resend);
 
-  const email = normaliseEmail(String(form.get("email") ?? ""));
+  const email = normaliseEmail(raw);
   if (!email) return { ok: false, message: "That doesn't look like an email address." };
   if (!adminConfigured()) return { ok: false, message: "Sign-up isn't set up on this server yet." };
 
   try {
-    await subscribe(email, prefsFrom(form));
-    return { ok: true, message: SIGNUP_SENT };
+    return signupState(email, await subscribe(email, prefsFrom(form)), resend);
   } catch (err) {
     console.error("[subscribe]", err);
     return { ok: false, message: "Something went wrong. Please try again in a minute." };
