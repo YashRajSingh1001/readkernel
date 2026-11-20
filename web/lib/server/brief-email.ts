@@ -4,7 +4,6 @@ import { RATINGS } from "@/lib/feedback";
 import { TOPICS, type Story } from "@/lib/format";
 
 const PAPER = "#fbfaf6";
-const CARD = "#ffffff";
 const INK = "#1b1a17";
 const MUTED = "#6b6860";
 const LINE = "#e7e4dc";
@@ -60,7 +59,7 @@ function feedbackHtml(ratings: { label: string; url: string }[]): string {
     .map(
       (r) =>
         `<a href="${esc(r.url)}" style="display:inline-block;margin:8px 6px 0 0;padding:6px 14px;border:1px solid ${LINE};` +
-        `border-radius:999px;background:${CARD};color:${INK};text-decoration:none;font-weight:bold;">${esc(r.label)}</a>`,
+        `border-radius:999px;background:#ffffff;color:${INK};text-decoration:none;font-weight:bold;">${esc(r.label)}</a>`,
     )
     .join("");
   return `

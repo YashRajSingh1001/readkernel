@@ -34,8 +34,6 @@ SERIF = "Georgia, 'Times New Roman', serif"
 SANS = "-apple-system, 'Segoe UI', Arial, sans-serif"
 GOTHIC = "'Century Gothic', CenturyGothic, 'Trebuchet MS', Arial, sans-serif"
 
-RATINGS = (("good", "Nailed it"), ("ok", "Average"), ("bad", "Missed the mark"))
-
 
 def long_date(iso: str) -> str:
     d = date.fromisoformat(iso)
@@ -47,11 +45,6 @@ def links(site_url: str, token: str | None) -> dict[str, str]:
     one_click = f"{site_url}/api/unsubscribe?token={quote(token)}" if token else ""
     manage = f"{site_url}/preferences?token={quote(token)}" if token else f"{site_url}/brief/customize"
     return {"unsubscribe": unsubscribe, "one_click": one_click, "manage": manage}
-
-
-def rating_links(site_url: str, day: str, token: str | None) -> list[tuple[str, str]]:
-    t = f"&t={quote(token)}" if token else ""
-    return [(label, f"{site_url}/feedback?d={day}&r={r}{t}") for r, label in RATINGS]
 
 
 def subject_line(edition: dict) -> str:
@@ -159,6 +152,14 @@ def _alerts_html(alerts: list[dict]) -> str:
   <tr><td style="padding:18px 16px;background:{CARD};border:1px solid {ACCENT};border-radius:10px;">
     <div style="font-family:{SANS};font-size:12px;letter-spacing:1px;text-transform:uppercase;color:{ACCENT};">Your watch alerts</div>{items}
   </td></tr>"""
+
+
+RATINGS = (("good", "Nailed it"), ("ok", "Average"), ("bad", "Missed the mark"))
+
+
+def rating_links(site_url: str, day: str, token: str | None) -> list[tuple[str, str]]:
+    t = f"&t={quote(token)}" if token else ""
+    return [(label, f"{site_url}/feedback?d={day}&r={r}{t}") for r, label in RATINGS]
 
 
 def _feedback_html(question: str, ratings: list[tuple[str, str]]) -> str:
