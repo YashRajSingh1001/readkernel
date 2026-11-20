@@ -15,7 +15,7 @@ export default function PrivacyPage() {
     <Container>
       <p className="text-sm font-semibold text-label">Privacy</p>
       <h1 className="mt-1 text-4xl font-extrabold tracking-tight">Privacy, in plain words</h1>
-      <p className="mt-2 text-xs text-muted">Last updated 18 October 2026</p>
+      <p className="mt-2 text-xs text-muted">Last updated 20 November 2026</p>
 
       <div className="prose-rk mt-8">
         <p>
@@ -52,6 +52,14 @@ export default function PrivacyPage() {
               <td>Your name and email from Google</td>
               <td>Only if you sign in</td>
               <td>To recognise you and link your brief and saved stories</td>
+            </tr>
+            <tr>
+              <td>Page visits: which page (its path only, never the rest of the link), the referring site, and your rough country and device type</td>
+              <td>You open a page</td>
+              <td>
+                To see which pages people read. Counted by Vercel Web Analytics, which sets no cookies and doesn&apos;t
+                identify you
+              </td>
             </tr>
             <tr>
               <td>Saved stories</td>
