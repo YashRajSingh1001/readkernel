@@ -19,6 +19,8 @@ def load_sources(path: Path) -> tuple[list[Source], list[str]]:
                 raise ValueError(f"source #{i + 1} is missing '{key}'")
         if entry["topic"] not in TOPICS:
             raise ValueError(f"{entry['name']}: unknown topic '{entry['topic']}'")
+        if not isinstance(entry.get("explain", False), bool):
+            raise ValueError(f"{entry['name']}: explain must be true or false")
         if entry["url"] in seen_urls:
             raise ValueError(f"{entry['name']}: duplicate url {entry['url']}")
         seen_urls.add(entry["url"])
@@ -29,6 +31,7 @@ def load_sources(path: Path) -> tuple[list[Source], list[str]]:
                 topic=entry["topic"],
                 weight=float(entry.get("weight", 1.0)),
                 exclude=tuple(w.lower() for w in entry.get("exclude") or ()),
+                explain=entry.get("explain", False),
             )
         )
     global_exclude = [w.lower() for w in raw.get("global_exclude") or []]
