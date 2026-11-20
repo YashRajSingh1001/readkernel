@@ -2,7 +2,7 @@ name: Daily brief
 
 on:
   schedule:
-    - cron: "30 4 * * *"
+    - cron: "30 0 * * *" # 00:30 UTC = 06:00 Asia/Kolkata
   workflow_dispatch:
     inputs:
       send_email:
@@ -25,11 +25,21 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: |
-          if [ "${{ github.event_name }}" != "schedule" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if [ "${{ github.event_name }}" != "schedule" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           today=$(TZ=Asia/Kolkata date +%F)
-          found=$(curl -s -H "apikey: $SUPABASE_SECRET_KEY" "$SUPABASE_URL/rest/v1/editions?select=date&date=eq.$today" || true)
-          if echo "$found" | grep -q "\"$today\""; then
-            echo "Today's brief was already built by the 6:15 AM trigger."
+          if ! response=$(curl -fsS -H "apikey: $SUPABASE_SECRET_KEY" "$SUPABASE_URL/rest/v1/editions?select=date&date=eq.$today"); then
+            echo "::error::Could not check whether today's brief exists. Failing closed to avoid a duplicate send."
+            exit 1
+          fi
+          if ! count=$(echo "$response" | jq 'length'); then
+            echo "::error::Unexpected response from editions check. Failing closed."
+            exit 1
+          fi
+          if [ "$count" -gt 0 ]; then
+            echo "Today's brief already exists. Skipping."
             echo "run=false" >> "$GITHUB_OUTPUT"
           else
             echo "run=true" >> "$GITHUB_OUTPUT"
