@@ -5,6 +5,7 @@ import html
 import json
 import re
 import sys
+import time
 import unicodedata
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -27,6 +28,7 @@ MIN_STEPS = 3
 MAX_STEPS = 5
 MIN_QUOTE_WORDS = 4
 MAX_ATTEMPTS = 4
+MODEL_RETRY_SECONDS = 65
 USER_AGENT = "Mozilla/5.0 (compatible; ReadKernel/0.1; +https://readkernel.com)"
 NO_LIMITS = "The source names none."
 NOT_AVAILABLE = "Not available yet"
@@ -76,6 +78,10 @@ class Candidate:
 
 
 class Skip(Exception):
+    pass
+
+
+class ModelUnavailable(Exception):
     pass
 
 
@@ -185,7 +191,11 @@ def draft(candidate: Candidate, text: str, llm: LLM) -> tuple[Draft, int]:
     user = f"Source: {candidate.source_name}\nURL: {candidate.source_url}\n\n<source>\n{prompt_text(text)}\n</source>"
     reply = llm.json(SYSTEM, user, max_tokens=1500)
     if not reply:
-        raise Skip("the model gave no usable reply")
+        print(f"    no reply from {llm}; waiting {MODEL_RETRY_SECONDS}s for its rate limit, then asking again")
+        time.sleep(MODEL_RETRY_SECONDS)
+        reply = llm.json(SYSTEM, user, max_tokens=1500)
+    if not reply:
+        raise ModelUnavailable(f"{llm} gave no usable reply twice")
     try:
         result = Draft(**reply)
     except ValidationError as exc:
@@ -286,7 +296,7 @@ def review_email(row: dict, to: str) -> Message:
     return Message(to=to, subject=f"Explainer draft to check: {row['title']}", html=page, text=text)
 
 
-def run(settings: Settings, db: Supabase | None, llm: LLM, today: date, dry_run: bool) -> dict | None:
+def run(settings: Settings, db: Supabase | None, llm: LLM, today: date) -> dict | None:
     week_of = week_start(today)
     existing = load_existing(db)
     this_week = [e for e in existing if e["week_of"] == week_of.isoformat()]
@@ -347,8 +357,12 @@ def main() -> None:
     llm = make_llm(settings)
     if not llm:
         sys.exit("[explain] an LLM is needed to draft an explainer")
-    row = run(settings, db, llm, datetime.now(settings.timezone).date(), args.dry_run)
-    record_usage(None if args.dry_run else db, llm, "explain")
+    try:
+        row = run(settings, db, llm, datetime.now(settings.timezone).date())
+    except ModelUnavailable as exc:
+        sys.exit(f"[explain] {exc}; no explainer this run")
+    finally:
+        record_usage(None if args.dry_run else db, llm, "explain")
     if not row:
         return
     if args.dry_run:

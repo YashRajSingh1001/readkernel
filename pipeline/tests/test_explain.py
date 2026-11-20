@@ -144,8 +144,60 @@ def test_no_qualifying_story_means_no_explainer(tmp_path):
     (tmp_path / "brief-2026-11-20.json").write_text(json.dumps(brief), encoding="utf-8")
     settings = dataclasses.replace(load_settings(), data_dir=tmp_path)
     llm = FakeLLM(None)
-    assert explain.run(settings, None, llm, date(2026, 11, 20), dry_run=True) is None
+    assert explain.run(settings, None, llm, date(2026, 11, 20)) is None
     assert not hasattr(llm, "user")
+
+
+class RateLimitedLLM:
+    def __init__(self, replies):
+        self.replies = list(replies)
+
+    def json(self, system, user, max_tokens=700):
+        return self.replies.pop(0)
+
+
+def two_candidates(tmp_path, monkeypatch):
+    brief = {"feed": [
+        story("top", 9.0, ("Simon Willison", "https://simonwillison.net/top")),
+        story("lower", 5.0, ("OpenAI News", "https://openai.com/lower")),
+    ]}
+    (tmp_path / "brief-2026-11-20.json").write_text(json.dumps(brief), encoding="utf-8")
+    fetched, waits = [], []
+    monkeypatch.setattr(explain, "fetch_page", lambda client, url: fetched.append(url) or SIMON)
+    monkeypatch.setattr(explain.time, "sleep", waits.append)
+    return dataclasses.replace(load_settings(), data_dir=tmp_path), fetched, waits
+
+
+def test_a_rate_limited_model_waits_and_keeps_the_top_story(tmp_path, monkeypatch):
+    settings, fetched, waits = two_candidates(tmp_path, monkeypatch)
+    llm = RateLimitedLLM([None, reply_with(GOOD)])
+    row = explain.run(settings, None, llm, date(2026, 11, 20))
+    assert row["story_key"] == "top" and row["status"] == "draft" and row["week_of"] == "2026-11-16"
+    assert fetched == ["https://simonwillison.net/top"]
+    assert waits == [explain.MODEL_RETRY_SECONDS]
+
+
+def test_a_model_that_stays_silent_stops_the_run_instead_of_picking_a_lower_story(tmp_path, monkeypatch):
+    settings, fetched, _ = two_candidates(tmp_path, monkeypatch)
+    with pytest.raises(explain.ModelUnavailable):
+        explain.run(settings, None, RateLimitedLLM([None, None]), date(2026, 11, 20))
+    assert fetched == ["https://simonwillison.net/top"]
+
+
+def test_review_email_reaches_the_team_with_the_approve_command(tmp_path):
+    from email import message_from_bytes, policy
+
+    from kernel.mailer import PreviewMailer
+
+    result, _ = draft(CANDIDATE, SIMON, FakeLLM(reply_with(GOOD)))
+    row = explain.to_row(CANDIDATE, result, "how-gpt-6-2-works", date(2026, 11, 16))
+    PreviewMailer("ReadKernel <brief@r.example>", tmp_path).send(explain.review_email(row, "team@r.example"))
+    parsed = message_from_bytes(next(tmp_path.glob("*.eml")).read_bytes(), policy=policy.default)
+    assert parsed["To"] == "team@r.example"
+    assert parsed["Subject"] == "Explainer draft to check: How GPT-6.2 Astra and Sol work and how to try them"
+    text = parsed.get_body(("plain",)).get_content()
+    assert "python -m kernel.explain --approve how-gpt-6-2-works" in text
+    assert GOOD[0] in text
 
 
 def fake_db(handler) -> tuple[Supabase, list[httpx.Request]]:
@@ -163,7 +215,7 @@ def fake_db(handler) -> tuple[Supabase, list[httpx.Request]]:
 def test_a_second_run_in_the_same_week_does_nothing():
     row = {"slug": "how-x-works", "week_of": "2026-11-16", "story_key": "k", "source_url": "u", "status": "draft"}
     db, seen = fake_db(lambda r: httpx.Response(200, json=[row]))
-    assert explain.run(load_settings(), db, FakeLLM(None), date(2026, 11, 20), dry_run=False) is None
+    assert explain.run(load_settings(), db, FakeLLM(None), date(2026, 11, 20)) is None
     assert [r.url.path for r in seen] == ["/rest/v1/explainers"]
 
 
