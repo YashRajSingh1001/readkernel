@@ -239,3 +239,21 @@ def test_approve_unknown_slug_fails():
     db, _ = fake_db(lambda r: httpx.Response(200, json=[]))
     with pytest.raises(LookupError):
         approve(db, "nope")
+
+
+def test_a_rejected_draft_frees_the_week_for_the_next_story(tmp_path, monkeypatch):
+    settings, fetched, _ = two_candidates(tmp_path, monkeypatch)
+    rejected = {"slug": "top-story", "week_of": "2026-11-16", "story_key": "top",
+                "source_url": "https://simonwillison.net/top", "status": "rejected"}
+    monkeypatch.setattr(explain, "load_existing", lambda db: [rejected])
+    row = explain.run(settings, None, FakeLLM(reply_with(GOOD)), date(2026, 11, 20))
+    assert row["story_key"] == "lower"
+    assert fetched == ["https://openai.com/lower"]
+
+
+def test_reject_touches_only_a_draft():
+    db, seen = fake_db(lambda r: httpx.Response(200, json=[{"slug": "how-x-works"}]))
+    explain.reject(db, "how-x-works")
+    assert seen[0].method == "PATCH"
+    assert dict(seen[0].url.params) == {"slug": "eq.how-x-works", "status": "eq.draft"}
+    assert json.loads(seen[0].content) == {"status": "rejected"}

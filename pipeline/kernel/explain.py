@@ -279,6 +279,11 @@ def approve(db: Supabase, slug: str) -> str:
     raise LookupError(f"no explainer with slug {slug}")
 
 
+def reject(db: Supabase, slug: str) -> None:
+    if not db.update("explainers", {"status": "rejected"}, slug=slug, status="draft"):
+        raise LookupError(f"no draft with slug {slug}")
+
+
 def find(db: Supabase, slug: str) -> dict | None:
     if slug:
         return db.select_one("explainers", COLUMNS, slug=slug)
@@ -294,6 +299,8 @@ def review_email(row: dict, to: str) -> Message:
         "",
         "Check each step against its quote and the source, then approve it with:",
         f"  python -m kernel.explain --approve {row['slug']}",
+        "Or turn it down and draft the next story with:",
+        f"  python -m kernel.explain --reject {row['slug']} && python -m kernel.explain",
     ])
     page = f'<pre style="font-family:Menlo,Consolas,monospace;font-size:13px;white-space:pre-wrap;">{html.escape(text)}</pre>'
     return Message(to=to, subject=f"Explainer draft to check: {row['title']}", html=page, text=text)
@@ -302,7 +309,7 @@ def review_email(row: dict, to: str) -> Message:
 def run(settings: Settings, db: Supabase | None, llm: LLM, today: date) -> dict | None:
     week_of = week_start(today)
     existing = load_existing(db)
-    this_week = [e for e in existing if e["week_of"] == week_of.isoformat()]
+    this_week = [e for e in existing if e["week_of"] == week_of.isoformat() and e["status"] != "rejected"]
     if this_week:
         print(f"[explain] week of {week_of} already has {this_week[0]['slug']} ({this_week[0]['status']}); nothing to do")
         return None
@@ -336,6 +343,7 @@ def main() -> None:
     action.add_argument("--dry-run", action="store_true", help="draft and print; save nothing, email nobody")
     action.add_argument("--show", nargs="?", const="", metavar="SLUG", help="print a draft (default: the newest)")
     action.add_argument("--approve", metavar="SLUG", help="publish a draft to readers")
+    action.add_argument("--reject", metavar="SLUG", help="turn a draft down; the next run drafts another story")
     args = parser.parse_args()
 
     settings = load_settings()
@@ -355,6 +363,13 @@ def main() -> None:
             print(f"[explain] {args.approve}: {approve(db, args.approve)}")
         except LookupError as exc:
             sys.exit(f"[explain] {exc}")
+        return
+    if args.reject:
+        try:
+            reject(db, args.reject)
+        except LookupError as exc:
+            sys.exit(f"[explain] {exc}")
+        print(f"[explain] {args.reject}: rejected. Run python -m kernel.explain to draft the next story.")
         return
 
     llm = make_llm(settings)
