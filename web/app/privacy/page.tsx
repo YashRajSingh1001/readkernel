@@ -54,7 +54,7 @@ export default function PrivacyPage() {
               <td>To recognise you and link your brief and saved stories</td>
             </tr>
             <tr>
-              <td>Page visits: which page, the referring site, and your rough country and device type</td>
+              <td>Page visits: which page (its path only, never the rest of the link), the referring site, and your rough country and device type</td>
               <td>You open a page</td>
               <td>
                 To see which pages people read. Counted by Vercel Web Analytics, which sets no cookies and doesn&apos;t
