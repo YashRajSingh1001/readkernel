@@ -34,6 +34,7 @@ class Settings:
     timezone: ZoneInfo
     supabase_url: str
     supabase_secret_key: str
+    supabase_publishable_key: str
     site_url: str
     email_transport: str
     email_from: str
@@ -64,6 +65,7 @@ def load_settings() -> Settings:
         timezone=ZoneInfo(_env("TIMEZONE", "Asia/Kolkata")),
         supabase_url=_env("SUPABASE_URL"),
         supabase_secret_key=_env("SUPABASE_SECRET_KEY"),
+        supabase_publishable_key=_env("SUPABASE_PUBLISHABLE_KEY"),
         site_url=_env("SITE_URL", "http://localhost:3000").rstrip("/"),
         email_transport=_env("EMAIL_TRANSPORT", "preview").lower(),
         email_from=_env("EMAIL_FROM"),

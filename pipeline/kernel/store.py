@@ -51,6 +51,16 @@ class Supabase:
             )
             response.raise_for_status()
 
+    def update(self, table: str, values: dict, **filters: str) -> list[dict]:
+        response = self.client.patch(
+            f"{self.base}/{table}",
+            params={k: f"eq.{v}" for k, v in filters.items()},
+            json=values,
+            headers={"Prefer": "return=representation"},
+        )
+        response.raise_for_status()
+        return response.json()
+
     def delete_before(self, table: str, column: str, before: str) -> None:
         response = self.client.delete(f"{self.base}/{table}", params={column: f"lt.{before}"})
         response.raise_for_status()
