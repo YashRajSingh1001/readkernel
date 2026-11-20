@@ -129,3 +129,62 @@ def test_company_reads_pick_best_new_post_per_company(tmp_path):
     (tmp_path / "company_posts.json").write_text(json.dumps(rows), encoding="utf-8")
     assert [r["title"] for r in load_company_reads(None, tmp_path, weekly=False)] == ["Best"]
     assert [r["title"] for r in load_company_reads(None, tmp_path, weekly=True)] == ["Old", "Netflix"]
+
+
+EXPLAINED = {"slug": "how-sol-works", "title": "How Sol <works>", "what_it_is": "Sol is OpenAI's everyday model."}
+
+
+def test_explained_block_sits_between_stories_and_company_blogs():
+    from kernel.send import personal_edition
+
+    edition = {**EDITION, "feed": EDITION["stories"], "explained": EXPLAINED}
+    weekly = personal_edition(edition, EDITION["stories"], {}, True, [READ])
+    assert ">Explained<" in render(weekly, "https://r.example", "t")[1]
+    daily = personal_edition(edition, [], {}, False, [READ])
+    _, html, text = render(daily, "https://r.example", "t", fmt="headlines")
+    assert "How Sol &lt;works&gt;" in html and "Sol is OpenAI&#x27;s everyday model." in html
+    assert "https://r.example/explained/how-sol-works" in html
+    assert html.index("Second story") < html.index(">Explained<") < html.index("From company blogs")
+    assert "EXPLAINED\n- How Sol <works>\n  Sol is OpenAI's everyday model.\n  https://r.example/explained/how-sol-works" in text
+    assert text.index("Second story") < text.index("EXPLAINED") < text.index("FROM COMPANY BLOGS")
+    _, plain_html, plain_text = render(EDITION, "https://r.example", "t")
+    assert ">Explained<" not in plain_html and "EXPLAINED" not in plain_text
+
+
+def explainer_db(handler):
+    import httpx
+
+    from kernel.store import Supabase
+
+    seen = []
+
+    def record(request):
+        seen.append(request)
+        return handler(request)
+
+    db = Supabase("https://proj.supabase.co", "sb_secret_test")
+    db.client = httpx.Client(transport=httpx.MockTransport(record), headers=db.client.headers)
+    return db, seen
+
+
+def test_sunday_email_gets_the_approved_explainer_and_other_days_do_not():
+    import httpx
+
+    from kernel.send import load_explained
+
+    row = {"slug": "how-sol-works", "title": "How Sol works", "body": {"what_it_is": "Sol is a model.", "steps": []}}
+    db, seen = explainer_db(lambda r: httpx.Response(200, json=[row]))
+    assert load_explained(db, "2026-11-22") == {"slug": "how-sol-works", "title": "How Sol works", "what_it_is": "Sol is a model."}
+    params = dict(seen[0].url.params)
+    assert params["status"] == "eq.approved" and params["approved_at"] == "gte.2026-11-15"
+    assert load_explained(db, "2026-11-21") is None
+    assert len(seen) == 1
+
+
+def test_missing_explainers_table_does_not_stop_the_sunday_email():
+    import httpx
+
+    from kernel.send import load_explained
+
+    db, _ = explainer_db(lambda r: httpx.Response(404, json={"code": "PGRST205"}))
+    assert load_explained(db, "2026-11-22") is None
