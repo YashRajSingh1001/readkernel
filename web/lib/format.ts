@@ -149,10 +149,12 @@ export function faviconUrl(url: string): string {
   return host ? `https://www.google.com/s2/favicons?domain=${host}&sz=64` : "";
 }
 
-export function readingMinutes(stories: Story[]): number {
-  const words = stories.reduce(
-    (n, s) => n + `${s.headline} ${s.summary} ${s.why_it_matters}`.split(/\s+/).length,
-    0,
-  );
-  return Math.max(1, Math.round(words / 220));
+const WORDS_PER_MINUTE = 230;
+
+export function readingMinutes(stories: Story[], format = "summaries"): number {
+  const words = stories.reduce((n, s) => {
+    const text = format === "headlines" ? s.headline : `${s.headline} ${s.summary} ${s.why_it_matters}`;
+    return n + text.split(/\s+/).filter(Boolean).length;
+  }, 0);
+  return Math.max(1, Math.floor((words + WORDS_PER_MINUTE / 2) / WORDS_PER_MINUTE));
 }
