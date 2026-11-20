@@ -33,6 +33,7 @@ ACCENT = "#c2410c"
 SERIF = "Georgia, 'Times New Roman', serif"
 SANS = "-apple-system, 'Segoe UI', Arial, sans-serif"
 GOTHIC = "'Century Gothic', CenturyGothic, 'Trebuchet MS', Arial, sans-serif"
+WORDS_PER_MINUTE = 230
 
 
 def long_date(iso: str) -> str:
@@ -45,6 +46,12 @@ def links(site_url: str, token: str | None) -> dict[str, str]:
     one_click = f"{site_url}/api/unsubscribe?token={quote(token)}" if token else ""
     manage = f"{site_url}/preferences?token={quote(token)}" if token else f"{site_url}/brief/customize"
     return {"unsubscribe": unsubscribe, "one_click": one_click, "manage": manage}
+
+
+def reading_minutes(stories: list[dict], fmt: str) -> int:
+    fields = ("headline",) if fmt == "headlines" else ("headline", "summary", "why_it_matters")
+    words = sum(len((s.get(f) or "").split()) for s in stories for f in fields)
+    return max(1, (words + WORDS_PER_MINUTE // 2) // WORDS_PER_MINUTE)
 
 
 def subject_line(edition: dict) -> str:
@@ -67,8 +74,9 @@ def render(
     label = "This week" if weekly else "Today's brief"
     show_text = fmt != "headlines"
     preheader = " · ".join(s["headline"] for s in stories[1:4])
+    count = f"{len(stories)} stories · about {reading_minutes(stories, fmt)} min read"
 
-    lines = [f"ReadKernel · {label} · {long_date(edition['date'])}", f"{len(stories)} stories", ""]
+    lines = [f"ReadKernel · {label} · {long_date(edition['date'])}", count, ""]
     alerts = edition.get("alerts") or []
     if alerts:
         lines.append("YOUR WATCH ALERTS")
@@ -121,7 +129,7 @@ def render(
       read<strong>kernel</strong><span style="color:{ACCENT};">.</span></a>
     <div style="font-family:{SANS};font-size:14px;font-weight:bold;color:{ACCENT};margin-top:18px;">{label}</div>
     <div style="font-family:{SERIF};font-size:28px;font-weight:bold;color:{INK};margin-top:4px;">{escape(long_date(edition['date']))}</div>
-    <div style="font-family:{SANS};font-size:14px;color:{MUTED};margin-top:6px;">{len(stories)} stories worth your time.</div>
+    <div style="font-family:{SANS};font-size:14px;color:{MUTED};margin-top:6px;">{count}</div>
   </td></tr>
   {cards}
   {_feedback_html(question, ratings)}

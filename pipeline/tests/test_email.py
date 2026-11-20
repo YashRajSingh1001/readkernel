@@ -64,6 +64,19 @@ def test_formats_change_what_the_email_contains():
     assert "https://r.example/preferences?token=t" in plain_html
 
 
+def test_header_shows_reading_time_for_the_words_each_format_shows():
+    _, html, text = render(EDITION, "https://r.example", "t")
+    assert "2 stories · about 1 min read" in html
+    assert text.splitlines()[1] == "2 stories · about 1 min read"
+
+    long_story = dict(EDITION["stories"][0], summary="word " * 680)
+    edition = {**EDITION, "stories": [long_story, EDITION["stories"][1]]}
+    assert "2 stories · about 3 min read" in render(edition, "https://r.example", "t")[1]
+    _, headlines_html, headlines_text = render(edition, "https://r.example", "t", fmt="headlines")
+    assert "2 stories · about 1 min read" in headlines_html
+    assert "2 stories · about 1 min read" in headlines_text
+
+
 def test_weekly_subject_and_label():
     subject, html, _ = render({**EDITION, "weekly": True}, "https://r.example", "t")
     assert subject.startswith("The week in tech:")

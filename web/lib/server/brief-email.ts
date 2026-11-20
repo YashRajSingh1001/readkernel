@@ -1,7 +1,7 @@
 import "server-only";
 
 import { RATINGS } from "@/lib/feedback";
-import { TOPICS, type Story } from "@/lib/format";
+import { TOPICS, readingMinutes, type Story } from "@/lib/format";
 
 const PAPER = "#fbfaf6";
 const INK = "#1b1a17";
@@ -78,8 +78,9 @@ export function renderBrief(edition: BriefEdition, siteUrl: string, token: strin
   const subject = `${stories[0]?.headline ?? "Today's brief"} · ReadKernel ${day} ${month.slice(0, 3)}`;
   const showText = fmt !== "headlines";
   const preheader = stories.slice(1, 4).map((s) => s.headline).join(" · ");
+  const count = `${stories.length} stories · about ${readingMinutes(stories, fmt)} min read`;
 
-  const lines = [`ReadKernel · Today's brief · ${longDate(edition.date)}`, `${stories.length} stories`, ""];
+  const lines = [`ReadKernel · Today's brief · ${longDate(edition.date)}`, count, ""];
   stories.forEach((s, i) => {
     lines.push(`${i + 1}. ${s.headline}  [${topicLabel(s.topic)}]`);
     if (showText && s.summary) lines.push(`   ${s.summary}`);
@@ -115,7 +116,7 @@ export function renderBrief(edition: BriefEdition, siteUrl: string, token: strin
       read<strong>kernel</strong><span style="color:${ACCENT};">.</span></a>
     <div style="font-family:${SANS};font-size:14px;font-weight:bold;color:${ACCENT};margin-top:18px;">Today's brief</div>
     <div style="font-family:${SERIF};font-size:28px;font-weight:bold;color:${INK};margin-top:4px;">${esc(longDate(edition.date))}</div>
-    <div style="font-family:${SANS};font-size:14px;color:${MUTED};margin-top:6px;">${stories.length} stories worth your time.</div>
+    <div style="font-family:${SANS};font-size:14px;color:${MUTED};margin-top:6px;">${esc(count)}</div>
   </td></tr>
   ${cards}
   ${feedbackHtml(ratings)}
