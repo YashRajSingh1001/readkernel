@@ -164,7 +164,10 @@ def week_start(day: date) -> date:
 
 
 def slug_for(title: str, week_of: date, taken: set[str]) -> str:
-    base = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:60].strip("-") or "explainer"
+    base = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    if len(base) > 60:
+        base = base[:61].rsplit("-", 1)[0]
+    base = base or "explainer"
     return base if base not in taken else f"{base}-{week_of.isoformat()}"
 
 

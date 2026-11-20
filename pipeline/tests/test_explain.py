@@ -229,6 +229,12 @@ def test_approve_publishes_only_a_draft():
     assert body["status"] == "approved" and body["approved_at"]
 
 
+def test_slug_ends_on_a_whole_word_and_avoids_taken_slugs():
+    title = "Introducing GPT‑6.2 Astra and Sol for professional and everyday work"
+    assert explain.slug_for(title, date(2026, 11, 16), set()) == "introducing-gpt-6-2-astra-and-sol-for-professional-and"
+    assert explain.slug_for("How Sol works", date(2026, 11, 16), {"how-sol-works"}) == "how-sol-works-2026-11-16"
+
+
 def test_approve_unknown_slug_fails():
     db, _ = fake_db(lambda r: httpx.Response(200, json=[]))
     with pytest.raises(LookupError):
