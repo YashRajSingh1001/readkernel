@@ -10,7 +10,7 @@ export type SignupState =
 export function signupState(email: string, result: SubscribeResult, resend: boolean): SignupState {
   const message =
     `We sent a confirmation link to ${email} in an email from ReadKernel titled "${CONFIRM_SUBJECT}". ` +
-    "Not in your inbox? Check your spam or promotions folder.";
+    "If it isn't in your inbox, check your spam or promotions folder.";
   if (result === "cooldown") return { ok: true, email, message, notice: "We just sent one. You can ask again in a few minutes." };
   return resend ? { ok: true, email, message, notice: "Sent again." } : { ok: true, email, message };
 }
