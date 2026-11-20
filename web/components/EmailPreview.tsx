@@ -7,9 +7,8 @@ export function EmailPreview({ stories, format, date, weekly }: { stories: Story
   const minutes = readingMinutes(stories, format);
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-white text-[#17150f] shadow-sm">
-      <div className="flex items-center justify-between border-b border-[#e6e3dc] px-5 py-3 text-[11px] text-[#66625a]">
+      <div className="flex items-center border-b border-[#e6e3dc] px-5 py-3 text-[11px] text-[#66625a]">
         <span>PREVIEW · {weekly ? "THIS WEEK" : formatDate(date).toUpperCase()}</span>
-        <span>≈ {minutes} min read</span>
       </div>
       <div className="max-h-[70vh] overflow-y-auto px-5 py-5">
         <p className="text-lg">
