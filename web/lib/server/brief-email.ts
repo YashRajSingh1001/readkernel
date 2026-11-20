@@ -1,8 +1,10 @@
 import "server-only";
 
+import { RATINGS } from "@/lib/feedback";
 import { TOPICS, type Story } from "@/lib/format";
 
 const PAPER = "#fbfaf6";
+const CARD = "#ffffff";
 const INK = "#1b1a17";
 const MUTED = "#6b6860";
 const LINE = "#e7e4dc";
@@ -48,6 +50,27 @@ export function briefLinks(siteUrl: string, token: string) {
   };
 }
 
+function ratingLinks(siteUrl: string, date: string, token: string) {
+  const t = encodeURIComponent(token);
+  return Object.entries(RATINGS).map(([r, label]) => ({ label, url: `${siteUrl}/feedback?d=${date}&r=${r}&t=${t}` }));
+}
+
+function feedbackHtml(ratings: { label: string; url: string }[]): string {
+  const buttons = ratings
+    .map(
+      (r) =>
+        `<a href="${esc(r.url)}" style="display:inline-block;margin:8px 6px 0 0;padding:6px 14px;border:1px solid ${LINE};` +
+        `border-radius:999px;background:${CARD};color:${INK};text-decoration:none;font-weight:bold;">${esc(r.label)}</a>`,
+    )
+    .join("");
+  return `
+  <tr><td style="padding:24px 8px 20px 8px;font-family:${SANS};font-size:14px;color:${INK};">
+    <div style="font-family:${SERIF};font-size:18px;font-weight:bold;">How was today's brief?</div>
+    <div>${buttons}</div>
+    <div style="margin-top:12px;font-size:13px;color:${MUTED};">Reply to this email with a story we missed.</div>
+  </td></tr>`;
+}
+
 export function renderBrief(edition: BriefEdition, siteUrl: string, token: string, fmt = "summaries") {
   const { stories } = edition;
   const urls = briefLinks(siteUrl, token);
@@ -65,6 +88,13 @@ export function renderBrief(edition: BriefEdition, siteUrl: string, token: strin
     for (const src of s.sources.slice(0, 4)) lines.push(`   - ${src.name}: ${src.url}`);
     lines.push("");
   });
+  const ratings = ratingLinks(siteUrl, edition.date, token);
+  lines.push(
+    "How was today's brief?",
+    ...ratings.map((r) => `${r.label}: ${r.url}`),
+    "Reply to this email with a story we missed.",
+    "",
+  );
   lines.push(
     `Read on the web: ${dayUrl}`,
     `Change topics, length or format: ${urls.manage}`,
@@ -89,6 +119,7 @@ export function renderBrief(edition: BriefEdition, siteUrl: string, token: strin
     <div style="font-family:${SANS};font-size:14px;color:${MUTED};margin-top:6px;">${stories.length} stories worth your time.</div>
   </td></tr>
   ${cards}
+  ${feedbackHtml(ratings)}
   <tr><td style="padding:24px 8px;border-top:1px solid ${LINE};font-family:${SANS};font-size:12px;line-height:1.6;color:${MUTED};">
     <a href="${esc(dayUrl)}" style="color:${INK};">Read this brief on the web</a><br>
     You're getting this because you subscribed to ReadKernel.

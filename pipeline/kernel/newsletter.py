@@ -34,6 +34,8 @@ SERIF = "Georgia, 'Times New Roman', serif"
 SANS = "-apple-system, 'Segoe UI', Arial, sans-serif"
 GOTHIC = "'Century Gothic', CenturyGothic, 'Trebuchet MS', Arial, sans-serif"
 
+RATINGS = (("good", "Nailed it"), ("ok", "Average"), ("bad", "Missed the mark"))
+
 
 def long_date(iso: str) -> str:
     d = date.fromisoformat(iso)
@@ -45,6 +47,11 @@ def links(site_url: str, token: str | None) -> dict[str, str]:
     one_click = f"{site_url}/api/unsubscribe?token={quote(token)}" if token else ""
     manage = f"{site_url}/preferences?token={quote(token)}" if token else f"{site_url}/brief/customize"
     return {"unsubscribe": unsubscribe, "one_click": one_click, "manage": manage}
+
+
+def rating_links(site_url: str, day: str, token: str | None) -> list[tuple[str, str]]:
+    t = f"&t={quote(token)}" if token else ""
+    return [(label, f"{site_url}/feedback?d={day}&r={r}{t}") for r, label in RATINGS]
 
 
 def subject_line(edition: dict) -> str:
@@ -96,6 +103,9 @@ def render(
                 lines.append(f"  {r['summary']}")
             lines.append(f"  {r['link']}")
         lines += [f"  More: {site_url}/companies", ""]
+    question = f"How was {'this week' if weekly else 'today'}'s brief?"
+    ratings = rating_links(site_url, edition["date"], token)
+    lines += [question, *(f"{label}: {url}" for label, url in ratings), "Reply to this email with a story we missed.", ""]
     lines += [
         f"Read on the web: {day_url}",
         f"Change topics, length or format: {urls['manage']}",
@@ -121,6 +131,7 @@ def render(
     <div style="font-family:{SANS};font-size:14px;color:{MUTED};margin-top:6px;">{len(stories)} stories worth your time.</div>
   </td></tr>
   {cards}
+  {_feedback_html(question, ratings)}
   <tr><td style="padding:24px 8px;border-top:1px solid {LINE};font-family:{SANS};font-size:12px;line-height:1.6;color:{MUTED};">
     <a href="{escape(day_url)}" style="color:{INK};">Read this brief on the web</a><br>
     You're getting this because you subscribed to ReadKernel.
@@ -147,6 +158,20 @@ def _alerts_html(alerts: list[dict]) -> str:
   <tr><td style="height:16px;"></td></tr>
   <tr><td style="padding:18px 16px;background:{CARD};border:1px solid {ACCENT};border-radius:10px;">
     <div style="font-family:{SANS};font-size:12px;letter-spacing:1px;text-transform:uppercase;color:{ACCENT};">Your watch alerts</div>{items}
+  </td></tr>"""
+
+
+def _feedback_html(question: str, ratings: list[tuple[str, str]]) -> str:
+    buttons = "".join(
+        f'<a href="{escape(url)}" style="display:inline-block;margin:8px 6px 0 0;padding:6px 14px;border:1px solid {LINE};'
+        f'border-radius:999px;background:{CARD};color:{INK};text-decoration:none;font-weight:bold;">{escape(label)}</a>'
+        for label, url in ratings
+    )
+    return f"""
+  <tr><td style="padding:24px 8px 20px 8px;font-family:{SANS};font-size:14px;color:{INK};">
+    <div style="font-family:{SERIF};font-size:18px;font-weight:bold;">{escape(question)}</div>
+    <div>{buttons}</div>
+    <div style="margin-top:12px;font-size:13px;color:{MUTED};">Reply to this email with a story we missed.</div>
   </td></tr>"""
 
 
