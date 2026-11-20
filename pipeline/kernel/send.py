@@ -103,6 +103,25 @@ def load_alerts(db: Supabase | None, day: str, weekly: bool) -> dict[str, list[d
     return {k: v[:8] for k, v in alerts.items()}
 
 
+def load_explained(db: Supabase | None, day: str) -> dict | None:
+    today = date.fromisoformat(day)
+    if not db or today.isoweekday() != 7:
+        return None
+    since = (today - timedelta(days=7)).isoformat()
+    try:
+        rows = db.select(
+            "explainers",
+            {"select": "slug,title,body", "status": "eq.approved", "approved_at": f"gte.{since}", "order": "approved_at.desc"},
+        )
+    except httpx.HTTPError as exc:
+        print(f"[send] explainer unavailable: {exc}")
+        return None
+    if not rows:
+        return None
+    row = rows[0]
+    return {"slug": row["slug"], "title": row["title"], "what_it_is": row["body"]["what_it_is"]}
+
+
 def message_for(
     edition: dict, email: str, token: str | None, site_url: str, fmt: str = "summaries"
 ) -> Message:
@@ -159,6 +178,9 @@ def main() -> None:
     alerts = load_alerts(db, day, args.weekly)
     print(f"[send] watch alerts for {len(alerts)} readers")
     print(f"[send] company read: {', '.join(r['title'][:60] for r in company_reads) or 'none new'}")
+    edition["explained"] = load_explained(db, day)
+    if edition["explained"]:
+        print(f"[send] explained: {edition['explained']['title']}")
 
     if args.to:
         mailer = make_mailer(settings)

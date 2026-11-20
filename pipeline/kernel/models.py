@@ -11,6 +11,7 @@ class Source:
     topic: str
     weight: float = 1.0
     exclude: tuple[str, ...] = ()
+    explain: bool = False
 
 
 @dataclass

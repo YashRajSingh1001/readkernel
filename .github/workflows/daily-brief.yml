@@ -88,6 +88,11 @@ jobs:
         continue-on-error: true
         run: python -m kernel.watches
 
+      - name: Weekly explainer draft
+        continue-on-error: true
+        run: |
+          if [ "$(TZ=Asia/Kolkata date +%u)" = "5" ]; then python -m kernel.explain; else echo "Not Friday"; fi
+
       - name: Email subscribers
         if: github.event_name == 'schedule' || inputs.send_email
         run: python -m kernel.send

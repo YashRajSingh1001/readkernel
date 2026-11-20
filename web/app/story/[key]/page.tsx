@@ -21,6 +21,7 @@ import {
   getThread,
   timeAgo,
 } from "@/lib/brief";
+import { getStoryExplainer } from "@/lib/explained";
 import { siteUrl } from "@/lib/site";
 
 export async function generateStaticParams() {
@@ -55,10 +56,11 @@ async function StoryView({ params }: { params: PageProps<"/story/[key]">["params
   const story = await getStory(key);
   if (!story) notFound();
 
-  const [edition, thread, companies] = await Promise.all([
+  const [edition, thread, companies, explainer] = await Promise.all([
     getEdition(story.edition_date),
     story.thread_id ? getThread(story.thread_id) : Promise.resolve([]),
     getStoryCompanies(key, story.edition_date),
+    getStoryExplainer(key),
   ]);
   const related = (edition?.feed ?? [])
     .filter((s) => s.topic === story.topic && s.story_key !== key)
@@ -112,6 +114,16 @@ async function StoryView({ params }: { params: PageProps<"/story/[key]">["params
             <span className="font-medium text-ink">Why it matters: </span>
             {story.why_it_matters}
           </p>
+        )}
+
+        {explainer && (
+          <Link
+            href={`/explained/${explainer.slug}`}
+            className="mt-5 inline-flex items-center gap-2 rounded-full border border-line px-3 py-1 text-sm hover:border-ink"
+          >
+            <span className="font-semibold text-accent">Explained</span>
+            <span>{explainer.title} →</span>
+          </Link>
         )}
 
         {companies.length > 0 && (

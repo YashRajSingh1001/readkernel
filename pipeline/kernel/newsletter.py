@@ -87,6 +87,8 @@ def render(
         for src in s["sources"][:4]:
             lines.append(f"   - {src['name']}: {src['url']}")
         lines.append("")
+    explained = edition.get("explained")
+    lines += _explained_text(explained, site_url)
     reads = edition.get("company_reads") or []
     if reads:
         lines.append("FROM COMPANY BLOGS")
@@ -107,6 +109,7 @@ def render(
     text = "\n".join(lines)
 
     cards = _alerts_html(alerts) + "".join(_story_html(i, s, fmt) for i, s in enumerate(stories, 1))
+    cards += _explained_html(explained, site_url)
     cards += _company_html(reads, site_url)
     html = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -174,6 +177,33 @@ def _feedback_html(question: str, ratings: list[tuple[str, str]]) -> str:
     <div>{buttons}</div>
     <div style="margin-top:12px;font-size:13px;color:{MUTED};">Reply to this email with a story we missed.</div>
   </td></tr>"""
+
+
+def _explained_text(explained: dict | None, site_url: str) -> list[str]:
+    if not explained:
+        return []
+    return [
+        "EXPLAINED",
+        f"- {explained['title']}",
+        f"  {explained['what_it_is']}",
+        f"  {site_url}/explained/{explained['slug']}",
+        "",
+    ]
+
+
+def _explained_html(explained: dict | None, site_url: str) -> str:
+    if not explained:
+        return ""
+    url = f"{site_url}/explained/{explained['slug']}"
+    return f"""
+  <tr><td style="height:16px;"></td></tr>
+  <tr><td style="padding:20px 16px;background:{CARD};border:1px solid {LINE};border-radius:10px;">
+    <div style="font-family:{SANS};font-size:12px;letter-spacing:1px;text-transform:uppercase;color:{ACCENT};">Explained</div>
+    <div style="margin-top:8px;font-family:{SERIF};font-size:18px;line-height:1.3;font-weight:bold;"><a href="{escape(url)}" style="color:{INK};text-decoration:none;">{escape(explained['title'])}</a></div>
+    <p style="margin:6px 0 0 0;font-family:{SANS};font-size:14px;line-height:1.5;color:{INK};">{escape(explained['what_it_is'])}</p>
+    <div style="margin-top:10px;font-family:{SANS};font-size:13px;"><a href="{escape(url)}" style="color:{ACCENT};">How it works and how to try it &rarr;</a></div>
+  </td></tr>
+  <tr><td style="height:8px;"></td></tr>"""
 
 
 def _company_html(reads: list[dict], site_url: str) -> str:

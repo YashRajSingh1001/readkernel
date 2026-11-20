@@ -2,17 +2,19 @@ import type { MetadataRoute } from "next";
 
 import { TOPICS, getLatestEdition, listEditions, listRecentCompanies } from "@/lib/brief";
 import { listEntries } from "@/lib/content";
+import { listExplainers } from "@/lib/explained";
 import { siteUrl } from "@/lib/site";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const site = siteUrl();
-  const [editions, latest, blog, guides, reviews, companies] = await Promise.all([
+  const [editions, latest, blog, guides, reviews, companies, explainers] = await Promise.all([
     listEditions(365),
     getLatestEdition(),
     listEntries("blog"),
     listEntries("guides"),
     listEntries("newsletters"),
     listRecentCompanies(30),
+    listExplainers(),
   ]);
   const updated = latest ? new Date(latest.generated_at) : new Date(0);
 
@@ -35,6 +37,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "never" as const,
       priority: 0.6,
     })),
+    { url: `${site}/explained`, lastModified: explainers[0] ? new Date(explainers[0].approved_at) : updated, priority: 0.6 },
+    ...explainers.map((e) => ({ url: `${site}/explained/${e.slug}`, lastModified: new Date(e.approved_at), priority: 0.6 })),
     ...companies.map((c) => ({ url: `${site}/company/${c.slug}`, lastModified: updated, changeFrequency: "daily" as const, priority: 0.5 })),
     ...(latest?.feed ?? [])
       .filter((s) => s.story_key)
