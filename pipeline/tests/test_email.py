@@ -70,6 +70,25 @@ def test_weekly_subject_and_label():
     assert "This week" in html
 
 
+def test_rating_links_sit_above_the_footer():
+    _, html, text = render(EDITION, "https://r.example", "tok123")
+    for r, label in (("good", "Nailed it"), ("ok", "Average"), ("bad", "Missed the mark")):
+        url = f"https://r.example/feedback?d=2026-10-18&r={r}&t=tok123"
+        assert f"{label}: {url}" in text
+        assert url.replace("&", "&amp;") in html and label in html
+    assert "How was today&#x27;s brief?" in html and "How was today's brief?" in text
+    assert "Reply to this email with a story we missed." in html
+    assert text.index("Reply to this email with a story we missed.") < text.index("Read on the web:")
+    assert html.index("Missed the mark") < html.index("Read this brief on the web")
+
+
+def test_rating_links_without_token_and_for_weekly():
+    _, html, text = render({**EDITION, "weekly": True}, "https://r.example")
+    assert "Nailed it: https://r.example/feedback?d=2026-10-18&r=good\n" in text
+    assert "&t=" not in text
+    assert "How was this week's brief?" in text and "How was this week&#x27;s brief?" in html
+
+
 def test_reply_to_header_when_set(tmp_path):
     mailer = PreviewMailer("ReadKernel <brief@r.example>", tmp_path, reply_to="hello@r.example")
     mailer.send(message_for(EDITION, "a@example.com", "tok", "https://r.example"))

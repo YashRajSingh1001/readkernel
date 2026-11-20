@@ -58,6 +58,11 @@ export default function PrivacyPage() {
               <td>You tap Save</td>
               <td>Kept in your browser; also in your account if you&apos;re signed in</td>
             </tr>
+            <tr>
+              <td>Your rating of a brief, and anything you write in the feedback box</td>
+              <td>You click a rating in an email, or report a mistake on a story</td>
+              <td>To learn what to fix. A rating from an email is linked to your subscription; mistake reports aren&apos;t</td>
+            </tr>
           </tbody>
         </table>
 

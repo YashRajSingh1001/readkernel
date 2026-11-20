@@ -6,6 +6,7 @@ const root = new URL("../../", import.meta.url);
 const stubs = {
   "server-only": "export {};",
   "next/cache": "export function cacheLife() {}",
+  "next/headers": "export async function headers() { return new Headers(); }",
 };
 
 export function resolve(specifier, context, nextResolve) {
