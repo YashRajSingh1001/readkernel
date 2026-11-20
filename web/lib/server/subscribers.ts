@@ -68,6 +68,10 @@ async function findBy(column: "email" | "token", value: string): Promise<Subscri
   return rows[0] ?? null;
 }
 
+export async function subscriberId(token: string): Promise<string | null> {
+  return (await findBy("token", token))?.id ?? null;
+}
+
 async function update(id: string, fields: Record<string, unknown>) {
   await adminRest(`subscribers?id=eq.${id}`, { method: "PATCH", body: fields, prefer: "return=minimal" });
 }
